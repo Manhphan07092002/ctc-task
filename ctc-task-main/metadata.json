@@ -1,0 +1,5 @@
+{
+  "name": "OrangeTask",
+  "description": "A cross-platform daily task management application featuring calendar views, team collaboration, and progress tracking with a vibrant orange-themed UI.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

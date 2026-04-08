@@ -1,0 +1,14 @@
+﻿components/CalendarView.tsx(3,16): error TS2305: Module '"../types"' has no exported member 'CalendarDay'.
+components/MeetingModal.tsx(4,25): error TS2305: Module '"../types"' has no exported member 'MeetingStatus'.
+components/MeetingRoom.tsx(178,25): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+components/MeetingRoom.tsx(178,44): error TS2322: Type 'string' is not assignable to type 'number'.
+components/MeetingRoom.tsx(194,42): error TS2322: Type 'string' is not assignable to type 'number'.
+components/MeetingRoom.tsx(269,31): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+components/MeetingRoom.tsx(269,50): error TS2322: Type 'string' is not assignable to type 'number'.
+components/MeetingRoom.tsx(284,50): error TS2322: Type 'string' is not assignable to type 'number'.
+components/MeetingView.tsx(4,25): error TS2305: Module '"../types"' has no exported member 'MeetingStatus'.
+components/MeetingView.tsx(134,58): error TS2322: Type 'string' is not assignable to type 'number'.
+components/TaskModal.tsx(75,32): error TS2339: Property 'dueDate' does not exist on type 'Task'.
+components/TaskModal.tsx(120,7): error TS2353: Object literal may only specify known properties, and 'dueDate' does not exist in type 'Task'.
