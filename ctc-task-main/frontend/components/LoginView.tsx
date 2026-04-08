@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Layout, ArrowRight, AlertCircle, Sparkles, ShieldCheck, Zap } from 'lucide-react';
+import { Layout, ClipboardCheck, ArrowRight, AlertCircle, Sparkles, ShieldCheck, Zap } from 'lucide-react';
 import { Button, Input } from './UI';
 import { MOCK_USERS } from '../constants';
 
@@ -37,19 +37,17 @@ export const LoginView: React.FC = () => {
       <div className="absolute bottom-[-10%] right-[-5%] w-[35vw] h-[35vw] rounded-full bg-gradient-to-tr from-brand-400/30 to-orange-400/30 blur-[100px] -z-10 mix-blend-multiply pointer-events-none" />
 
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-        
+
         {/* Left Welcome Content (Hidden on small screens) */}
         <div className="hidden lg:flex flex-col justify-center animate-in slide-in-from-left-8 duration-700">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-brand-500 to-brand-400 rounded-[2rem] shadow-2xl shadow-brand-500/40 mb-8 transform -rotate-6 hover:rotate-0 transition-transform duration-500">
-            <Layout size={40} className="text-white drop-shadow-md" />
-          </div>
+          <img src="/logo.png" alt="CTC Task Logo" className="h-20 w-auto object-contain mb-8 drop-shadow-md transform -rotate-2 hover:rotate-0 transition-transform duration-500 mix-blend-multiply" />
           <h1 className="text-6xl font-extrabold text-gray-900 leading-tight tracking-tight mb-6">
             Manage your day, <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-brand-400">the bright way.</span>
           </h1>
           <p className="text-xl text-gray-600 font-medium mb-10 max-w-md leading-relaxed">
-            OrangeTask is the next-generation workspace combining intelligent AI logic with unparalleled aesthetics.
+            CTC Task is the next-generation workspace combining intelligent AI logic with unparalleled aesthetics.
           </p>
-          
+
           <div className="space-y-6">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-2xl bg-white/60 backdrop-blur-md shadow-sm border border-gray-100">
@@ -76,10 +74,8 @@ export const LoginView: React.FC = () => {
         <div className="w-full max-w-md mx-auto relative animate-in slide-in-from-right-8 fade-in duration-700">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-brand-500 to-brand-400 rounded-2xl shadow-xl shadow-brand-500/30 mb-4">
-              <Layout size={32} className="text-white" />
-            </div>
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">OrangeTask</h1>
+            <img src="/logo.png" alt="CTC Task Logo" className="h-16 w-auto object-contain mx-auto mb-4 drop-shadow-md mix-blend-multiply" />
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">CTC Task</h1>
           </div>
 
           <div className="bg-white/70 backdrop-blur-3xl rounded-[2.5rem] shadow-2xl shadow-gray-200/50 border border-white p-8 sm:p-10 relative overflow-hidden">
@@ -88,7 +84,7 @@ export const LoginView: React.FC = () => {
 
             <h2 className="text-2xl font-extrabold text-gray-900 mb-2 relative">Welcome Back</h2>
             <p className="text-sm text-gray-500 mb-8 relative">Please sign in to access your workspace.</p>
-            
+
             <form onSubmit={handleSubmit} className="space-y-5 relative">
               {error && (
                 <div className="p-4 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-600 text-sm rounded-2xl flex items-center gap-3 animate-in shake">
@@ -97,7 +93,7 @@ export const LoginView: React.FC = () => {
                 </div>
               )}
 
-              <Input 
+              <Input
                 label="Email Address"
                 type="email"
                 required
@@ -106,7 +102,7 @@ export const LoginView: React.FC = () => {
                 placeholder="you@company.com"
               />
 
-              <Input 
+              <Input
                 label="Password"
                 type="password"
                 required
@@ -116,13 +112,13 @@ export const LoginView: React.FC = () => {
               />
 
               <div className="pt-2">
-                <Button 
-                  type="submit" 
-                  className="w-full py-4 text-base font-extrabold tracking-wide" 
+                <Button
+                  type="submit"
+                  className="w-full py-4 text-base font-extrabold tracking-wide"
                   size="lg"
                   disabled={isLoading}
                 >
-                {isLoading ? 'Signing in...' : 'Sign In'} {!isLoading && <ArrowRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />}
+                  {isLoading ? 'Signing in...' : 'Sign In'} {!isLoading && <ArrowRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform" />}
                 </Button>
               </div>
             </form>
@@ -145,7 +141,7 @@ export const LoginView: React.FC = () => {
                       <p className="text-xs font-medium text-gray-500 group-hover:text-brand-600 transition-colors">{u.role}</p>
                     </div>
                     <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                       <ArrowRight size={14} className="text-brand-500" />
+                      <ArrowRight size={14} className="text-brand-500" />
                     </div>
                   </button>
                 ))}

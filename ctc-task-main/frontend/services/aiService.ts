@@ -129,7 +129,7 @@ export const createChatSession = () => {
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: {
-      systemInstruction: "You are OrangeBot, a helpful, energetic productivity assistant for the OrangeTask app. Your answers should be concise, encouraging, and formatted with Markdown. You help users organize their day and answer general questions.",
+      systemInstruction: "You are CTCBot, a helpful, energetic productivity assistant for the CTC Task app. Your answers should be concise, encouraging, and formatted with Markdown. You help users organize their day and answer general questions.",
     }
   });
 };
