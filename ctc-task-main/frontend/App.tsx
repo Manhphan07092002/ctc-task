@@ -32,6 +32,7 @@ import { TaskSuggestionModal } from './components/TaskSuggestionModal';
 import { MeetingView } from './components/MeetingView';
 import { MeetingModal } from './components/MeetingModal';
 import { MeetingRoom } from './components/MeetingRoom';
+import { JoinMeetingPage } from './pages/JoinMeetingPage';
 import { AIAssistant, AIAssistantHandle } from './components/AIAssistant';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAuth } from './contexts/AuthContext';
@@ -343,6 +344,7 @@ export default function CTCTaskApp() {
               } />
 
               <Route path="/meetings" element={<MeetingView allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
+              <Route path="/meetings/join/:meetingId" element={<JoinMeetingPage onJoinMeeting={setActiveMeeting} />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

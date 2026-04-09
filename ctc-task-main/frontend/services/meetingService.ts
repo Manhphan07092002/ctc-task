@@ -51,6 +51,17 @@ export const saveMeeting = async (meeting: Meeting): Promise<void> => {
   }
 };
 
+export const getMeetingById = async (meetingId: string): Promise<Meeting | null> => {
+  try {
+    const response = await fetch(`${API_BASE}/meetings/${meetingId}`);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching meeting by id:', error);
+    return null;
+  }
+};
+
 export const deleteMeeting = async (meetingId: string): Promise<void> => {
   try {
     const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Video, Plus, Calendar, Clock, Users, Trash2, ExternalLink, Zap } from 'lucide-react';
+import { Video, Plus, Calendar, Clock, Users, Trash2, ExternalLink, Zap, Link2, Check } from 'lucide-react';
 import { Meeting, User } from '../types';
 import { subscribeToMeetings, deleteMeeting, saveMeeting, sendSignal } from '../services/meetingService';
 import { Button, Card, Avatar } from './UI';
@@ -15,6 +15,7 @@ interface MeetingViewProps {
 
 export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreateMeeting, allUsers }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const { user } = useAuth();
   const { t, language } = useLanguage();
 
@@ -61,6 +62,14 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
 
     await saveMeeting(newMeeting);
     onJoinMeeting(newMeeting);
+  };
+
+  const handleCopyLink = (meetingId: string) => {
+    const url = `${window.location.origin}/meetings/join/${meetingId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(meetingId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   return (
@@ -147,15 +156,29 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
                       </div>
                     )}
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex items-center gap-2"
-                    onClick={() => onJoinMeeting(meeting)}
-                  >
-                    <ExternalLink size={14} />
-                    {t('join')}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      id={`copy-link-${meeting.id}`}
+                      title={language === 'vi' ? 'Sao chép liên kết phòng' : 'Copy room link'}
+                      onClick={() => handleCopyLink(meeting.id)}
+                      className={`p-2 rounded-lg border transition-all duration-200 ${
+                        copiedId === meeting.id
+                          ? 'bg-green-50 border-green-200 text-green-600'
+                          : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-600'
+                      }`}
+                    >
+                      {copiedId === meeting.id ? <Check size={14} /> : <Link2 size={14} />}
+                    </button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex items-center gap-2"
+                      onClick={() => onJoinMeeting(meeting)}
+                    >
+                      <ExternalLink size={14} />
+                      {t('join')}
+                    </Button>
+                  </div>
                 </div>
               </div>
           ))
