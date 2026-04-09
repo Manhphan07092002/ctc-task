@@ -231,8 +231,8 @@ export default function CTCTaskApp() {
           setNotification={setNotification}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8">
-          <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 lg:p-8 flex flex-col">
+          <div className="w-full flex-1 space-y-8">
             <Routes>
               <Route path="/" element={
                  <DashboardPage
