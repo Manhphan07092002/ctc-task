@@ -395,7 +395,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                   onChange={(e) => setPriority(e.target.value as TaskPriority)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white disabled:bg-gray-50 disabled:text-gray-500"
                 >
-                  {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                  {Object.values(TaskPriority).map(p => <option key={p} value={p}>{t(p)}</option>)}
                 </select>
               </div>
                <div>
@@ -406,7 +406,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                     onChange={(e) => setStatus(e.target.value as TaskStatus)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white disabled:bg-gray-50 disabled:text-gray-500"
                   >
-                    {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                    {Object.values(TaskStatus).map(s => <option key={s} value={s}>{t(s)}</option>)}
                   </select>
                </div>
             </div>
@@ -422,7 +422,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                   onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white appearance-none disabled:bg-gray-50 disabled:text-gray-500"
                 >
-                  {Object.values(RecurrenceType).map(r => <option key={r} value={r}>{r}</option>)}
+                  {Object.values(RecurrenceType).map(r => <option key={r} value={r}>{t(r)}</option>)}
                 </select>
               </div>
             </div>
@@ -509,7 +509,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubtask())}
-                    placeholder="Add an item..."
+                    placeholder={t('addAnItem')}
                     className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-400 outline-none"
                   />
                   <Button type="button" size="sm" variant="secondary" onClick={addSubtask} disabled={!newSubtaskTitle.trim()}>
@@ -550,7 +550,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                 ))}
               </div>
               {assignableUsers.length === 0 && (
-                <p className="text-xs text-gray-400 italic">No eligible users to assign.</p>
+                <p className="text-xs text-gray-400 italic">{t('noEligibleUsers')}</p>
               )}
             </div>
           </form>
@@ -567,7 +567,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {comments.length === 0 ? (
                 <div className="text-center text-gray-400 text-sm py-8 italic">
-                  No comments yet.
+                  {t('noCommentsYet')}
                 </div>
               ) : (
                 comments.map(comment => {
@@ -597,7 +597,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
               {/* Mention Suggestion Popover */}
               {mentionQuery !== null && filteredUsers.length > 0 && (
                 <div className="absolute bottom-full left-4 mb-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
-                  <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">Suggested Members</div>
+                  <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">{t('suggestedMembers')}</div>
                   {filteredUsers.map(u => (
                     <button
                       key={u.id}
@@ -645,7 +645,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
         <div className="flex justify-between items-center px-8 py-5 border-t border-gray-100/50 bg-transparent">
           <div className="text-xs text-gray-400 pl-2">
             {creator && (
-              <span>Created by <span className="font-medium text-gray-600">{creator.name}</span> ({initialTask?.department})</span>
+              <span>{t('createdBy')} <span className="font-medium text-gray-600">{creator.name}</span> ({initialTask?.department})</span>
             )}
           </div>
           <div className="flex gap-3">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Video, Plus, Calendar, Clock, Users, Trash2, ExternalLink, Zap } from 'lucide-react';
 import { Meeting, User } from '../types';
-import { subscribeToMeetings, deleteMeeting, saveMeeting } from '../services/meetingService';
+import { subscribeToMeetings, deleteMeeting, saveMeeting, sendSignal } from '../services/meetingService';
 import { Button, Card, Avatar } from './UI';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -95,7 +95,18 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
                 <h3 className="text-lg font-bold text-gray-900 truncate pr-8">{meeting.title}</h3>
                 {user?.id === meeting.hostId && (
                   <button 
-                    onClick={() => deleteMeeting(meeting.id)}
+                    onClick={async () => {
+                      if (window.confirm(language === 'vi' ? 'Bạn có chắc chắn muốn xóa phòng này? Mọi người đang trong phòng sẽ bị đẩy ra ngoài.' : 'Are you sure you want to delete this room? Everyone inside will be kicked out.')) {
+                        await sendSignal(meeting.id, {
+                          id: Math.random().toString(36).substring(2),
+                          from: user?.id || 'system',
+                          to: 'all',
+                          type: 'meeting_deleted',
+                          data: {}
+                        });
+                        deleteMeeting(meeting.id);
+                      }
+                    }}
                     className="text-gray-400 hover:text-red-500 p-1 transition-colors"
                   >
                     <Trash2 size={18} />

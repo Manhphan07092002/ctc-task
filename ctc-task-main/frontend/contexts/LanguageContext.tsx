@@ -118,6 +118,23 @@ const translations = {
     confirmDeleteNote: 'Are you sure you want to delete this note?',
     confirmDeleteUser: 'Are you sure you want to remove this user from the team?',
     cannotDeleteSelf: 'You cannot delete your own account.',
+    // Enums
+    'Low': 'Low',
+    'Medium': 'Medium',
+    'High': 'High',
+    'Todo': 'Todo',
+    'In Progress': 'In Progress',
+    'Done': 'Done',
+    'None': 'None',
+    'Daily': 'Daily',
+    'Weekly': 'Weekly',
+    'Monthly': 'Monthly',
+    // Modal UI
+    addAnItem: 'Add an item...',
+    noEligibleUsers: 'No eligible users to assign.',
+    noCommentsYet: 'No comments yet.',
+    suggestedMembers: 'Suggested Members',
+    createdBy: 'Created by',
   },
   vi: {
     // Navigation
@@ -227,6 +244,23 @@ const translations = {
     confirmDeleteNote: 'Bạn có chắc chắn muốn xóa ghi chú này?',
     confirmDeleteUser: 'Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?',
     cannotDeleteSelf: 'Bạn không thể xóa tài khoản của chính mình.',
+    // Enums
+    'Low': 'Thấp',
+    'Medium': 'Trung bình',
+    'High': 'Cao',
+    'Todo': 'Cần làm',
+    'In Progress': 'Đang làm',
+    'Done': 'Hoàn thành',
+    'None': 'Không lặp lại',
+    'Daily': 'Hằng ngày',
+    'Weekly': 'Hằng tuần',
+    'Monthly': 'Hằng tháng',
+    // Modal UI
+    addAnItem: 'Thêm mục mới...',
+    noEligibleUsers: 'Không có người dùng phù hợp để giao việc.',
+    noCommentsYet: 'Chưa có bình luận nào.',
+    suggestedMembers: 'Thành viên đề xuất',
+    createdBy: 'Tạo bởi',
   }
 };
 

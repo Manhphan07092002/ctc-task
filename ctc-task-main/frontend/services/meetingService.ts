@@ -20,7 +20,7 @@ export const subscribeToMeetings = (callback: (meetings: Meeting[]) => void) => 
     if (!isSubscribed) return;
     const meetings = await getMeetings();
     callback(meetings);
-    setTimeout(poll, 3000); // Poll every 3 seconds
+    setTimeout(poll, 1500); // Poll every 1.5 seconds for near-realtime updates
   };
 
   poll();
@@ -78,7 +78,8 @@ export const sendSignal = async (meetingId: string, signal: any): Promise<void> 
 
 export const subscribeToSignals = (meetingId: string, callback: (signals: any[]) => void) => {
   let isSubscribed = true;
-  let lastTimestamp = Date.now();
+  let lastTimestamp = 0;
+  let isFirstFetch = true;
   
   const poll = async () => {
     if (!isSubscribed) return;
@@ -86,15 +87,24 @@ export const subscribeToSignals = (meetingId: string, callback: (signals: any[])
       const response = await fetch(`${API_BASE}/meetings/${meetingId}/signals?since=${lastTimestamp}`);
       if (response.ok) {
         const signals = await response.json();
+        
         if (signals.length > 0) {
           lastTimestamp = Math.max(...signals.map((s: any) => s.timestamp));
-          callback(signals);
+          
+          if (isFirstFetch) {
+            // For the first fetch, we mark signals as historical so the UI doesn't initiate new WebRTC offers for old joins
+            const historicalSignals = signals.map((s: any) => ({ ...s, isHistorical: true }));
+            callback(historicalSignals);
+          } else {
+            callback(signals);
+          }
         }
+        isFirstFetch = false;
       }
     } catch (error) {
       console.error('Error polling signals:', error);
     }
-    setTimeout(poll, 1000); // Poll signals more frequently (every 1 second)
+    setTimeout(poll, 1000);
   };
 
   poll();

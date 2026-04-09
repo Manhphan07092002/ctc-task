@@ -11,7 +11,7 @@ import { Button, Avatar, Card } from './UI';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { subscribeToSignals, sendSignal } from '../services/meetingService';
+import { subscribeToSignals, sendSignal, saveMeeting } from '../services/meetingService';
 
 interface MeetingRoomProps {
   meeting: Meeting;
@@ -19,9 +19,63 @@ interface MeetingRoomProps {
   allUsers: User[];
 }
 
+function useAudioLevel(stream: MediaStream | null | undefined, isMuted: boolean) {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  useEffect(() => {
+    if (!stream || isMuted || stream.getAudioTracks().length === 0) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    let audioContext: AudioContext;
+    try {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch (e) {
+      return;
+    }
+
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.4;
+    
+    let source: MediaStreamAudioSourceNode;
+    try {
+       source = audioContext.createMediaStreamSource(stream);
+       source.connect(analyser); 
+    } catch (e) {
+       return;
+    }
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const checkInterval = setInterval(() => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += dataArray[i];
+      }
+      const average = sum / dataArray.length;
+      setIsSpeaking(average > 15);
+    }, 150);
+
+    return () => {
+      clearInterval(checkInterval);
+      try { source.disconnect(); } catch(e){}
+      if (audioContext.state !== 'closed') audioContext.close();
+    };
+  }, [stream, isMuted]);
+
+  return isSpeaking;
+}
+
+const AudioSpeakerWrapper = ({ stream, isMuted, children, containerClass }: {stream: MediaStream | null | undefined, isMuted: boolean, children: any, containerClass: (isSpeaking: boolean) => string}) => {
+  const isSpeaking = useAudioLevel(stream, isMuted);
+  return <div className={containerClass(isSpeaking)}>{children}</div>;
+};
+
 export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allUsers }) => {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [showChat, setShowChat] = useState(false);
@@ -29,10 +83,41 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
   const [messages, setMessages] = useState<{id: string, user: string, text: string, time: string}[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [remoteStatuses, setRemoteStatuses] = useState<Record<string, {isMicOn: boolean, isCamOn: boolean}>>({});
+  const [remoteStatuses, setRemoteStatuses] = useState<Record<string, {isMicOn: boolean, isCamOn: boolean, isHandRaised?: boolean, isSharingScreen?: boolean}>>({});
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [isHandRaised, setIsHandRaised] = useState(false);
+  const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
+  const [activeReactions, setActiveReactions] = useState<{id: string, userId: string, emoji: string}[]>([]);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const peersRef = useRef<Record<string, RTCPeerConnection>>({});
+  const statusRef = useRef({ isMicOn: true, isCamOn: true, isHandRaised: false, isSharingScreen: false });
+  const isSharingRef = useRef(false);
+
+  useEffect(() => {
+    isSharingRef.current = isSharingScreen;
+    statusRef.current = { isMicOn, isCamOn, isHandRaised, isSharingScreen };
+  }, [isMicOn, isCamOn, isHandRaised, isSharingScreen]);
+
+  useEffect(() => {
+    if (!user) return;
+    // Use existing PUT endpoint: fetch current state first then update atomically
+    fetch(`/api/meetings/${meeting.id}`)
+      .then(r => r.json())
+      .then(data => {
+        const parts: string[] = data.participants || [];
+        if (!parts.includes(user.id)) {
+          fetch(`/api/meetings/${meeting.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...data, participants: [...parts, user.id] }),
+          }).catch(e=>{});
+        }
+      }).catch(e=>{});
+  }, [user, meeting.id]);
 
   useEffect(() => {
     const startStream = async () => {
@@ -56,6 +141,39 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      Object.values(peersRef.current).forEach(peer => peer.close());
+
+      if (user) {
+        // Run in background without awaiting, best effort to notify others we left
+        fetch(`/api/meetings/${meeting.id}/signals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: Math.random().toString(36).substring(2),
+            from: user.id,
+            to: 'all',
+            type: 'user_left',
+            data: {}
+          }),
+          keepalive: true
+        }).catch(e => {});
+
+        // Safely remove self from DB participants array via existing PUT endpoint
+        fetch(`/api/meetings/${meeting.id}`, { keepalive: true })
+          .then(r => r.json())
+          .then(data => {
+            const parts: string[] = (data.participants || []).filter((p: string) => p !== user.id);
+            fetch(`/api/meetings/${meeting.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...data, participants: parts }),
+              keepalive: true
+            });
+          }).catch(e=>{});
+      }
     };
   }, []);
 
@@ -72,29 +190,127 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
         from: user.id,
         to: 'all',
         type: 'status_update',
-        data: { isMicOn, isCamOn }
+        data: { isMicOn, isCamOn, isHandRaised, isSharingScreen }
       });
     }
-  }, [isMicOn, isCamOn, user, meeting.id]);
+  }, [isMicOn, isCamOn, isHandRaised, isSharingScreen, user, meeting.id]);
 
   // Subscribe to signals
   useEffect(() => {
     if (!user) return;
 
+    const createPeer = (userId: string, isInitiator: boolean) => {
+      if (peersRef.current[userId]) return peersRef.current[userId]; // already exists
+      
+      const peer = new RTCPeerConnection({
+         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      
+      peersRef.current[userId] = peer;
+  
+      if (streamRef.current) {
+         const videoTrack = isSharingRef.current && screenStreamRef.current 
+            ? screenStreamRef.current.getVideoTracks()[0] 
+            : streamRef.current.getVideoTracks()[0];
+         const audioTrack = streamRef.current.getAudioTracks()[0];
+
+         if (videoTrack) peer.addTrack(videoTrack, streamRef.current);
+         if (audioTrack) peer.addTrack(audioTrack, streamRef.current);
+      }
+  
+      peer.onicecandidate = (e) => {
+         if (e.candidate) {
+            sendSignal(meeting.id, { from: user.id, to: userId, type: 'webrtc_candidate', data: e.candidate });
+         }
+      };
+  
+      peer.ontrack = (e) => {
+         setRemoteStreams(prev => ({ ...prev, [userId]: e.streams[0] }));
+      };
+  
+      if (isInitiator) {
+         peer.createOffer().then(offer => {
+            peer.setLocalDescription(offer);
+            sendSignal(meeting.id, { from: user.id, to: userId, type: 'webrtc_offer', data: offer });
+         });
+      }
+  
+      return peer;
+    };
+
+    // Broadcast that we just joined so others initiate connections to us
+    sendSignal(meeting.id, {
+      from: user.id,
+      to: 'all',
+      type: 'user_joined',
+      data: { isMicOn, isCamOn } 
+    });
+
     const unsubscribe = subscribeToSignals(meeting.id, (signals) => {
       signals.forEach(signal => {
         if (signal.from === user.id) return; // Ignore own signals
+        if (signal.to !== 'all' && signal.to !== user.id) return; // Ignore signals meant for others
 
         if (signal.type === 'chat_message') {
           setMessages(prev => {
             if (prev.some(m => m.id === signal.id)) return prev;
             return [...prev, signal.data];
           });
+        } else if (signal.type === 'reaction') {
+          const reaction = { id: Math.random().toString(), userId: signal.from, emoji: signal.data };
+          setActiveReactions(prev => [...prev, reaction]);
+          setTimeout(() => {
+             setActiveReactions(prev => prev.filter(r => r.id !== reaction.id));
+          }, 3000);
         } else if (signal.type === 'status_update') {
-          setRemoteStatuses(prev => ({
-            ...prev,
-            [signal.from]: signal.data
-          }));
+          if (!signal.isHistorical) {
+            setRemoteStatuses(prev => ({ ...prev, [signal.from]: signal.data }));
+          }
+        } else if (signal.type === 'user_joined') {
+          if (!signal.isHistorical) {
+            setRemoteStatuses(prev => ({ ...prev, [signal.from]: signal.data }));
+            createPeer(signal.from, true); // Initiate connection to the new user
+
+            // Introduce ourselves back to the new user so they know our status
+            sendSignal(meeting.id, {
+              from: user.id,
+              to: signal.from,
+              type: 'status_update',
+              data: statusRef.current
+            });
+          }
+        } else if (signal.type === 'user_left') {
+          if (!signal.isHistorical) {
+            setRemoteStatuses(prev => { const n = {...prev}; delete n[signal.from]; return n; });
+            setRemoteStreams(prev => { const n = {...prev}; delete n[signal.from]; return n; });
+            if (peersRef.current[signal.from]) {
+              peersRef.current[signal.from].close();
+              delete peersRef.current[signal.from];
+            }
+          }
+        } else if (signal.type === 'meeting_deleted') {
+          if (!signal.isHistorical) {
+            alert(language === 'vi' ? 'Chủ phòng đã kết thúc và xóa phòng họp này. Bạn sẽ được đưa ra ngoài.' : 'The host has ended and deleted this meeting. You will be removed.');
+            onLeave();
+          }
+        } else if (signal.type === 'webrtc_offer' && !signal.isHistorical) {
+          const peer = createPeer(signal.from, false);
+          peer.setRemoteDescription(new RTCSessionDescription(signal.data));
+          peer.createAnswer().then(answer => {
+            peer.setLocalDescription(answer);
+            sendSignal(meeting.id, { from: user.id, to: signal.from, type: 'webrtc_answer', data: answer });
+          });
+        } else if (signal.type === 'force_mute') {
+          if (!signal.isHistorical) {
+            if (signal.data === 'mic') setIsMicOn(false);
+            if (signal.data === 'cam') setIsCamOn(false);
+          }
+        } else if (signal.type === 'webrtc_answer' && !signal.isHistorical) {
+          const peer = peersRef.current[signal.from];
+          if (peer) peer.setRemoteDescription(new RTCSessionDescription(signal.data));
+        } else if (signal.type === 'webrtc_candidate' && !signal.isHistorical) {
+          const peer = peersRef.current[signal.from];
+          if (peer) peer.addIceCandidate(new RTCIceCandidate(signal.data));
         }
       });
     });
@@ -135,6 +351,113 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
     setIsFullScreen(!isFullScreen);
   };
 
+  const toggleScreenShare = async () => {
+    try {
+      if (!isSharingScreen) {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        screenStreamRef.current = displayStream;
+        const screenTrack = displayStream.getVideoTracks()[0];
+
+        // Replace track in all peers
+        Object.values(peersRef.current).forEach(peer => {
+          const sender = peer.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(screenTrack).catch(err => console.error("Screen share replaceTrack error:", err));
+          }
+        });
+
+        if (localVideoRef.current) localVideoRef.current.srcObject = displayStream;
+        setIsSharingScreen(true);
+
+        // Listen for native stop button
+        screenTrack.onended = () => {
+          stopScreenShare();
+        };
+      } else {
+        stopScreenShare();
+      }
+    } catch (e) { 
+      console.error("Error sharing screen", e); 
+      setIsSharingScreen(false);
+    }
+  };
+
+  const stopScreenShare = () => {
+    if (streamRef.current) {
+      const camTrack = streamRef.current.getVideoTracks()[0];
+      if (camTrack) {
+        Object.values(peersRef.current).forEach(peer => {
+          const sender = peer.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(camTrack).catch(err => console.error("Camera replaceTrack error:", err));
+          }
+        });
+      }
+      if (localVideoRef.current) localVideoRef.current.srcObject = streamRef.current;
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+    }
+    setIsSharingScreen(false);
+  };
+
+  const handleReaction = (emoji: string) => {
+    if (!user) return;
+    const reaction = { id: Math.random().toString(), userId: user.id, emoji };
+    setActiveReactions(prev => [...prev, reaction]);
+    
+    sendSignal(meeting.id, {
+      from: user.id,
+      to: 'all',
+      type: 'reaction',
+      data: emoji
+    });
+    
+    setShowReactions(false);
+    setTimeout(() => {
+       setActiveReactions(prev => prev.filter(r => r.id !== reaction.id));
+    }, 3000);
+  };
+
+  const activeRemoteUsers = allUsers.filter(u => !!remoteStatuses[u.id] && u.id !== user?.id);
+  const totalParticipants = 1 + activeRemoteUsers.length;
+  
+  let sharingUserId = isSharingScreen ? user?.id : null;
+  if (!sharingUserId) {
+    const remoteSharer = activeRemoteUsers.find(u => remoteStatuses[u.id]?.isSharingScreen);
+    if (remoteSharer) sharingUserId = remoteSharer.id;
+  }
+
+  const allActiveUserIds = [user?.id, ...Object.keys(remoteStatuses)].filter(Boolean) as string[];
+  let activeHostId = meeting.hostId;
+  if (!allActiveUserIds.includes(meeting.hostId)) {
+    activeHostId = [...allActiveUserIds].sort()[0];
+  }
+  const isHost = user?.id === activeHostId;
+
+  const handleForceMute = (targetUserId: string, tool: 'mic' | 'cam') => {
+    sendSignal(meeting.id, {
+      from: user?.id || '',
+      to: targetUserId,
+      type: 'force_mute',
+      data: tool
+    });
+  };
+
+  const getContainerClass = (uId?: string) => {
+    if (sharingUserId) {
+      if (sharingUserId === uId) {
+        return "relative overflow-hidden bg-gray-900 rounded-2xl shadow-xl border border-brand-500/30 order-1 w-full h-[60vh] lg:h-full lg:w-3/4 flex-grow object-contain";
+      }
+      return "relative rounded-xl overflow-hidden bg-gray-800 shadow-md border border-white/5 aspect-video w-[140px] lg:w-[220px] flex-shrink-0 order-2 h-fit";
+    }
+    if (totalParticipants === 1) {
+      return "relative overflow-hidden bg-gray-800 w-full h-full rounded-2xl shadow-2xl border-none";
+    }
+    return "relative rounded-2xl overflow-hidden bg-gray-800 shadow-2xl border border-white/5 aspect-video flex-1 min-w-[320px] max-w-[800px]";
+  };
+
   return (
     <div className="fixed inset-0 bg-[#202124] text-white flex flex-col z-50 overflow-hidden font-sans">
       {/* Header */}
@@ -160,18 +483,22 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
 
       {/* Main Content Area */}
       <div className="flex-grow flex relative overflow-hidden p-4 pt-20 pb-24">
-        <div className={`flex-grow grid gap-4 transition-all duration-300 ${showChat || showParticipants ? 'mr-80' : ''}`}
-             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+        <div className={`flex-grow flex gap-4 transition-all duration-300 w-full h-full overflow-y-auto overflow-x-hidden p-2 ${sharingUserId ? 'flex-row flex-wrap justify-center lg:justify-start content-start' : 'flex-wrap items-center justify-center content-center'} ${showChat || showParticipants ? 'pr-80' : ''}`}>
           
           {/* Local Video */}
-          <div className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-2xl border border-white/5 aspect-video">
-            {isCamOn ? (
+          <AudioSpeakerWrapper stream={streamRef.current} isMuted={!isMicOn} containerClass={(isSpeaking) => `${getContainerClass(user?.id)} ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]' : ''}`}>
+            {isCamOn || isSharingScreen ? (
               <video 
-                ref={localVideoRef} 
+                ref={el => {
+                  if (el) {
+                    const expectedStream = isSharingScreen ? screenStreamRef.current : streamRef.current;
+                    if (el.srcObject !== expectedStream) el.srcObject = expectedStream;
+                  }
+                }}
                 autoPlay 
                 muted 
                 playsInline 
-                className="w-full h-full object-cover mirror"
+                className={`w-full h-full ${!isSharingScreen ? 'object-cover mirror' : 'object-contain bg-black'}`}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-4">
@@ -179,26 +506,58 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
                 <p className="text-xl font-medium text-gray-400">{user?.name} ({t('you')})</p>
               </div>
             )}
-            <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm">
-              {!isMicOn && <MicOff size={14} className="text-red-500" />}
+            <div className={`absolute bottom-4 left-4 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition-colors duration-300 ${isMicOn ? 'bg-black/40 text-white' : 'bg-red-500/80 text-white shadow-lg'}`}>
+              {!isMicOn && <MicOff size={14} />}
               <span>{user?.name} ({t('you')})</span>
             </div>
-          </div>
+            {isHandRaised && (
+              <div className="absolute top-4 right-4 bg-brand-500 text-white p-2 rounded-full shadow-lg animate-bounce">
+                <Hand size={20} />
+              </div>
+            )}
+            {activeReactions.filter(r => r.userId === user?.id).map(r => (
+              <div key={r.id} className="absolute inset-0 flex items-center justify-center pointer-events-none animate-float-up text-6xl">
+                {r.emoji}
+              </div>
+            ))}
+          </AudioSpeakerWrapper>
 
-          {/* Mock Participants */}
-          {allUsers.filter(u => meeting.participants.includes(u.id) && u.id !== user?.id).map((u, idx) => {
-            const status = remoteStatuses[u.id] || { isMicOn: false, isCamOn: false };
+          {/* Remote Participants */}
+          {activeRemoteUsers.map((u) => {
+            const status = remoteStatuses[u.id] || { isMicOn: false, isCamOn: false, isSharingScreen: false };
+            const stream = remoteStreams[u.id];
+
             return (
-              <div key={u.id} className="relative rounded-2xl overflow-hidden bg-gray-800 shadow-2xl border border-white/5 aspect-video">
-                <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-gray-800 to-gray-900">
-                  <Avatar src={u.avatar} size="xl" className="border-4 border-white/10" />
-                  <p className="text-xl font-medium text-gray-400">{u.name}</p>
-                </div>
-                <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm">
-                  {!status.isMicOn && <MicOff size={14} className="text-red-500" />}
+              <AudioSpeakerWrapper key={`remote-${u.id}`} stream={stream} isMuted={!status.isMicOn} containerClass={(isSpeaking) => `${getContainerClass(u.id)} ${isSpeaking ? 'ring-4 ring-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)]' : ''}`}>
+                {stream && (status.isCamOn || status.isSharingScreen) ? (
+                  <video 
+                    key={`remote-vid-${u.id}-${status.isSharingScreen}`}
+                    autoPlay 
+                    playsInline 
+                    className={`w-full h-full ${!status.isSharingScreen ? 'object-cover mirror' : 'object-contain bg-black'}`}
+                    ref={el => { if (el && el.srcObject !== stream) el.srcObject = stream; }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-gray-800 to-gray-900">
+                    <Avatar src={u.avatar} size="xl" className="border-4 border-white/10" />
+                    <p className="text-xl font-medium text-gray-400">{u.name}</p>
+                  </div>
+                )}
+                <div className={`absolute bottom-4 left-4 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition-colors duration-300 ${status.isMicOn ? 'bg-black/40 text-white' : 'bg-red-500/80 text-white shadow-lg'}`}>
+                  {!status.isMicOn && <MicOff size={14} className="text-white" />}
                   <span>{u.name}</span>
                 </div>
-              </div>
+                {status.isHandRaised && (
+                  <div className="absolute top-4 right-4 bg-brand-500 text-white p-2 rounded-full shadow-lg animate-bounce">
+                    <Hand size={20} />
+                  </div>
+                )}
+                {activeReactions.filter(r => r.userId === u.id).map(r => (
+                  <div key={r.id} className="absolute inset-0 flex items-center justify-center pointer-events-none animate-float-up text-6xl">
+                    {r.emoji}
+                  </div>
+                ))}
+              </AudioSpeakerWrapper>
             );
           })}
         </div>
@@ -264,33 +623,62 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
 
               {showParticipants && (
                 <div className="flex-grow overflow-y-auto p-4 space-y-4">
-                  <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                  <AudioSpeakerWrapper stream={streamRef.current} isMuted={!isMicOn} containerClass={(isSpeaking) => `flex items-center justify-between p-2 rounded-lg transition-colors ${isSpeaking ? 'bg-green-50 ring-1 ring-green-200' : 'hover:bg-gray-50'}`}>
                     <div className="flex items-center gap-3">
-                      <Avatar src={user?.avatar} size="sm" />
+                      <div className="relative">
+                         <Avatar src={user?.avatar} size="sm" />
+                      </div>
                       <div>
-                        <p className="text-sm font-bold">{user?.name} ({t('you')})</p>
-                        <p className="text-[10px] text-brand-500 font-medium">Host</p>
+                        <p className="text-sm font-bold text-gray-900">{user?.name} ({t('you')})</p>
+                        <p className="text-[10px] text-brand-500 font-medium">{isHost ? 'Host' : 'Participant'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isMicOn ? <Mic size={16} className="text-gray-400" /> : <MicOff size={16} className="text-red-500" />}
+                       {isMicOn ? <Mic size={16} className="text-brand-500" /> : <MicOff size={16} className="text-red-500/80" />}
                     </div>
-                  </div>
-                  {allUsers.filter(u => meeting.participants.includes(u.id) && u.id !== user?.id).map(u => {
+                  </AudioSpeakerWrapper>
+                  {allUsers.filter(u => !!remoteStatuses[u.id] && u.id !== user?.id).map(u => {
                     const status = remoteStatuses[u.id] || { isMicOn: false, isCamOn: false };
+                    const isTargetHost = u.id === activeHostId;
                     return (
-                      <div key={u.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg">
+                      <AudioSpeakerWrapper key={u.id} stream={remoteStreams[u.id]} isMuted={!status.isMicOn} containerClass={(isSpeaking) => `flex items-center justify-between p-2 rounded-lg transition-colors ${isSpeaking ? 'bg-green-50 ring-1 ring-green-200' : 'hover:bg-gray-50'}`}>
                         <div className="flex items-center gap-3">
-                          <Avatar src={u.avatar} size="sm" />
+                          <div className="relative">
+                            <Avatar src={u.avatar} size="sm" />
+                          </div>
                           <div>
-                            <p className="text-sm font-medium">{u.name}</p>
-                            <p className="text-[10px] text-gray-400">{u.department}</p>
+                            <p className="text-sm font-medium text-gray-900">{u.name}</p>
+                            <p className="text-[10px] text-gray-400">{isTargetHost ? 'Host' : u.department}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          {status.isMicOn ? <Mic size={16} className="text-gray-400" /> : <MicOff size={16} className="text-red-500" />}
+                          {status.isMicOn ? (
+                            isHost ? (
+                              <button onClick={() => handleForceMute(u.id, 'mic')} className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded group" title="Tắt Mic của người này">
+                                <Mic size={16} className="group-hover:hidden" />
+                                <MicOff size={16} className="hidden group-hover:block" />
+                              </button>
+                            ) : (
+                              <div className="p-1"><Mic size={16} className="text-brand-500" /></div>
+                            )
+                          ) : (
+                            <div className="p-1"><MicOff size={16} className="text-red-500/80" /></div>
+                          )}
+
+                          {status.isCamOn ? (
+                            isHost ? (
+                              <button onClick={() => handleForceMute(u.id, 'cam')} className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded group" title="Tắt Camera của người này">
+                                <Video size={16} className="group-hover:hidden" />
+                                <VideoOff size={16} className="hidden group-hover:block" />
+                              </button>
+                            ) : (
+                              <div className="p-1"><Video size={16} className="text-brand-500" /></div>
+                            )
+                          ) : (
+                            <div className="p-1"><VideoOff size={16} className="text-red-500/80" /></div>
+                          )}
                         </div>
-                      </div>
+                      </AudioSpeakerWrapper>
                     );
                   })}
                 </div>
@@ -321,15 +709,44 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
           >
             {isCamOn ? <Video size={24} /> : <VideoOff size={24} />}
           </button>
-          <button className="p-4 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
+          <button 
+            onClick={() => setIsHandRaised(!isHandRaised)}
+            className={`p-4 rounded-full transition-all ${isHandRaised ? 'bg-brand-500 hover:bg-brand-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          >
             <Hand size={24} />
           </button>
-          <button className="p-4 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
+          <button 
+            onClick={toggleScreenShare}
+            className={`p-4 rounded-full transition-all ${isSharingScreen ? 'bg-brand-500 hover:bg-brand-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+          >
             <Share size={24} />
           </button>
-          <button className="p-4 rounded-full bg-gray-700 hover:bg-gray-600 transition-all">
-            <Smile size={24} />
-          </button>
+          
+          <div className="relative">
+            <button 
+              onClick={() => setShowReactions(!showReactions)}
+              className={`p-4 rounded-full transition-all ${showReactions ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`}
+            >
+              <Smile size={24} />
+            </button>
+            <AnimatePresence>
+              {showReactions && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 bg-gray-800 p-2 rounded-2xl flex gap-2 shadow-xl border border-gray-700"
+                >
+                  {['👍', '❤️', '😂', '😮', '👏', '🎉'].map(emoji => (
+                    <button key={emoji} onClick={() => handleReaction(emoji)} className="p-2 text-2xl hover:bg-gray-600 rounded-lg transition-transform hover:scale-125">
+                      {emoji}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <button 
             onClick={onLeave}
             className="p-4 px-8 rounded-full bg-red-500 hover:bg-red-600 transition-all flex items-center gap-2"
@@ -367,6 +784,15 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
       <style>{`
         .mirror {
           transform: scaleX(-1);
+        }
+        @keyframes float-up {
+          0% { transform: translateY(50px) scale(0.5); opacity: 0; }
+          20% { transform: translateY(0) scale(1.2); opacity: 1; }
+          80% { transform: translateY(-50px) scale(1); opacity: 1; }
+          100% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+        }
+        .animate-float-up {
+          animation: float-up 3s ease-out forwards;
         }
       `}</style>
     </div>

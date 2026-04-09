@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
+import { User } from '../types';
 import { Layout, ClipboardCheck, ArrowRight, AlertCircle, Sparkles, ShieldCheck, Zap } from 'lucide-react';
 import { Button, Input } from './UI';
-import { MOCK_USERS } from '../constants';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
+  const { users } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -128,7 +130,7 @@ export const LoginView: React.FC = () => {
                 Quick Access
               </div>
               <div className="grid grid-cols-1 gap-2.5">
-                {MOCK_USERS.map(u => (
+                {users?.map((u: User) => (
                   <button
                     key={u.id}
                     type="button"

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User } from '../types';
-import { getUsers } from '../services/userService';
+
+const API_URL = '/api/users';
 
 interface AuthContextType {
   user: User | null;
@@ -17,25 +18,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check local storage for existing session
     const storedUserId = localStorage.getItem('orange_task_user_id');
     if (storedUserId) {
-      const users = getUsers();
-      const foundUser = users.find(u => u.id === storedUserId);
-      if (foundUser) {
-        setUser(foundUser);
-      }
+      fetch(API_URL)
+        .then(r => r.json())
+        .then((users: User[]) => {
+          const foundUser = users.find(u => u.id === storedUserId);
+          if (foundUser) setUser(foundUser);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   const login = async (email: string): Promise<boolean> => {
-    const users = getUsers();
-    const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('orange_task_user_id', foundUser.id);
-      return true;
+    try {
+      const res = await fetch(API_URL);
+      const users: User[] = await res.json();
+      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (foundUser) {
+        setUser(foundUser);
+        localStorage.setItem('orange_task_user_id', foundUser.id);
+        return true;
+      }
+    } catch (e) {
+      console.error('Login failed:', e);
     }
     return false;
   };
@@ -46,7 +55,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const updateUserSession = (updatedUser: User) => {
-      setUser(updatedUser);
+    setUser(updatedUser);
   };
 
   return (
