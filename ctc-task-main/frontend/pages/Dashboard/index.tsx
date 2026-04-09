@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { CheckCircle2, ListTodo, Timer, Flame } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { Task, TaskStatus, TaskPriority, User, Note } from '../types';
-import { useLanguage } from '../contexts/LanguageContext';
-import { Button, Card, Avatar } from '../components/UI';
-import { TaskListItem } from '../components/TaskListItem';
-import { StatCard } from '../components/StatCard';
+import { Task, TaskStatus, TaskPriority, User, Note } from '../../types';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { Button, Card, Avatar } from '../../components/UI';
+import { TaskListItem } from '../../components/TaskListItem';
+import { StatCard } from '../../components/StatCard';
 
 interface DashboardProps {
   roleBasedTasks: Task[];
@@ -22,10 +22,10 @@ interface DashboardProps {
   checkPermission: (action: 'edit' | 'delete', task: Task, user: User) => boolean;
 }
 
-export const DashboardPage: React.FC<DashboardProps> = ({
+export default function DashboardPage({
   roleBasedTasks, filteredTasks, filteredNotes, notes, users, user, searchQuery,
   openCreateModal, openEditModal, handleStatusToggle, handleDeleteTask, checkPermission
-}) => {
+}: DashboardProps) {
   const { t } = useLanguage();
 
   const stats = useMemo(() => {
@@ -106,7 +106,7 @@ export const DashboardPage: React.FC<DashboardProps> = ({
               <h2 className="text-lg font-bold text-gray-800">{t('quickNotes')}</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredNotes.slice(0, 2).map(note => (
+              {filteredNotes.slice(0, 2).map((note: Note) => (
                 <div key={note.id} className={`${note.color} p-4 rounded-xl border border-black/5 cursor-pointer hover:shadow-sm transition-all`}>
                   <h4 className="font-bold text-gray-800 mb-1">{note.title || 'Untitled Note'}</h4>
                   <p className="text-sm text-gray-600 line-clamp-2">{note.content}</p>

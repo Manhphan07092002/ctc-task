@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Video, Plus, Calendar, Keyboard, Link2, Check, Copy, X, MoreVertical, Trash2 } from 'lucide-react';
-import { Meeting, User } from '../types';
-import { subscribeToMeetings, deleteMeeting, saveMeeting, sendSignal } from '../services/meetingService';
-import { Button, Avatar } from './UI';
-import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { Meeting, User } from '../../types';
+import { subscribeToMeetings, deleteMeeting, saveMeeting, sendSignal } from '../../services/meetingService';
+import { Button, Avatar } from "../../components/UI";
+import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface MeetingViewProps {
   onJoinMeeting: (meeting: Meeting) => void;
@@ -73,7 +73,7 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
     if (!joinLink.trim()) return;
     const segments = joinLink.split('/');
     const code = segments[segments.length - 1];
-    const meeting = meetings.find(m => m.id === code || m.meetingLink.includes(code));
+    const meeting = meetings.find((m: any) => m.id === code || m.meetingLink.includes(code));
     if (meeting) {
       onJoinMeeting(meeting);
     } else {
@@ -132,7 +132,7 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
               <input 
                 type="text" 
                 value={joinLink} 
-                onChange={e => setJoinLink(e.target.value)} 
+                onChange={(e: any) => setJoinLink(e.target.value)} 
                 onKeyDown={e => e.key === 'Enter' && handleJoinByLink()}
                 placeholder={language === 'vi' ? 'Nhập một mã hoặc đường link' : 'Enter a code or link'} 
                 className="w-full pl-10 pr-4 h-12 rounded-md border border-gray-400 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] outline-none text-[16px] placeholder-gray-600" 

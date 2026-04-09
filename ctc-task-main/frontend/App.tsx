@@ -2,42 +2,30 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopHeader } from './components/layout/TopHeader';
-import { DashboardPage } from './pages/DashboardPage';
-import { TaskListItem } from './components/TaskListItem';
 
-import {
-  PlusCircle,
-  CheckCircle2,
-  Clock,
-  Trash2,
-  CheckSquare,
-  Shield,
-  Filter,
-  Lock,
-  Edit,
-  Wand2,
-  Sparkles
-} from 'lucide-react';
+import DashboardPage from './pages/Dashboard/index';
+import TasksPage from './pages/Tasks/index';
+import NotesPage from './pages/Notes/index';
+import TeamPage from './pages/Team/index';
+import { CalendarView as CalendarPage } from './pages/Calendar/index';
+import { MeetingView as MeetingsPage } from './pages/Meetings/index';
+import { JoinMeetingPage } from './pages/Meetings/JoinMeeting';
+import { SettingsView as SettingsPage } from './pages/Settings/index';
 
-import { Task, TaskStatus, TaskPriority, Note, RecurrenceType, User } from './types';
-import { NAV_ITEMS, PRIORITY_COLORS } from './constants';
-import { Button, Card, Avatar } from './components/UI';
-import { CalendarView } from './components/CalendarView';
+import { Sparkles } from 'lucide-react';
+
+import { Task, TaskStatus, Note, RecurrenceType, User, Meeting } from './types';
 import { TaskModal } from './components/TaskModal';
 import { NoteModal } from './components/NoteModal';
 import { UserModal } from './components/UserModal';
-import { SettingsView } from './components/SettingsView';
 import { InviteModal } from './components/InviteModal';
 import { TaskSuggestionModal } from './components/TaskSuggestionModal';
-import { MeetingView } from './components/MeetingView';
 import { MeetingModal } from './components/MeetingModal';
 import { MeetingRoom } from './components/MeetingRoom';
-import { JoinMeetingPage } from './pages/JoinMeetingPage';
 import { AIAssistant, AIAssistantHandle } from './components/AIAssistant';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAuth } from './contexts/AuthContext';
 import { useData } from './contexts/DataContext';
-import { Meeting } from './types';
 import { LoginView } from './components/LoginView';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
@@ -107,7 +95,7 @@ export default function CTCTaskApp() {
       if (pendingCount > 0) {
         setNotification({
           visible: true, title: "Reminder: Pending Tasks ⏰",
-          message: `You have \${pendingCount} unfinished tasks for today.`, type: 'warning'
+          message: `You have ${pendingCount} unfinished tasks for today.`, type: 'warning'
         });
         setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 10000);
       }
@@ -155,7 +143,7 @@ export default function CTCTaskApp() {
     for (const t of tasksToAdd) {
       await saveTask(t);
     }
-    setNotification({ visible: true, title: 'Success', message: `Added \${tasksToAdd.length} tasks.`, type: 'info' });
+    setNotification({ visible: true, title: 'Success', message: `Added ${tasksToAdd.length} tasks.`, type: 'info' });
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -187,7 +175,6 @@ export default function CTCTaskApp() {
 
     if (newStatus === TaskStatus.DONE && task.recurrence && task.recurrence !== RecurrenceType.NONE) {
       const nextDate = getNextDate(task.startDate, task.recurrence);
-      // Wait for tasks update to refresh before checking, we do quick check
       const exists = tasks.some(t => t.title === task.title && t.startDate === nextDate && t.status === TaskStatus.TODO);
       if (!exists) {
         const newTask: Task = { ...task, id: Math.random().toString(36).substr(2, 9), startDate: nextDate, status: TaskStatus.TODO, subtasks: task.subtasks?.map(st => ({ ...st, isCompleted: false })), comments: [] };
@@ -245,107 +232,56 @@ export default function CTCTaskApp() {
               } />
               
               <Route path="/tasks" element={
-                <div className="space-y-6">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-800">{t('tasks')}</h2>
-                    <p className="text-gray-500 text-sm mt-1">Manage your complete task list</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="text-brand-600 border-brand-200 hover:bg-brand-50" onClick={() => setIsSuggestionModalOpen(true)}>
-                      <Wand2 size={18} className="mr-2" /> AI Plan
-                    </Button>
-                    <Button variant="secondary" onClick={() => aiAssistantRef.current?.summarizeTasks(rawTodaysTasks)}>
-                      <Sparkles size={18} className="mr-2" /> {t('aiSummary')}
-                    </Button>
-                    <Button onClick={() => openCreateModal()}>
-                      <PlusCircle size={18} className="mr-2" /> {t('addTask')}
-                    </Button>
-                  </div>
-                </div>
-
-                {allTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mr-2"><Filter size={14} /><span>{t('filter')}</span></div>
-                    {allTags.map(tag => (
-                      <button key={tag} onClick={() => toggleTagFilter(tag)} className={`px-3 py-1 rounded-full text-xs font-medium transition-all border \${selectedTags.includes(tag) ? 'bg-brand-500 text-white border-brand-500 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300 hover:text-brand-600'}`}>{tag}</button>
-                    ))}
-                    {selectedTags.length > 0 && <button onClick={() => setSelectedTags([])} className="text-xs text-gray-400 hover:text-gray-600 ml-2">{t('clear')}</button>}
-                  </div>
-                )}
-
-                <Card className="overflow-hidden">
-                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-100 flex items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    <div className="flex-1">{t('taskDetails')}</div><div className="w-32 text-center">{t('priority')}</div><div className="w-32 text-center">{t('status')}</div><div className="w-10"></div>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {filteredTasks.length === 0 ? (
-                      <div className="p-8 text-center text-gray-500">{searchQuery || selectedTags.length > 0 ? t('noMatchingTasks') : t('noTasksToday')}</div>
-                    ) : filteredTasks.map(task => (
-                      <TaskListItem key={task.id} task={task} onClick={() => openEditModal(task)} onCheck={() => handleStatusToggle(task)} onDelete={checkPermission('delete', task, user) ? () => handleDeleteTask(task.id) : undefined} canToggle={checkPermission('edit', task, user) || task.assignees.includes(user.id)} isReadOnly={!checkPermission('edit', task, user)} showDepartment={user.role === 'Admin' || user.role === 'Manager'} allUsers={users} />
-                    ))}
-                  </div>
-                </Card>
-              </div>
+                <TasksPage 
+                  t={t}
+                  rawTodaysTasks={rawTodaysTasks}
+                  filteredTasks={filteredTasks}
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  toggleTagFilter={toggleTagFilter}
+                  setSelectedTags={setSelectedTags}
+                  searchQuery={searchQuery}
+                  openCreateModal={openCreateModal}
+                  openEditModal={openEditModal}
+                  handleStatusToggle={handleStatusToggle}
+                  handleDeleteTask={handleDeleteTask}
+                  checkPermission={checkPermission}
+                  user={user}
+                  users={users}
+                  aiAssistantRef={aiAssistantRef}
+                  setIsSuggestionModalOpen={setIsSuggestionModalOpen}
+                />
               } />
 
               <Route path="/calendar" element={
                 <div className="h-[calc(100vh-8rem)]">
-                  <CalendarView tasks={roleBasedTasks} onDateClick={(date) => openCreateModal(date)} onTaskClick={(task) => openEditModal(task)} />
+                  <CalendarPage tasks={roleBasedTasks} onDateClick={(date) => openCreateModal(date)} onTaskClick={(task) => openEditModal(task)} />
                 </div>
               } />
 
-               {/* Notes View inside routes */}
               <Route path="/notes" element={
-                <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-gray-800">{t('notes')}</h2>
-                  <Button onClick={openCreateNoteModal}><PlusCircle size={18} className="mr-2" /> {t('addNote')}</Button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredNotes.map(note => (
-                    <div key={note.id} onClick={() => openEditNoteModal(note)} className={`\${note.color} p-6 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer relative group border border-black/5 flex flex-col h-64`}>
-                      <h3 className="font-bold text-gray-900 text-lg mb-3 pr-6 line-clamp-1">{note.title || 'Untitled'}</h3>
-                      <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap flex-grow overflow-hidden mask-image-b">{note.content}</p>
-                      <div className="mt-4 pt-4 border-t border-black/5 flex justify-between items-center text-xs text-gray-500"><span>{new Date(note.createdAt).toLocaleDateString()}</span></div>
-                    </div>
-                  ))}
-                  <button onClick={openCreateNoteModal} className="border-2 border-dashed border-gray-300 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-400 hover:text-brand-500 hover:border-brand-300 hover:bg-brand-50 transition-all h-64"><PlusCircle size={40} className="mb-2 opacity-50" /><span className="font-medium">{t('createNote')}</span></button>
-                </div>
-              </div>
+                <NotesPage 
+                  t={t}
+                  filteredNotes={filteredNotes}
+                  openCreateNoteModal={openCreateNoteModal}
+                  openEditNoteModal={openEditNoteModal}
+                />
               } />
 
               <Route path="/team" element={
-                user.role !== 'Employee' ? (
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <div><h2 className="text-xl font-bold text-gray-800">{t('teamMembers')}</h2><p className="text-gray-500 text-sm mt-1">Manage your team and permissions</p></div>
-                      {user.role === 'Admin' && <Button onClick={() => openCreateUserModal()}><PlusCircle size={18} className="mr-2" /> Add Member</Button>}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {users.filter(u => user.role === 'Admin' ? true : u.department === user.department).map(u => (
-                        <Card key={u.id} className="p-6 flex items-center gap-4 relative group">
-                          <Avatar src={u.avatar} alt={u.name} size={16} />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-gray-800 text-lg truncate">{u.name}</h4><p className="text-gray-500 text-sm mb-2">{u.department} • {u.email}</p>
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium \${u.role === 'Admin' ? 'bg-brand-100 text-brand-700' : u.role === 'Manager' ? 'bg-purple-100 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>{u.role === 'Admin' && <Shield size={10} />}{u.role}</span>
-                          </div>
-                          {user.role === 'Admin' && (
-                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm rounded-lg p-1">
-                              <button onClick={() => openEditUserModal(u)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md hover:text-blue-600"><Edit size={14} /></button>
-                              <button onClick={() => handleDeleteUser(u.id)} className="p-1.5 text-gray-500 hover:bg-red-50 rounded-md hover:text-red-600"><Trash2 size={14} /></button>
-                            </div>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ) : <Navigate to="/" replace />
+                <TeamPage 
+                  t={t}
+                  user={user}
+                  users={users}
+                  openCreateUserModal={openCreateUserModal}
+                  openEditUserModal={openEditUserModal}
+                  handleDeleteUser={handleDeleteUser}
+                />
               } />
 
-              <Route path="/meetings" element={<MeetingView allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
+              <Route path="/meetings" element={<MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
               <Route path="/meetings/join/:meetingId" element={<JoinMeetingPage onJoinMeeting={setActiveMeeting} />} />
-              <Route path="/settings" element={<SettingsView />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

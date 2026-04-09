@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Bell, Moon, Globe, Lock, Shield, Mail } from 'lucide-react';
-import { Button, Card, Input, Switch, Avatar } from './UI';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth } from '../contexts/AuthContext';
-import { saveUser } from '../services/userService';
+import { Button, Card, Input, Switch, Avatar } from "../../components/UI";
+import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { saveUser } from '../../services/userService';
 
 export const SettingsView: React.FC = () => {
   const { t } = useLanguage();

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { Meeting } from '../types';
-import { getMeetingById } from '../services/meetingService';
-import { useLanguage } from '../contexts/LanguageContext';
+import { Meeting } from '../../types';
+import { getMeetingById } from '../../services/meetingService';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface JoinMeetingPageProps {
   onJoinMeeting: (meeting: Meeting) => void;

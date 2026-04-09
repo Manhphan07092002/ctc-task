@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
-import { Task, CalendarDay } from '../types';
+import { Task, CalendarDay } from '../../types';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon } from 'lucide-react';
-import { PRIORITY_COLORS } from '../constants';
-import { Button } from './UI';
-import { useLanguage } from '../contexts/LanguageContext';
+import { PRIORITY_COLORS } from '../../constants';
+import { Button } from "../../components/UI";
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface CalendarViewProps {
   tasks: Task[];
