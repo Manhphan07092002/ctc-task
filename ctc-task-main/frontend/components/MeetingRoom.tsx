@@ -4,7 +4,7 @@ import {
   Mic, MicOff, Video, VideoOff, PhoneOff, 
   MessageSquare, Users, Settings, Share, 
   MoreVertical, Hand, Smile, Grid, Layout as LayoutIcon,
-  Maximize, Minimize, Shield, Info, X
+  Maximize, Minimize, Shield, Info, X, Calendar, Clock
 } from 'lucide-react';
 import { Meeting, User } from '../types';
 import { Button, Avatar, Card } from './UI';
@@ -96,6 +96,15 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
   const peersRef = useRef<Record<string, RTCPeerConnection>>({});
   const statusRef = useRef({ isMicOn: true, isCamOn: true, isHandRaised: false, isSharingScreen: false });
   const isSharingRef = useRef(false);
+  
+  const [hasJoined, setHasJoined] = useState(false);
+  const hasJoinedRef = useRef(false);
+  
+  const isLocalSpeaking = useAudioLevel(streamRef.current, !isMicOn);
+
+  useEffect(() => {
+    hasJoinedRef.current = hasJoined;
+  }, [hasJoined]);
 
   useEffect(() => {
     isSharingRef.current = isSharingScreen;
@@ -103,7 +112,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
   }, [isMicOn, isCamOn, isHandRaised, isSharingScreen]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !hasJoined) return;
     // Use existing PUT endpoint: fetch current state first then update atomically
     fetch(`/api/meetings/${meeting.id}`)
       .then(r => r.json())
@@ -146,7 +155,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
       }
       Object.values(peersRef.current).forEach(peer => peer.close());
 
-      if (user) {
+      if (user && hasJoinedRef.current) {
         // Run in background without awaiting, best effort to notify others we left
         fetch(`/api/meetings/${meeting.id}/signals`, {
           method: 'POST',
@@ -183,8 +192,8 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
       streamRef.current.getVideoTracks().forEach(track => track.enabled = isCamOn);
     }
     
-    // Broadcast status change
-    if (user) {
+    // Broadcast status change ONLY if already joined
+    if (user && hasJoined) {
       sendSignal(meeting.id, {
         id: Math.random().toString(36).substr(2, 9),
         from: user.id,
@@ -193,11 +202,11 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
         data: { isMicOn, isCamOn, isHandRaised, isSharingScreen }
       });
     }
-  }, [isMicOn, isCamOn, isHandRaised, isSharingScreen, user, meeting.id]);
+  }, [isMicOn, isCamOn, isHandRaised, isSharingScreen, user, meeting.id, hasJoined]);
 
   // Subscribe to signals
   useEffect(() => {
-    if (!user) return;
+    if (!user || !hasJoined) return;
 
     const createPeer = (userId: string, isInitiator: boolean) => {
       if (peersRef.current[userId]) return peersRef.current[userId]; // already exists
@@ -316,7 +325,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
     });
 
     return () => unsubscribe();
-  }, [meeting.id, user]);
+  }, [meeting.id, user, hasJoined]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -457,6 +466,109 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
     }
     return "relative rounded-2xl overflow-hidden bg-gray-800 shadow-2xl border border-white/5 aspect-video flex-1 min-w-[320px] max-w-[800px]";
   };
+
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'en-US', {
+      weekday: 'short', day: 'numeric', month: 'short'
+    });
+
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString(language === 'vi' ? 'vi-VN' : 'en-US', {
+      hour: '2-digit', minute: '2-digit',
+    });
+
+  if (!hasJoined) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-brand-50 via-white to-purple-50 text-gray-900 flex flex-col z-50 overflow-hidden font-sans items-center justify-center">
+        {/* Decorative background gradients */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand-400/20 blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-400/20 blur-[120px] pointer-events-none"></div>
+
+        <div className="relative w-full max-w-6xl px-6 flex flex-col lg:flex-row gap-12 items-center lg:items-stretch z-10">
+          
+          <div className="w-full lg:w-3/5 max-w-[800px] flex flex-col gap-6">
+            <div className={`relative aspect-video bg-black rounded-[2rem] overflow-hidden shadow-2xl backdrop-blur-md border transition-all duration-300 ${isLocalSpeaking ? 'border-brand-500 ring-4 ring-brand-500/30 shadow-[0_0_40px_rgba(139,92,246,0.3)]' : 'border-gray-200 shadow-gray-300/50'}`}>
+               <video 
+                  ref={el => { if (el && el.srcObject !== streamRef.current) el.srcObject = streamRef.current; }}
+                  autoPlay muted playsInline className={`w-full h-full object-cover mirror ${!isCamOn ? 'hidden' : ''}`}
+               />
+               {!isCamOn && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 backdrop-blur-xl">
+                    <Avatar src={user?.avatar} size="xl" className="border-4 border-white mb-6 scale-125 shadow-xl" />
+                    <p className="text-gray-600 font-medium text-lg tracking-wide">{language === 'vi' ? 'Camera đang tắt' : 'Camera is off'}</p>
+                 </div>
+               )}
+               
+               <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-6">
+                 <button 
+                   onClick={() => setIsMicOn(!isMicOn)}
+                   className={`p-4 rounded-2xl transition-all duration-300 shadow-2xl flex items-center justify-center ${isMicOn ? 'bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 hover:border-white/40' : 'bg-red-500 hover:bg-red-600 text-white scale-95 border border-red-400'}`}
+                 >
+                   {isMicOn ? <Mic size={26} /> : <MicOff size={26} />}
+                 </button>
+                 <button 
+                   onClick={() => setIsCamOn(!isCamOn)}
+                   className={`p-4 rounded-2xl transition-all duration-300 shadow-2xl flex items-center justify-center ${isCamOn ? 'bg-black/40 hover:bg-black/60 text-white backdrop-blur-md border border-white/20 hover:border-white/40' : 'bg-red-500 hover:bg-red-600 text-white scale-95 border border-red-400'}`}
+                 >
+                   {isCamOn ? <Video size={26} /> : <VideoOff size={26} />}
+                 </button>
+               </div>
+            </div>
+          </div>
+
+          <div className="w-full lg:w-2/5 flex flex-col justify-center lg:py-12 px-2 2xl:px-8">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-gray-900 to-gray-600 tracking-tight leading-tight">{meeting.title}</h1>
+              
+              <div className="flex flex-col gap-3 mt-6 mb-8 lg:mx-0 mx-auto max-w-sm w-full bg-white/60 backdrop-blur-md p-6 rounded-2xl border border-gray-100 shadow-sm text-left">
+                <div className="flex items-center gap-4 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+                    <Calendar size={18} className="text-brand-500" />
+                  </div>
+                  <span className="font-medium text-[15px]">{formatDate(meeting.startTime)}</span>
+                </div>
+                <div className="flex items-center gap-4 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+                    <Clock size={18} className="text-brand-500" />
+                  </div>
+                  <span className="font-medium text-[15px]">{formatTime(meeting.startTime)} – {formatTime(meeting.endTime)}</span>
+                </div>
+                <div className="flex items-center gap-4 text-gray-700">
+                  <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
+                    <Users size={18} className="text-brand-500" />
+                  </div>
+                  <span className="font-medium text-[15px]">
+                    {meeting.participants.length}{' '}
+                    {language === 'vi' ? 'Thành viên' : 'Participants'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-4 max-w-sm mx-auto lg:mx-0">
+                <button 
+                  onClick={() => setHasJoined(true)} 
+                  className="group relative w-full py-4 bg-brand-500 text-white font-bold rounded-2xl transition-all duration-300 shadow-xl shadow-brand-500/20 text-lg hover:-translate-y-1 hover:shadow-2xl hover:shadow-brand-500/30 flex items-center justify-center gap-3 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-brand-500 to-purple-500 opacity-100 transition-opacity duration-300 group-hover:opacity-90"></div>
+                  <div className="relative flex items-center gap-2">
+                    <Video size={24} />
+                    {language === 'vi' ? 'Tham gia ngay' : 'Join Now'}
+                  </div>
+                </button>
+                <button 
+                  onClick={onLeave} 
+                  className="w-full py-4 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-2xl transition-all border border-gray-200 hover:border-gray-300 shadow-sm text-lg"
+                >
+                  {language === 'vi' ? 'Quay lại' : 'Back'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-[#202124] text-white flex flex-col z-50 overflow-hidden font-sans">
