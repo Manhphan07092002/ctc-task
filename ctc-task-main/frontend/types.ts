@@ -75,6 +75,7 @@ export interface Report {
   approvedAt?: string;
   approvedBy?: string;
   directorFeedback?: string;
+  managerFeedback?: string;
 }
 
 export interface User {

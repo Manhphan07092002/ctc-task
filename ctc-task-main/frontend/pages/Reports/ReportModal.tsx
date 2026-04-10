@@ -109,6 +109,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [rows, setRows]           = useState<TaskRow[]>([newRow()]);
   const [nextWeekPlan, setNextWeekPlan] = useState('');
   const [directorFeedback, setDirectorFeedback] = useState('');
+  const [managerFeedback, setManagerFeedback] = useState('');
 
   // ── Permissions ──
   const perms = currentUser.permissions || [];
@@ -156,6 +157,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     if (initialReport) {
       setTitle(initialReport.title);
       setDirectorFeedback(initialReport.directorFeedback || '');
+      setManagerFeedback(initialReport.managerFeedback || '');
       const parsed = parseContent(initialReport.content);
       if (parsed) {
         setRows(parsed.tasks.length ? parsed.tasks : [newRow()]);
@@ -263,6 +265,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       approvedAt: finalStatus === 'Approved' ? new Date().toISOString() : undefined,
       approvedBy: finalStatus === 'Approved' ? currentUser.id : undefined,
       directorFeedback,
+      managerFeedback,
     };
     onSave({ ...report, status: finalStatus });
     onClose();
@@ -519,6 +522,24 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               className="w-full resize-none text-sm text-gray-700 bg-white/80 border border-amber-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-300 placeholder-gray-400 disabled:bg-amber-50/30 disabled:cursor-default"
             />
           </div>
+
+          {/* ── MANAGER FEEDBACK ── */}
+          {(initialReport?.managerFeedback || isManagerReview || (canApprove && initialReport && initialReport.authorId !== currentUser.id)) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <h3 className="text-sm font-bold text-orange-800 mb-2 flex items-center gap-1.5">
+                <User size={14} />
+                Ý kiến Trưởng phòng
+              </h3>
+              <textarea
+                value={managerFeedback}
+                onChange={e => setManagerFeedback(e.target.value)}
+                disabled={!isManagerReview && !(canApprove && initialReport && initialReport.authorId !== currentUser.id)}
+                rows={3}
+                placeholder="Nhập nhận xét của Trưởng phòng..."
+                className="w-full resize-none text-sm text-orange-900 bg-white border border-orange-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-400 placeholder-orange-300 disabled:bg-orange-50/30 disabled:cursor-default"
+              />
+            </div>
+          )}
 
           {/* ── DIRECTOR FEEDBACK ── */}
           {(initialReport?.directorFeedback || isDirectorReview) && (

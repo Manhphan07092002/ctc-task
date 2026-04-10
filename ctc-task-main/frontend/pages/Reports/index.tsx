@@ -15,6 +15,7 @@ export default function ReportsPage() {
   // ── All hooks must be called before any conditional return ──
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [filterDept, setFilterDept] = useState<string>('all');
 
   const perms      = user?.permissions || [];
   const canApprove = perms.includes('approve_dept_reports');
@@ -86,6 +87,11 @@ export default function ReportsPage() {
   else if (activeTab === 'pending')            displayedReports = pendingList;
   else                                         displayedReports = myReports;
 
+  // Apply department filter for director
+  if (canViewAll && activeTab === 'all' && filterDept !== 'all') {
+    displayedReports = displayedReports.filter(r => r.department === filterDept);
+  }
+
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case 'Draft':    return <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full flex items-center gap-1"><FileEdit size={12}/> Nháp</span>;
@@ -149,11 +155,40 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Director banner */}
+      {/* Director banner + Dept Filter */}
       {activeTab === 'all' && canViewAll && (
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-6">
+        <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-4">
           <p className="font-bold text-base">Chế độ Xem Toàn Cục</p>
           <p className="text-sm mt-0.5">Bạn đang xem tất cả báo cáo đã được Trưởng phòng phê duyệt trên toàn hệ thống.</p>
+        </div>
+      )}
+
+      {activeTab === 'all' && canViewAll && (
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <span className="text-sm text-gray-500 font-medium whitespace-nowrap">Lọc theo phòng:</span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilterDept('all')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                filterDept === 'all' ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'
+              }`}
+            >
+              Tất cả
+            </button>
+            {departments
+              .filter(d => !['GIÁM ĐỐC','ADMIN'].includes(d.name))
+              .map(dept => (
+                <button
+                  key={dept.id}
+                  onClick={() => setFilterDept(dept.name)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    filterDept === dept.name ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'
+                  }`}
+                >
+                  {dept.name}
+                </button>
+              ))}
+          </div>
         </div>
       )}
 

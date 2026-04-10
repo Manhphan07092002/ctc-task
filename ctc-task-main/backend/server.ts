@@ -115,6 +115,9 @@ async function startServer() {
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN directorFeedback TEXT;');
   } catch(e) { /* ignores if column already exists */ }
+  try {
+    await db.exec('ALTER TABLE reports ADD COLUMN managerFeedback TEXT;');
+  } catch(e) { /* ignores if column already exists */ }
 
   // Seed Roles
   const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
@@ -552,22 +555,22 @@ async function startServer() {
   });
 
   app.post('/api/reports', async (req, res) => {
-    const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback } = req.body;
+    const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
       await db.run(
-        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null]
+        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, managerFeedback || null]
       );
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
   });
 
   app.put('/api/reports/:id', async (req, res) => {
-    const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback } = req.body;
+    const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
       await db.run(
-        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=?, directorFeedback=? WHERE id=?',
-        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, req.params.id]
+        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=?, directorFeedback=?, managerFeedback=? WHERE id=?',
+        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, managerFeedback || null, req.params.id]
       );
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
