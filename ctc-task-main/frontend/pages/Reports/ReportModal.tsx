@@ -367,13 +367,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
               {/* Header */}
               <div className="grid bg-blue-50 border-b border-gray-200 text-xs font-bold text-blue-800 uppercase tracking-wider"
-                style={{ gridTemplateColumns: '40px 140px 1fr 140px 1fr 120px 36px' }}>
+                style={{ gridTemplateColumns: '40px 1fr 140px 1fr 120px 140px 36px' }}>
                 <div className="px-3 py-3 text-center">STT</div>
-                <div className="px-3 py-3">Nhân viên</div>
                 <div className="px-3 py-3">Nội dung công việc</div>
                 <div className="px-3 py-3 text-center">Kết quả</div>
                 <div className="px-3 py-3">Công việc phải làm tiếp theo</div>
                 <div className="px-3 py-3 text-center">Ghi chú</div>
+                <div className="px-3 py-3">Nhân viên</div>
                 <div className="px-2 py-3" />
               </div>
 
@@ -383,21 +383,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   <div
                     key={row.id}
                     className="grid items-center hover:bg-gray-50/70 transition-colors group"
-                    style={{ gridTemplateColumns: '40px 140px 1fr 140px 1fr 120px 36px' }}
+                    style={{ gridTemplateColumns: '40px 1fr 140px 1fr 120px 140px 36px' }}
                   >
                     {/* STT */}
                     <div className="px-3 py-2 text-center text-sm text-gray-400 font-medium">{idx + 1}</div>
-
-                    {/* Nhân viên */}
-                    <div className="px-2 py-2">
-                       <input
-                        value={row.assignee || ''}
-                        onChange={e => updateRow(row.id, 'assignee', e.target.value)}
-                        disabled={isFormReadOnly}
-                        placeholder="..."
-                        className="w-full text-sm text-gray-800 font-medium bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
-                      />
-                    </div>
 
                     {/* Nội dung */}
                     <div className="px-2 py-2">
@@ -458,6 +447,17 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                         rows={2}
                         placeholder="Ghi chú..."
                         className="w-full resize-none text-xs text-gray-600 bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
+                      />
+                    </div>
+
+                    {/* Nhân viên */}
+                    <div className="px-2 py-2">
+                       <input
+                        value={row.assignee || ''}
+                        onChange={e => updateRow(row.id, 'assignee', e.target.value)}
+                        disabled={isFormReadOnly}
+                        placeholder="..."
+                        className="w-full text-sm text-gray-800 font-medium bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
                       />
                     </div>
 
