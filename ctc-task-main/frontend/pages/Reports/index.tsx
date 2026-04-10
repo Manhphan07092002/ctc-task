@@ -45,19 +45,27 @@ export default function ReportsPage() {
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, user, canApprove]);
 
+  // IDs of users who are department managers
+  const managerIds = useMemo(
+    () => new Set(departments.map(d => d.managerId).filter(Boolean)),
+    [departments]
+  );
+
   const pendingDirectorReports = useMemo(() => {
     if (!canViewAll || !user) return [];
+    // Director only sees Pending reports authored by department managers (Trưởng phòng)
     return reports
-      .filter(r => r.status === 'Pending' && r.authorId !== user.id)
+      .filter(r => r.status === 'Pending' && r.authorId !== user.id && managerIds.has(r.authorId))
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
-  }, [reports, canViewAll, user]);
+  }, [reports, canViewAll, user, managerIds]);
 
   const directorReports = useMemo(() => {
     if (!canViewAll) return [];
+    // Director only sees Approved reports authored by department managers (Trưởng phòng)
     return reports
-      .filter(r => r.status === 'Approved')
+      .filter(r => r.status === 'Approved' && managerIds.has(r.authorId))
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
-  }, [reports, canViewAll]);
+  }, [reports, canViewAll, managerIds]);
 
   // ── Early return AFTER all hooks ──
   if (!user) return null;
@@ -138,7 +146,7 @@ export default function ReportsPage() {
       {activeTab === 'all' && canViewAll && (
         <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-6">
           <p className="font-bold text-base">Chế độ Xem Toàn Cục</p>
-          <p className="text-sm mt-0.5">Bạn đang xem tất cả báo cáo đã được Trưởng phòng phê duyệt trên toàn hệ thống.</p>
+          <p className="text-sm mt-0.5">Bạn đang xem báo cáo tổng hợp đã được Trưởng phòng gửi và phê duyệt. Mỗi Trưởng phòng đại diện cho toàn phòng ban của mình.</p>
         </div>
       )}
 
