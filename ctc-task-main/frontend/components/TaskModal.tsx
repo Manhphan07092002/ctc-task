@@ -59,10 +59,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
 
   // Determine assignable users based on Role
   const assignableUsers = allUsers.filter(u => {
-    if (user.role === 'Admin') return true; // Admin sees all
-    if (user.role === 'Manager') return u.department === user.department; // Manager sees dept
-    // Employee can assign to anyone in department (collaboration) or strict self? 
-    // Let's allow department collaboration
+    if (user.role === 'Admin' || user.role === 'Director') return true;
     return u.department === user.department;
   });
 

@@ -16,7 +16,7 @@ const parseJSON = (text: string) => {
 export const generateSubtasksFromTitle = async (taskTitle: string): Promise<string[]> => {
   if (!taskTitle) return [];
   
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -46,7 +46,7 @@ export const generateSubtasksFromTitle = async (taskTitle: string): Promise<stri
 export const generateTaskDetails = async (taskTitle: string): Promise<{ description: string; subtasks: string[] } | null> => {
   if (!taskTitle) return null;
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -88,7 +88,7 @@ export interface SuggestedTask {
 export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask[]> => {
   if (!goal) return [];
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -124,7 +124,7 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
 };
 
 export const createChatSession = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   
   return ai.chats.create({
     model: 'gemini-3-flash-preview',

@@ -92,7 +92,7 @@ export default function DashboardPage({
                     onDelete={canDelete ? () => handleDeleteTask(task.id) : undefined}
                     canToggle={canEdit || isAssignee}
                     isReadOnly={!canEdit}
-                    showDepartment={user.role === 'Admin' || user.role === 'Manager'}
+                    showDepartment={user.role === 'Admin' || user.role === 'Manager' || user.role === 'Director'}
                     allUsers={users}
                   />
                 );

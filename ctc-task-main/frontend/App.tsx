@@ -68,9 +68,9 @@ export default function CTCTaskApp() {
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
-    if (currentUser.role === 'Admin' || currentUser.role === 'Director') return true;
+    if (currentUser.role === 'Admin') return true;
     if (currentUser.role === 'Manager') return task.department === currentUser.department;
-    if (currentUser.role === 'Employee') return task.createdBy === currentUser.id;
+    if (currentUser.role === 'Employee' || currentUser.role === 'Director') return task.createdBy === currentUser.id;
     return false;
   };
 

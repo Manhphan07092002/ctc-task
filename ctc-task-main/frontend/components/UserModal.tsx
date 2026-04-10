@@ -106,6 +106,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white"
                  >
                    <option value="Admin">Admin</option>
+                   <option value="Director">Director</option>
                    <option value="Manager">Manager</option>
                    <option value="Employee">Employee</option>
                  </select>

@@ -110,7 +110,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   const isReadOnly = !!(initialReport && initialReport.status !== 'Draft' && initialReport.authorId !== currentUser.id);
   const isManagerReview = !!(initialReport && initialReport.status === 'Pending' && currentUser.role === 'Manager' && currentUser.department === initialReport.department);
-  const isDirectorReview = !!(initialReport && initialReport.authorId !== currentUser.id && (currentUser.role === 'Director' || currentUser.role === 'Admin'));
+  const isDirectorReview = !!(initialReport && initialReport.authorId !== currentUser.id && currentUser.role === 'Director');
 
   const handleSave = (statusToSet: ReportStatus) => {
     const report: Report = {

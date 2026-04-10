@@ -76,7 +76,7 @@ export default function TasksPage({
               onDelete={checkPermission('delete', task, user) ? () => handleDeleteTask(task.id) : undefined} 
               canToggle={checkPermission('edit', task, user) || task.assignees.includes(user.id)} 
               isReadOnly={!checkPermission('edit', task, user)} 
-              showDepartment={user.role === 'Admin' || user.role === 'Manager'} 
+              showDepartment={user.role === 'Admin' || user.role === 'Manager' || user.role === 'Director'} 
               allUsers={users} 
             />
           ))}

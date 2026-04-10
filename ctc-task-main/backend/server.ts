@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,14 +11,14 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(cors());
   app.use(express.json());
 
   // Initialize SQLite
   const db = await open({
-    filename: './database.sqlite',
+    filename: process.env.DB_PATH || './database.sqlite',
     driver: sqlite3.Database
   });
 
@@ -359,7 +360,18 @@ async function startServer() {
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const frontendPath = path.join(__dirname, '../frontend/dist');
+  app.use(express.static(frontendPath));
+
+  app.use((req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    } else {
+      res.status(404).json({ error: 'API route not found' });
+    }
+  });
+
+  app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
