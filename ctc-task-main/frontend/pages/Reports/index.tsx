@@ -125,6 +125,11 @@ export default function ReportsPage() {
         {canViewAll && (
           <button className={tabClass('all')} onClick={() => setActiveTab('all')}>
             Toàn cục (Đã duyệt)
+            {directorReports.length > 0 && (
+              <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full">
+                {directorReports.length}
+              </span>
+            )}
           </button>
         )}
       </div>
