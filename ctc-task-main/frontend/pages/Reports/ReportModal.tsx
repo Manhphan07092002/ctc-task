@@ -213,7 +213,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     deptReports.forEach(r => {
       const authorName = users.find(u => u.id === r.authorId)?.name || 'Nhân viên';
       const parsed = parseContent(r.content);
-      if (parsed && parsed.tasks) {
+      
+      if (parsed && parsed.weekStart === weekStart && parsed.weekEnd === weekEnd && parsed.tasks) {
         // filter out empty rows
         const validTasks = parsed.tasks.filter(t => t.content.trim() !== '');
         validTasks.forEach(t => {

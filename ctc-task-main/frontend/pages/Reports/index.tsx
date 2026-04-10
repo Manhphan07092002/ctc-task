@@ -215,8 +215,20 @@ export default function ReportsPage() {
                   {renderStatusBadge(report.status)}
                 </div>
 
-                <div className="col-span-5 md:col-span-3 text-right text-sm text-gray-500">
-                  {new Date(report.approvedAt || report.submittedAt || report.createdAt).toLocaleDateString('vi-VN')}
+                <div className="col-span-5 md:col-span-3 flex flex-col items-end justify-center text-sm">
+                  {(() => {
+                    const d = new Date(report.approvedAt || report.submittedAt || report.createdAt);
+                    const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = d.toLocaleDateString('vi-VN');
+                    return (
+                      <>
+                        <span className="font-medium text-gray-700">{dateStr}</span>
+                        <span className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                          <Clock size={12} /> {timeStr}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             );
