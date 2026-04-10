@@ -49,14 +49,7 @@ export default function ReportsPage() {
   const managerRoleNames = useMemo(() => {
     return new Set(
       roles
-        .filter(r => {
-          try {
-            const perms = JSON.parse(r.permissions as any || '[]');
-            return perms.includes('approve_dept_reports');
-          } catch {
-            return false;
-          }
-        })
+        .filter(r => Array.isArray(r.permissions) && r.permissions.includes('approve_dept_reports'))
         .map(r => r.name)
     );
   }, [roles]);
