@@ -53,6 +53,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
             <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
             {NAV_ITEMS.map(item => {
               if (item.id === 'team' && user.role === 'Employee') return null;
+              if (item.id === 'admin' && user?.role?.toLowerCase() !== 'admin' && !user?.permissions?.includes('admin_panel')) return null;
+
+              // Admin link navigates OUTSIDE the SPA to the standalone admin layout
+              if (item.id === 'admin') {
+                return (
+                  <a
+                    key={item.id}
+                    href="/admin"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all text-gray-600 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100"
+                  >
+                    <item.icon size={18} />
+                    {t(item.id)}
+                  </a>
+                );
+              }
               
               // Map legacy item.id to Router Paths
               const path = item.id === 'dashboard' ? '/' : `/${item.id}`;

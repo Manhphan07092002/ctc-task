@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
+import AdminApp from './pages/Admin/AdminApp';
 import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -13,7 +14,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <LanguageProvider>
         <AuthProvider>
           <DataProvider>
-            <App />
+            <Routes>
+              <Route path="/admin/*" element={<AdminApp />} />
+              <Route path="/*" element={<App />} />
+            </Routes>
           </DataProvider>
         </AuthProvider>
       </LanguageProvider>

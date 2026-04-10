@@ -7,12 +7,14 @@ import {
   Users, 
   Settings,
   Video,
-  FileText
+  FileText,
+  Shield
 } from 'lucide-react';
 import { User, TaskPriority } from './types';
 
 export const NAV_ITEMS = [
   { id: 'dashboard', icon: LayoutDashboard },
+  { id: 'admin', icon: Shield },
   { id: 'tasks', icon: CheckSquare },
   { id: 'calendar', icon: Calendar },
   { id: 'notes', icon: StickyNote },

@@ -57,7 +57,9 @@ export interface Note {
   createdAt: string;
 }
 
-export type UserRole = 'Admin' | 'Director' | 'Manager' | 'Employee';
+// Core roles are the 4 built-in system roles.
+// The type is kept open (| string) to support custom roles created via Admin panel.
+export type UserRole = 'Admin' | 'Director' | 'Manager' | 'Employee' | (string & {});
 
 export type ReportStatus = 'Draft' | 'Pending' | 'Approved' | 'Rejected';
 
@@ -82,6 +84,7 @@ export interface User {
   role: UserRole;
   department: string;
   avatar: string;
+  permissions?: string[];
 }
 
 export type MeetingStatus = 'scheduled' | 'ongoing' | 'completed' | 'cancelled';

@@ -93,11 +93,75 @@ async function startServer() {
       approvedAt TEXT,
       approvedBy TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS roles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      permissions TEXT NOT NULL DEFAULT '[]',
+      isSystem INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS departments (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT,
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      managerId TEXT
+    );
   `);
 
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN directorFeedback TEXT;');
   } catch(e) { /* ignores if column already exists */ }
+
+  // Seed Roles
+  const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
+  if (roleCount.count === 0) {
+    const INITIAL_ROLES = [
+      {
+        id: 'role-admin', name: 'Admin', description: 'Toàn quyền hệ thống: quản lý người dùng, xem tất cả dữ liệu, cấu hình hệ thống.',
+        color: '#ef4444', permissions: JSON.stringify(['manage_users','view_all_tasks','view_all_reports','manage_meetings','admin_panel']), isSystem: 1
+      },
+      {
+        id: 'role-director', name: 'Director', description: 'Xem toàn bộ báo cáo đã phê duyệt, cung cấp phản hồi Giám đốc. Chỉ xem công việc.',
+        color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports','director_feedback','view_all_tasks']), isSystem: 1
+      },
+      {
+        id: 'role-manager', name: 'Manager', description: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.',
+        color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks','approve_dept_reports','view_dept_users']), isSystem: 1
+      },
+      {
+        id: 'role-employee', name: 'Employee', description: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần của bản thân.',
+        color: '#10b981', permissions: JSON.stringify(['view_own_tasks','create_report','join_meetings']), isSystem: 1
+      },
+    ];
+    for (const r of INITIAL_ROLES) {
+      await db.run(
+        'INSERT INTO roles (id, name, description, color, permissions, isSystem) VALUES (?, ?, ?, ?, ?, ?)',
+        [r.id, r.name, r.description, r.color, r.permissions, r.isSystem]
+      );
+    }
+  }
+
+  // Seed Departments
+  const deptCount = await db.get('SELECT COUNT(*) as count FROM departments');
+  if (deptCount.count === 0) {
+    const INITIAL_DEPTS = [
+      { id: 'dept-board',     name: 'Board',     description: 'Hội đồng quản trị và ban lãnh đạo công ty.',         color: '#ef4444' },
+      { id: 'dept-product',   name: 'Product',   description: 'Phát triển và quản lý sản phẩm.',                      color: '#3b82f6' },
+      { id: 'dept-marketing', name: 'Marketing', description: 'Tiếp thị và truyền thông thương hiệu.',              color: '#f59e0b' },
+      { id: 'dept-sales',     name: 'Sales',     description: 'Kiến tạo doanh thu và phát triển thị trường.',         color: '#10b981' },
+      { id: 'dept-it',        name: 'IT',        description: 'Hạ tầng công nghệ và hệ thống nội bộ.',              color: '#8b5cf6' },
+      { id: 'dept-hr',        name: 'HR',        description: 'Nhân sự, tuyển dụng và phát triển văn hoá doanh nghiệp.', color: '#ec4899' },
+      { id: 'dept-finance',   name: 'Finance',   description: 'Kế toán, tài chính và kiểm soát ngân sách.',         color: '#14b8a6' },
+    ];
+    for (const d of INITIAL_DEPTS) {
+      await db.run('INSERT INTO departments (id, name, description, color) VALUES (?, ?, ?, ?)',
+        [d.id, d.name, d.description, d.color]);
+    }
+  }
 
   // Seed Data
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
@@ -146,8 +210,12 @@ async function startServer() {
   // --- Users API ---
   app.get('/api/users', async (req, res) => {
     try {
-      const users = await db.all('SELECT * FROM users');
-      res.json(users);
+      const users = await db.all(`
+        SELECT u.*, r.permissions 
+        FROM users u 
+        LEFT JOIN roles r ON u.role = r.name
+      `);
+      res.json(users.map(u => ({ ...u, permissions: u.permissions ? JSON.parse(u.permissions) : [] })));
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.post('/api/users', async (req, res) => {
@@ -321,6 +389,158 @@ async function startServer() {
       await db.run('INSERT INTO signals (id, meetingId, `from`, `to`, type, data, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, meetingId, from, to, type, JSON.stringify(data), timestamp]);
       res.status(201).json({ id, timestamp });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // --- Roles API ---
+  app.get('/api/roles', async (req, res) => {
+    try {
+      const roles = await db.all('SELECT * FROM roles ORDER BY isSystem DESC, name ASC');
+      // Attach user count to each role
+      const result = await Promise.all(roles.map(async (r) => {
+        const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [r.name]);
+        return { ...r, permissions: JSON.parse(r.permissions || '[]'), userCount: count };
+      }));
+      res.json(result);
+    } catch(e) { res.status(500).json({ error: 'Failed to fetch roles' }); }
+  });
+
+  app.post('/api/roles', async (req, res) => {
+    const { id, name, description, color, permissions } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
+    try {
+      const newId = id || `role-${Date.now()}`;
+      await db.run(
+        'INSERT INTO roles (id, name, description, color, permissions, isSystem) VALUES (?, ?, ?, ?, ?, 0)',
+        [newId, name.trim(), description || '', color || '#6366f1', JSON.stringify(permissions || [])]
+      );
+      res.status(201).json({ id: newId });
+    } catch(e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+      res.status(500).json({ error: 'Failed to create role' });
+    }
+  });
+
+  app.put('/api/roles/:id', async (req, res) => {
+    const { name, description, color, permissions } = req.body;
+    try {
+      const existing = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
+      if (!existing) return res.status(404).json({ error: 'Not found' });
+      // System roles: only allow description and color update, not name or permissions
+      if (existing.isSystem) {
+        await db.run(
+          'UPDATE roles SET description = ?, color = ? WHERE id = ?',
+          [description ?? existing.description, color ?? existing.color, req.params.id]
+        );
+      } else {
+        await db.run(
+          'UPDATE roles SET name = ?, description = ?, color = ?, permissions = ? WHERE id = ?',
+          [name ?? existing.name, description ?? existing.description, color ?? existing.color,
+           JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]')), req.params.id]
+        );
+      }
+      res.json({ success: true });
+    } catch(e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+      res.status(500).json({ error: 'Failed to update role' });
+    }
+  });
+
+  app.delete('/api/roles/:id', async (req, res) => {
+    try {
+      const role = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
+      if (!role) return res.status(404).json({ error: 'Not found' });
+      if (role.isSystem) return res.status(403).json({ error: 'Không thể xóa vai trò hệ thống' });
+      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [role.name]);
+      if (count > 0) return res.status(409).json({ error: `Đang có ${count} người dùng với vai trò này` });
+      await db.run('DELETE FROM roles WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: 'Failed to delete role' }); }
+  });
+
+  // --- Departments API ---
+  app.get('/api/departments', async (req, res) => {
+    try {
+      const depts = await db.all('SELECT * FROM departments ORDER BY name ASC');
+      const result = await Promise.all(depts.map(async (d) => {
+        const { count: userCount } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [d.name]);
+        const { count: taskCount } = await db.get('SELECT COUNT(*) as count FROM tasks WHERE department = ?', [d.name]);
+        const manager = d.managerId ? await db.get('SELECT id, name, avatar FROM users WHERE id = ?', [d.managerId]) : null;
+        return { ...d, userCount, taskCount, manager };
+      }));
+      res.json(result);
+    } catch(e) { res.status(500).json({ error: 'Failed to fetch departments' }); }
+  });
+
+  app.post('/api/departments', async (req, res) => {
+    const { id, name, description, color, managerId } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Tên phòng ban không được trống' });
+    try {
+      const newId = id || `dept-${Date.now()}`;
+      await db.run('INSERT INTO departments (id, name, description, color, managerId) VALUES (?, ?, ?, ?, ?)',
+        [newId, name.trim(), description || '', color || '#6366f1', managerId || null]);
+      res.status(201).json({ id: newId });
+    } catch(e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+      res.status(500).json({ error: 'Failed to create department' });
+    }
+  });
+
+  app.put('/api/departments/:id', async (req, res) => {
+    const { name, description, color, managerId } = req.body;
+    try {
+      const existing = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
+      if (!existing) return res.status(404).json({ error: 'Not found' });
+      const oldName = existing.name;
+      const newName = name?.trim() ?? oldName;
+      await db.run('UPDATE departments SET name = ?, description = ?, color = ?, managerId = ? WHERE id = ?',
+        [newName, description ?? existing.description, color ?? existing.color, managerId ?? existing.managerId, req.params.id]);
+      // Update users and tasks if name changed
+      if (newName !== oldName) {
+        await db.run('UPDATE users SET department = ? WHERE department = ?', [newName, oldName]);
+        await db.run('UPDATE tasks SET department = ? WHERE department = ?', [newName, oldName]);
+      }
+      res.json({ success: true });
+    } catch(e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+      res.status(500).json({ error: 'Failed to update department' });
+    }
+  });
+
+  app.delete('/api/departments/:id', async (req, res) => {
+    try {
+      const dept = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
+      if (!dept) return res.status(404).json({ error: 'Not found' });
+      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [dept.name]);
+      if (count > 0) return res.status(409).json({ error: `Đang có ${count} nhân viên trong phòng ban này` });
+      await db.run('DELETE FROM departments WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: 'Failed to delete department' }); }
+  });
+
+  // --- Admin Analytics API ---
+  app.get('/api/admin/stats', async (req, res) => {
+    try {
+      const userCountDesc = await db.get('SELECT COUNT(*) as count FROM users');
+      const taskCountDesc = await db.get('SELECT COUNT(*) as count FROM tasks');
+      const reportCountDesc = await db.get('SELECT COUNT(*) as count FROM reports');
+      const meetingCountDesc = await db.get('SELECT COUNT(*) as count FROM meetings WHERE status != "ended"');
+      
+      const roleBreakdown = await db.all('SELECT role, COUNT(*) as count FROM users GROUP BY role');
+      const taskStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM tasks GROUP BY status');
+      const taskDeptBreakdown = await db.all('SELECT department, COUNT(*) as count FROM tasks GROUP BY department');
+      
+      res.json({
+        totalUsers: userCountDesc.count,
+        totalTasks: taskCountDesc.count,
+        totalReports: reportCountDesc.count,
+        activeMeetings: meetingCountDesc.count,
+        roleBreakdown,
+        taskStatusBreakdown,
+        taskDeptBreakdown
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to fetch admin stats' });
+    }
   });
 
   // --- Reports API ---
