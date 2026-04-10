@@ -217,6 +217,7 @@ export default function ReportsPage() {
         currentUser={user}
         tasks={tasks}
         departments={departments}
+        users={users}
         t={t}
       />
     </div>

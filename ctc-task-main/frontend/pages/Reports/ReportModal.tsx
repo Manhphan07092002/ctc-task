@@ -30,6 +30,7 @@ interface ReportModalProps {
   currentUser: UserType;
   tasks: Task[];
   departments: Department[];
+  users: UserType[];
   t: (key: string) => string;
 }
 
@@ -75,7 +76,7 @@ const RESULT_OPTIONS: { value: TaskRow['result']; label: string; color: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export const ReportModal: React.FC<ReportModalProps> = ({
-  isOpen, onClose, onSave, initialReport, currentUser, tasks, departments,
+  isOpen, onClose, onSave, initialReport, currentUser, tasks, departments, users,
 }) => {
   const week = getWeekRange();
 
@@ -111,13 +112,20 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     currentUser.department === initialReport.department &&
     initialReport.authorId !== currentUser.id
   );
-  const isManagerReview = isPendingMgrReview || isPendingDirReview;
-  const isDirectorReview = !!(
+
+  // Director viewing someone else's pending = read-only form + director approve button
+  const isFormReadOnly = isReadOnly || isPendingDirReview;
+  // Manager review: only manager approving EMPLOYEE reports (same dept, not own)
+  const isManagerReview = isPendingMgrReview;
+  // Director review modes
+  const isDirectorPendingReview = isPendingDirReview;
+  const isDirectorFeedbackReview = !!(
     initialReport &&
     initialReport.status === 'Approved' &&
     initialReport.authorId !== currentUser.id &&
     canDirectorF
   );
+  const isDirectorReview = isDirectorFeedbackReview;
 
   // ── Load initial data ──
   useEffect(() => {
@@ -241,7 +249,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 type="date"
                 value={weekStart}
                 onChange={e => setWeekStart(e.target.value)}
-                disabled={isReadOnly}
+                disabled={isFormReadOnly}
                 className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50"
               />
               <span className="text-gray-400 text-sm">đến</span>
@@ -249,7 +257,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 type="date"
                 value={weekEnd}
                 onChange={e => setWeekEnd(e.target.value)}
-                disabled={isReadOnly}
+                disabled={isFormReadOnly}
                 className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50"
               />
             </div>
@@ -258,16 +266,16 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
               <User size={14} className="text-blue-500" />
               <span>Người báo cáo:</span>
-              <span className="font-semibold text-gray-800">{initialReport
-                ? /* look up author name if viewing */
-                  currentUser.name
-                : currentUser.name}
+              <span className="font-semibold text-gray-800">
+                {initialReport
+                  ? (users?.find(u => u.id === initialReport.authorId)?.name || initialReport.title.split('·')[1]?.trim() || currentUser.name)
+                  : currentUser.name}
               </span>
             </div>
             <input
               value={title}
               onChange={e => setTitle(e.target.value)}
-              disabled={isReadOnly}
+              disabled={isFormReadOnly}
               placeholder="Tiêu đề báo cáo..."
               className="w-full text-center text-sm border-0 border-b border-dashed border-gray-300 focus:outline-none focus:border-blue-400 text-gray-700 bg-transparent py-1 disabled:text-gray-500"
             />
@@ -319,7 +327,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <textarea
                         value={row.content}
                         onChange={e => updateRow(row.id, 'content', e.target.value)}
-                        disabled={isReadOnly}
+                        disabled={isFormReadOnly}
                         rows={2}
                         placeholder="Mô tả công việc..."
                         className="w-full resize-none text-sm text-gray-800 bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
@@ -357,7 +365,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <textarea
                         value={row.nextAction}
                         onChange={e => updateRow(row.id, 'nextAction', e.target.value)}
-                        disabled={isReadOnly}
+                        disabled={isFormReadOnly}
                         rows={2}
                         placeholder="Bước tiếp theo..."
                         className="w-full resize-none text-sm text-gray-800 bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
@@ -369,7 +377,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <textarea
                         value={row.note}
                         onChange={e => updateRow(row.id, 'note', e.target.value)}
-                        disabled={isReadOnly}
+                        disabled={isFormReadOnly}
                         rows={2}
                         placeholder="Ghi chú..."
                         className="w-full resize-none text-xs text-gray-600 bg-transparent border-0 outline-none focus:bg-white focus:ring-1 focus:ring-blue-300 rounded-lg p-1.5 transition-all disabled:cursor-default placeholder-gray-300"
@@ -413,7 +421,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             <textarea
               value={nextWeekPlan}
               onChange={e => setNextWeekPlan(e.target.value)}
-              disabled={isReadOnly}
+              disabled={isFormReadOnly}
               rows={3}
               placeholder={`- Xử lý các công việc chưa thực hiện được ở tuần trước\n- Theo dõi các gói thầu ...\n- ...`}
               className="w-full resize-none text-sm text-gray-700 bg-white/80 border border-amber-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-300 placeholder-gray-400 disabled:bg-amber-50/30 disabled:cursor-default"
@@ -468,8 +476,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           </button>
 
           <div className="flex gap-2">
-            {/* Employee sending */}
-            {!isReadOnly && !isManagerReview && (
+            {/* Employee / Manager sending their OWN report */}
+            {!isFormReadOnly && !isManagerReview && !isDirectorPendingReview && (
               <>
                 <button
                   onClick={() => handleSave('Draft')}
@@ -486,7 +494,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               </>
             )}
 
-            {/* Manager / Director approval */}
+            {/* MANAGER approves employee report: Từ chối / Duyệt & Gửi GĐ */}
             {isManagerReview && (
               <>
                 <button
@@ -499,13 +507,24 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   onClick={() => handleAction('Approved')}
                   className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors shadow-sm"
                 >
-                  <CheckCircle size={15} />
-                  {isPendingDirReview ? 'Phê duyệt' : 'Duyệt & Gửi Giám Đốc'}
+                  <CheckCircle size={15} /> Duyệt &amp; Gửi Giám Đốc
                 </button>
               </>
             )}
 
-            {/* Director feedback save */}
+            {/* DIRECTOR approves manager's Pending report: Phê duyệt only */}
+            {isDirectorPendingReview && (
+              <>
+                <button
+                  onClick={() => handleAction('Approved')}
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors shadow-sm"
+                >
+                  <CheckCircle size={15} /> Phê duyệt
+                </button>
+              </>
+            )}
+
+            {/* DIRECTOR feedback on Approved report */}
             {isDirectorReview && (
               <button
                 onClick={() => handleAction(initialReport!.status)}
