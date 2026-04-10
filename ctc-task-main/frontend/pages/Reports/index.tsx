@@ -45,27 +45,17 @@ export default function ReportsPage() {
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, user, canApprove]);
 
-  // IDs of users who are department managers
-  const managerIds = useMemo(
-    () => new Set(departments.map(d => d.managerId).filter(Boolean)),
-    [departments]
-  );
-
   const pendingDirectorReports = useMemo(() => {
-    if (!canViewAll || !user) return [];
-    // Director only sees Pending reports authored by department managers (Trưởng phòng)
-    return reports
-      .filter(r => r.status === 'Pending' && r.authorId !== user.id && managerIds.has(r.authorId))
-      .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
-  }, [reports, canViewAll, user, managerIds]);
+    return []; // Directors no longer use the Pending tab
+  }, []);
 
   const directorReports = useMemo(() => {
     if (!canViewAll) return [];
-    // Director only sees Approved reports authored by department managers (Trưởng phòng)
+    // Director sees ALL Approved reports (from employees approved by managers)
     return reports
-      .filter(r => r.status === 'Approved' && managerIds.has(r.authorId))
+      .filter(r => r.status === 'Approved')
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
-  }, [reports, canViewAll, managerIds]);
+  }, [reports, canViewAll]);
 
   // ── Early return AFTER all hooks ──
   if (!user) return null;
@@ -106,7 +96,7 @@ export default function ReportsPage() {
           <h2 className="text-xl font-bold text-gray-800">Quản lý Báo cáo</h2>
           <p className="text-gray-500 text-sm mt-1">Gửi hoặc xem báo cáo công việc hàng tuần</p>
         </div>
-        {canCreate && (
+        {canCreate && !canViewAll && (
           <Button onClick={handleOpenCreate}>
             <PlusCircle size={18} className="mr-2" /> Tạo báo cáo tuần này
           </Button>
@@ -115,11 +105,13 @@ export default function ReportsPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        <button className={tabClass('mine')} onClick={() => setActiveTab('mine')}>
-          Báo cáo của tôi
-        </button>
+        {!canViewAll && (
+          <button className={tabClass('mine')} onClick={() => setActiveTab('mine')}>
+            Báo cáo của tôi
+          </button>
+        )}
 
-        {(canApprove || canViewAll) && (
+        {!canViewAll && canApprove && (
           <button className={tabClass('pending')} onClick={() => setActiveTab('pending')}>
             Cần duyệt
             {pendingList.length > 0 && (
@@ -146,7 +138,7 @@ export default function ReportsPage() {
       {activeTab === 'all' && canViewAll && (
         <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-6">
           <p className="font-bold text-base">Chế độ Xem Toàn Cục</p>
-          <p className="text-sm mt-0.5">Bạn đang xem báo cáo tổng hợp đã được Trưởng phòng gửi và phê duyệt. Mỗi Trưởng phòng đại diện cho toàn phòng ban của mình.</p>
+          <p className="text-sm mt-0.5">Bạn đang xem tất cả báo cáo đã được Trưởng phòng phê duyệt trên toàn hệ thống.</p>
         </div>
       )}
 
