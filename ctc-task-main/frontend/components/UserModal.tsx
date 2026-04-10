@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { X, User as UserIcon, Mail, Shield, Briefcase } from 'lucide-react';
 import { Button, Input } from './UI';
+import { useData } from '../contexts/DataContext';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -12,10 +13,15 @@ interface UserModalProps {
 }
 
 export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, initialUser }) => {
+  const { roles, departments } = useData();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<UserRole>('Employee');
-  const [department, setDepartment] = useState('General');
+  
+  const defaultRole = roles.length > 0 ? roles[0].name : 'Employee';
+  const defaultDepartment = departments.length > 0 ? departments[0].name : 'Product';
+
+  const [role, setRole] = useState<UserRole>(defaultRole);
+  const [department, setDepartment] = useState(defaultDepartment);
   const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
@@ -29,12 +35,12 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
       } else {
         setName('');
         setEmail('');
-        setRole('Employee');
-        setDepartment('Product'); // Default
+        setRole(roles.length > 0 ? roles[0].name : 'Employee');
+        setDepartment(departments.length > 0 ? departments[0].name : 'Product');
         setAvatarUrl(`https://picsum.photos/id/${Math.floor(Math.random() * 100)}/50/50`);
       }
     }
-  }, [isOpen, initialUser]);
+  }, [isOpen, initialUser, roles, departments]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,10 +111,14 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
                    onChange={(e) => setRole(e.target.value as UserRole)}
                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white"
                  >
-                   <option value="Admin">Admin</option>
-                   <option value="Director">Director</option>
-                   <option value="Manager">Manager</option>
-                   <option value="Employee">Employee</option>
+                   {roles.length > 0 ? (
+                     roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)
+                   ) : (
+                     <><option value="Admin">Admin</option>
+                     <option value="Director">Director</option>
+                     <option value="Manager">Manager</option>
+                     <option value="Employee">Employee</option></>
+                   )}
                  </select>
               </div>
             </div>
@@ -121,11 +131,15 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
                    onChange={(e) => setDepartment(e.target.value)}
                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white"
                  >
-                   <option value="Board">Board</option>
-                   <option value="Product">Product</option>
-                   <option value="Marketing">Marketing</option>
-                   <option value="Sales">Sales</option>
-                   <option value="IT">IT</option>
+                   {departments.length > 0 ? (
+                     departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)
+                   ) : (
+                     <><option value="Board">Board</option>
+                     <option value="Product">Product</option>
+                     <option value="Marketing">Marketing</option>
+                     <option value="Sales">Sales</option>
+                     <option value="IT">IT</option></>
+                   )}
                  </select>
               </div>
             </div>

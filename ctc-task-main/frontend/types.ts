@@ -106,3 +106,20 @@ export interface CalendarDay {
   isCurrentMonth: boolean;
   isToday: boolean;
 }
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  permissions: string[];
+  isSystem: number;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  managerId?: string;
+}

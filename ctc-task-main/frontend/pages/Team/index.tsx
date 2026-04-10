@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Button, Card, Avatar } from '../../components/UI';
 import { PlusCircle, Shield, Edit, Trash2 } from 'lucide-react';
 import { User } from '../../types';
+import { useData } from '../../contexts/DataContext';
 
 interface TeamPageProps {
   t: (key: string) => string;
@@ -16,6 +17,8 @@ interface TeamPageProps {
 export default function TeamPage({
   t, user, users, openCreateUserModal, openEditUserModal, handleDeleteUser
 }: TeamPageProps) {
+  const { roles } = useData();
+
   if (user.role === 'Employee') {
     return <Navigate to="/" replace />;
   }
@@ -40,10 +43,18 @@ export default function TeamPage({
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-gray-800 text-lg truncate">{u.name}</h4>
               <p className="text-gray-500 text-sm mb-2">{u.department} • {u.email}</p>
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${u.role === 'Admin' ? 'bg-brand-100 text-brand-700' : u.role === 'Manager' ? 'bg-purple-100 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
-                {u.role === 'Admin' && <Shield size={10} />}
-                {u.role}
-              </span>
+              
+              {(() => {
+                const roleObj = roles.find(r => r.name === u.role);
+                const roleColor = roleObj?.color || '#3b82f6'; // default blue
+                return (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                    style={{ backgroundColor: roleColor + '18', color: roleColor, borderColor: roleColor + '44' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    {u.role}
+                  </span>
+                )
+              })()}
             </div>
             {user.role === 'Admin' && (
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm rounded-lg p-1">

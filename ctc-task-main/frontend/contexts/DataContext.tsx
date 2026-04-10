@@ -1,15 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Task, Note, User, Report } from '../types';
+import { Task, Note, User, Report, Role, Department } from '../types';
 import { getTasks as fetchTasks, saveTask as apiSaveTask, deleteTask as apiDeleteTask } from '../services/taskService';
 import { getNotes as fetchNotes, saveNote as apiSaveNote, deleteNote as apiDeleteNote } from '../services/noteService';
 import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '../services/userService';
 import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport } from '../services/reportService';
+import { getRoles as fetchRoles } from '../services/roleService';
+import { getDepartments as fetchDepartments } from '../services/departmentService';
 
 interface DataContextType {
   tasks: Task[];
   notes: Note[];
   users: User[];
   reports: Report[];
+  roles: Role[];
+  departments: Department[];
   isLoading: boolean;
   error: string | null;
   saveTask: (t: Task) => Promise<void>;
@@ -30,17 +34,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [notes, setNotes] = useState<Note[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      const [tRes, nRes, uRes, rRes] = await Promise.all([fetchTasks(), fetchNotes(), fetchUsers(), fetchReports()]);
+      const [tRes, nRes, uRes, rRes, rolesRes, deptsRes] = await Promise.all([
+        fetchTasks(), fetchNotes(), fetchUsers(), fetchReports(), fetchRoles(), fetchDepartments()
+      ]);
       setTasks(tRes);
       setNotes(nRes);
       setUsers(uRes);
       setReports(rRes);
+      setRoles(rolesRes);
+      setDepartments(deptsRes);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch data');
@@ -95,7 +105,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      tasks, notes, users, reports, isLoading, error,
+      tasks, notes, users, reports, roles, departments, isLoading, error,
       saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser, saveReport, deleteReport, refreshData
     }}>
       {children}
