@@ -18,8 +18,11 @@ export default function TeamPage({
   t, user, users, openCreateUserModal, openEditUserModal, handleDeleteUser
 }: TeamPageProps) {
   const { roles } = useData();
+  const perms = user.permissions || [];
+  const canViewTeam = perms.includes('view_dept_users') || perms.includes('manage_users');
+  const canManageTeam = perms.includes('manage_users');
 
-  if (user.role === 'Employee') {
+  if (!canViewTeam) {
     return <Navigate to="/" replace />;
   }
 
@@ -30,14 +33,14 @@ export default function TeamPage({
           <h2 className="text-xl font-bold text-gray-800">{t('teamMembers')}</h2>
           <p className="text-gray-500 text-sm mt-1">Manage your team and permissions</p>
         </div>
-        {user.role === 'Admin' && (
+        {canManageTeam && (
           <Button onClick={() => openCreateUserModal()}>
             <PlusCircle size={18} className="mr-2" /> Add Member
           </Button>
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {users.filter(u => (user.role === 'Admin' || user.role === 'Director') ? true : u.department === user.department).map(u => (
+        {users.filter(u => canManageTeam ? true : u.department === user.department).map(u => (
           <Card key={u.id} className="p-6 flex items-center gap-4 relative group">
             <Avatar src={u.avatar} alt={u.name} size={16} />
             <div className="flex-1 min-w-0">
@@ -56,7 +59,7 @@ export default function TeamPage({
                 )
               })()}
             </div>
-            {user.role === 'Admin' && (
+            {canManageTeam && (
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm rounded-lg p-1">
                 <button 
                   onClick={() => openEditUserModal(u)} 

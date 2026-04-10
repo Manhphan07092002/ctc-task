@@ -52,8 +52,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
 
             <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
             {NAV_ITEMS.map(item => {
-              if (item.id === 'team' && user.role === 'Employee') return null;
-              if (item.id === 'admin' && user?.role?.toLowerCase() !== 'admin' && !user?.permissions?.includes('admin_panel')) return null;
+              const perms = user?.permissions || [];
+              const hasPerm = (p: string) => perms.includes(p);
+              
+              if (item.id === 'tasks' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
+              if (item.id === 'calendar' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
+              if (item.id === 'meetings' && !hasPerm('join_meetings') && !hasPerm('manage_meetings')) return null;
+              if (item.id === 'reports' && !hasPerm('view_all_reports') && !hasPerm('approve_dept_reports') && !hasPerm('create_report') && !hasPerm('director_feedback')) return null;
+              if (item.id === 'team' && !hasPerm('view_dept_users') && !hasPerm('manage_users')) return null;
+              if (item.id === 'admin' && !hasPerm('admin_panel')) return null;
 
               // Admin link navigates OUTSIDE the SPA to the standalone admin layout
               if (item.id === 'admin') {

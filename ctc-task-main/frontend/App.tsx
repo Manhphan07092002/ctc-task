@@ -68,19 +68,19 @@ export default function CTCTaskApp() {
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
-    if (currentUser.role === 'Admin') return true;
-    if (currentUser.role === 'Manager') return task.department === currentUser.department;
-    if (currentUser.role === 'Employee' || currentUser.role === 'Director') return task.createdBy === currentUser.id;
-    return false;
+    const perms = currentUser.permissions || [];
+    if (perms.includes('admin_panel') || perms.includes('manage_users')) return true;
+    if (perms.includes('manage_dept_tasks')) return task.department === currentUser.department;
+    return task.createdBy === currentUser.id;
   };
 
   const roleBasedTasks = useMemo(() => {
     if (!user) return [];
+    const perms = user.permissions || [];
     return tasks.filter(t => {
-      if (user.role === 'Admin' || user.role === 'Director') return true;
-      if (t.assignees.includes(user.id)) return true;
-      if (user.role === 'Manager' && t.department === user.department) return true;
-      if (user.role === 'Employee' && t.createdBy === user.id) return true;
+      if (perms.includes('admin_panel') || perms.includes('view_all_tasks')) return true;
+      if (perms.includes('manage_dept_tasks') && t.department === user.department) return true;
+      if (t.assignees.includes(user.id) || t.createdBy === user.id) return true;
       return false;
     });
   }, [tasks, user]);
@@ -109,7 +109,7 @@ export default function CTCTaskApp() {
     // Report Reminder: Every Friday at >= 16:00
     const checkReportTime = () => {
       const now = new Date();
-      if (now.getDay() === 5 && now.getHours() >= 16 && user && user.role !== 'Admin' && user.role !== 'Director') {
+      if (now.getDay() === 5 && now.getHours() >= 16 && user && user.permissions?.includes('create_report')) {
         const hasFired = localStorage.getItem(`report_reminder_${now.toLocaleDateString()}`);
         if (!hasFired) {
           setNotification({

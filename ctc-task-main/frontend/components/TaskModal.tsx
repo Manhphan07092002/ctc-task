@@ -57,9 +57,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Determine assignable users based on Role
+  // Determine assignable users based on Permissions
   const assignableUsers = allUsers.filter(u => {
-    if (user.role === 'Admin' || user.role === 'Director') return true;
+    const perms = user.permissions || [];
+    if (perms.includes('manage_users') || perms.includes('view_all_tasks')) return true;
     return u.department === user.department;
   });
 
