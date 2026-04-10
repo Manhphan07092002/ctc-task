@@ -18,6 +18,7 @@ const translations = {
     notes: 'Notes',
     team: 'Team',
     settings: 'Settings',
+    reports: 'Reports',
     // Header
     search: 'Search...',
     goodMorning: 'Good Morning',
@@ -142,8 +143,9 @@ const translations = {
     calendar: 'Lịch',
     tasks: 'Công việc',
     notes: 'Ghi chú',
-    team: 'Nhóm',
+    team: 'Đội ngũ',
     settings: 'Cài đặt',
+    reports: 'Báo cáo',
     // Header
     search: 'Tìm kiếm...',
     goodMorning: 'Chào buổi sáng',

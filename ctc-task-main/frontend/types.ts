@@ -59,6 +59,21 @@ export interface Note {
 
 export type UserRole = 'Admin' | 'Manager' | 'Employee';
 
+export type ReportStatus = 'Draft' | 'Pending' | 'Approved' | 'Rejected';
+
+export interface Report {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  department: string;
+  status: ReportStatus;
+  createdAt: string;
+  submittedAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
+}
+
 export interface User {
   id: string;
   name: string;

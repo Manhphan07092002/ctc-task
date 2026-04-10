@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Task, Note, User } from '../types';
+import { Task, Note, User, Report } from '../types';
 import { getTasks as fetchTasks, saveTask as apiSaveTask, deleteTask as apiDeleteTask } from '../services/taskService';
 import { getNotes as fetchNotes, saveNote as apiSaveNote, deleteNote as apiDeleteNote } from '../services/noteService';
 import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '../services/userService';
+import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport } from '../services/reportService';
 
 interface DataContextType {
   tasks: Task[];
   notes: Note[];
   users: User[];
+  reports: Report[];
   isLoading: boolean;
   error: string | null;
   saveTask: (t: Task) => Promise<void>;
@@ -16,6 +18,8 @@ interface DataContextType {
   deleteNote: (id: string) => Promise<void>;
   saveUser: (u: User) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  saveReport: (r: Report) => Promise<void>;
+  deleteReport: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -25,16 +29,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      const [tRes, nRes, uRes] = await Promise.all([fetchTasks(), fetchNotes(), fetchUsers()]);
+      const [tRes, nRes, uRes, rRes] = await Promise.all([fetchTasks(), fetchNotes(), fetchUsers(), fetchReports()]);
       setTasks(tRes);
       setNotes(nRes);
       setUsers(uRes);
+      setReports(rRes);
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch data');
@@ -77,10 +83,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await refreshData();
   };
 
+  const saveReport = async (report: Report) => {
+    await apiSaveReport(report);
+    await refreshData();
+  };
+
+  const deleteReport = async (id: string) => {
+    await apiDeleteReport(id);
+    await refreshData();
+  };
+
   return (
     <DataContext.Provider value={{
-      tasks, notes, users, isLoading, error,
-      saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser, refreshData
+      tasks, notes, users, reports, isLoading, error,
+      saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser, saveReport, deleteReport, refreshData
     }}>
       {children}
     </DataContext.Provider>

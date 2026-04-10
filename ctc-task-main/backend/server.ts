@@ -79,6 +79,19 @@ async function startServer() {
       color TEXT,
       createdAt TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT,
+      authorId TEXT NOT NULL,
+      department TEXT NOT NULL,
+      status TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      submittedAt TEXT,
+      approvedAt TEXT,
+      approvedBy TEXT
+    );
   `);
 
   // Seed Data
@@ -299,9 +312,46 @@ async function startServer() {
     const { id, from, to, type, data } = req.body;
     try {
       const timestamp = Date.now();
-      await db.run('INSERT INTO signals (id, meetingId, \`from\`, \`to\`, type, data, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, meetingId, from, to, type, JSON.stringify(data), timestamp]);
+      await db.run('INSERT INTO signals (id, meetingId, `from`, `to`, type, data, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, meetingId, from, to, type, JSON.stringify(data), timestamp]);
       res.status(201).json({ id, timestamp });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // --- Reports API ---
+  app.get('/api/reports', async (req, res) => {
+    try {
+      const reports = await db.all('SELECT * FROM reports');
+      res.json(reports);
+    } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
+  });
+
+  app.post('/api/reports', async (req, res) => {
+    const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy } = req.body;
+    try {
+      await db.run(
+        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null]
+      );
+      res.status(201).json({ id });
+    } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
+  });
+
+  app.put('/api/reports/:id', async (req, res) => {
+    const { title, content, status, submittedAt, approvedAt, approvedBy } = req.body;
+    try {
+      await db.run(
+        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=? WHERE id=?',
+        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
+  });
+
+  app.delete('/api/reports/:id', async (req, res) => {
+    try {
+      await db.run('DELETE FROM reports WHERE id=?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });
 
   app.listen(PORT, '0.0.0.0', () => {

@@ -6,7 +6,8 @@ import {
   StickyNote, 
   Users, 
   Settings,
-  Video
+  Video,
+  FileText
 } from 'lucide-react';
 import { User, TaskPriority } from './types';
 
@@ -16,6 +17,7 @@ export const NAV_ITEMS = [
   { id: 'calendar', icon: Calendar },
   { id: 'notes', icon: StickyNote },
   { id: 'meetings', icon: Video },
+  { id: 'reports', icon: FileText },
   { id: 'team', icon: Users },
   { id: 'settings', icon: Settings },
 ];

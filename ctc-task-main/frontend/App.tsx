@@ -11,6 +11,7 @@ import { CalendarView as CalendarPage } from './pages/Calendar/index';
 import { MeetingView as MeetingsPage } from './pages/Meetings/index';
 import { JoinMeetingPage } from './pages/Meetings/JoinMeeting';
 import { SettingsView as SettingsPage } from './pages/Settings/index';
+import ReportsPage from './pages/Reports/index';
 
 import { Sparkles } from 'lucide-react';
 
@@ -103,6 +104,29 @@ export default function CTCTaskApp() {
     const intervalId = setInterval(checkPendingTasks, 300000);
     return () => clearInterval(intervalId);
   }, [rawTodaysTasks]);
+
+  useEffect(() => {
+    // Report Reminder: Every Friday at >= 16:00
+    const checkReportTime = () => {
+      const now = new Date();
+      if (now.getDay() === 5 && now.getHours() >= 16 && user && user.role !== 'Admin') {
+        const hasFired = localStorage.getItem(`report_reminder_${now.toLocaleDateString()}`);
+        if (!hasFired) {
+          setNotification({
+            visible: true, 
+            title: "⏰ Đã đến giờ làm Báo cáo!",
+            message: "Hôm nay là Thứ 6, đã qua 16h00. Vui lòng vào mục Báo cáo để tạo và gửi báo cáo công việc tuần này nhé!", 
+            type: 'warning'
+          });
+          localStorage.setItem(`report_reminder_${now.toLocaleDateString()}`, 'true');
+          setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 15000);
+        }
+      }
+    };
+    const interval = setInterval(checkReportTime, 60000);
+    checkReportTime(); // check immediately on mount
+    return () => clearInterval(interval);
+  }, [user]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
@@ -278,6 +302,8 @@ export default function CTCTaskApp() {
                   handleDeleteUser={handleDeleteUser}
                 />
               } />
+
+              <Route path="/reports" element={<ReportsPage />} />
 
               <Route path="/meetings" element={<MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
               <Route path="/meetings/join/:meetingId" element={<JoinMeetingPage onJoinMeeting={setActiveMeeting} />} />
