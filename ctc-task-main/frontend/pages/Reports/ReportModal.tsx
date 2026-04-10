@@ -57,6 +57,22 @@ function fmtDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
+const DateInput = ({ value, onChange, disabled, className }: { value: string, onChange: (v: string) => void, disabled?: boolean, className?: string }) => {
+  const [type, setType] = useState<'text'|'date'>('text');
+  return (
+    <input
+      type={type}
+      value={type === 'text' ? fmtDate(value) : value}
+      onChange={e => onChange(e.target.value)}
+      onFocus={() => setType('date')}
+      onBlur={() => setType('text')}
+      disabled={disabled}
+      className={className || "border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 text-center"}
+      style={{ minWidth: '130px' }}
+    />
+  );
+};
+
 function parseContent(raw: string): StructuredContent | null {
   try {
     const obj = JSON.parse(raw);
@@ -300,20 +316,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 <CalendarDays size={14} className="text-blue-500" />
                 <span>Tuần từ</span>
               </div>
-              <input
-                type="date"
+              <DateInput
                 value={weekStart}
-                onChange={e => setWeekStart(e.target.value)}
+                onChange={setWeekStart}
                 disabled={isFormReadOnly}
-                className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50"
+                className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 text-center"
               />
               <span className="text-gray-400 text-sm">đến</span>
-              <input
-                type="date"
+              <DateInput
                 value={weekEnd}
-                onChange={e => setWeekEnd(e.target.value)}
+                onChange={setWeekEnd}
                 disabled={isFormReadOnly}
-                className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50"
+                className="border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 text-center"
               />
             </div>
 
