@@ -57,7 +57,7 @@ export interface Note {
   createdAt: string;
 }
 
-export type UserRole = 'Admin' | 'Manager' | 'Employee';
+export type UserRole = 'Admin' | 'Director' | 'Manager' | 'Employee';
 
 export type ReportStatus = 'Draft' | 'Pending' | 'Approved' | 'Rejected';
 
@@ -72,6 +72,7 @@ export interface Report {
   submittedAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  directorFeedback?: string;
 }
 
 export interface User {

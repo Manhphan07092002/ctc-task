@@ -29,8 +29,8 @@ export default function ReportsPage() {
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, user]);
 
-  const adminReports = useMemo(() => {
-    if (user.role !== 'Admin') return [];
+  const directorReports = useMemo(() => {
+    if (user.role !== 'Admin' && user.role !== 'Director') return [];
     return reports
       .filter(r => r.status === 'Approved')
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
@@ -59,8 +59,8 @@ export default function ReportsPage() {
   };
 
   let displayedReports: Report[] = [];
-  if (user.role === 'Admin') {
-    displayedReports = adminReports;
+  if (user.role === 'Admin' || user.role === 'Director') {
+    displayedReports = directorReports;
   } else if (activeTab === 'mine') {
     displayedReports = myReports;
   } else {
@@ -74,7 +74,7 @@ export default function ReportsPage() {
           <h2 className="text-xl font-bold text-gray-800">Quản lý Báo cáo</h2>
           <p className="text-gray-500 text-sm mt-1">Gửi báo cáo công việc hàng tuần cho Quản lý</p>
         </div>
-        {user.role !== 'Admin' && (
+        {user.role !== 'Admin' && user.role !== 'Director' && (
           <Button onClick={handleOpenCreate}>
             <PlusCircle size={18} className="mr-2" /> Tạo báo cáo tuần này
           </Button>
@@ -101,10 +101,12 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {user.role === 'Admin' && (
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-6">
-          <p className="font-medium">Chế độ Giám đốc</p>
-          <p className="text-sm">Bạn đang xem tất cả các báo cáo đã được Trưởng phòng phê duyệt.</p>
+      {(user.role === 'Admin' || user.role === 'Director') && (
+        <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-6 flex justify-between items-center">
+          <div>
+            <p className="font-bold text-lg flex items-center gap-2">Chế độ {user.role === 'Admin' ? 'Quản trị viên' : 'Giám đốc'}</p>
+            <p className="text-sm">Bạn đang xem tất cả các báo cáo đã được Trưởng phòng phê duyệt trên toàn hệ thống.</p>
+          </div>
         </div>
       )}
 

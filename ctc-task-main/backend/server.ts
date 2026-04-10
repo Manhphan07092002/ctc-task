@@ -94,6 +94,10 @@ async function startServer() {
     );
   `);
 
+  try {
+    await db.exec('ALTER TABLE reports ADD COLUMN directorFeedback TEXT;');
+  } catch(e) { /* ignores if column already exists */ }
+
   // Seed Data
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
@@ -101,6 +105,7 @@ async function startServer() {
       { id: 'u1', name: 'Alice Wilson', email: 'alice@ctc.com', role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
       { id: 'u2', name: 'Bob Smith', email: 'bob@ctc.com', role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
       { id: 'u3', name: 'Charlie Davis', email: 'charlie@ctc.com', role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
+      { id: 'u4', name: 'Thái Hưng (Giám đốc)', email: 'director@ctc.com', role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=director' },
     ];
     for (const u of INITIAL_USERS) {
       await db.run('INSERT INTO users (id, name, email, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.role, u.department, u.avatar]);
@@ -326,22 +331,22 @@ async function startServer() {
   });
 
   app.post('/api/reports', async (req, res) => {
-    const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy } = req.body;
+    const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback } = req.body;
     try {
       await db.run(
-        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null]
+        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null]
       );
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
   });
 
   app.put('/api/reports/:id', async (req, res) => {
-    const { title, content, status, submittedAt, approvedAt, approvedBy } = req.body;
+    const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback } = req.body;
     try {
       await db.run(
-        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=? WHERE id=?',
-        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, req.params.id]
+        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=?, directorFeedback=? WHERE id=?',
+        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, req.params.id]
       );
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }

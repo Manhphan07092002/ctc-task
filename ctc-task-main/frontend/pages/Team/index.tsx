@@ -34,7 +34,7 @@ export default function TeamPage({
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {users.filter(u => user.role === 'Admin' ? true : u.department === user.department).map(u => (
+        {users.filter(u => (user.role === 'Admin' || user.role === 'Director') ? true : u.department === user.department).map(u => (
           <Card key={u.id} className="p-6 flex items-center gap-4 relative group">
             <Avatar src={u.avatar} alt={u.name} size={16} />
             <div className="flex-1 min-w-0">

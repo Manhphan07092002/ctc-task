@@ -68,7 +68,7 @@ export default function CTCTaskApp() {
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
-    if (currentUser.role === 'Admin') return true;
+    if (currentUser.role === 'Admin' || currentUser.role === 'Director') return true;
     if (currentUser.role === 'Manager') return task.department === currentUser.department;
     if (currentUser.role === 'Employee') return task.createdBy === currentUser.id;
     return false;
@@ -77,7 +77,7 @@ export default function CTCTaskApp() {
   const roleBasedTasks = useMemo(() => {
     if (!user) return [];
     return tasks.filter(t => {
-      if (user.role === 'Admin') return true;
+      if (user.role === 'Admin' || user.role === 'Director') return true;
       if (t.assignees.includes(user.id)) return true;
       if (user.role === 'Manager' && t.department === user.department) return true;
       if (user.role === 'Employee' && t.createdBy === user.id) return true;
@@ -109,7 +109,7 @@ export default function CTCTaskApp() {
     // Report Reminder: Every Friday at >= 16:00
     const checkReportTime = () => {
       const now = new Date();
-      if (now.getDay() === 5 && now.getHours() >= 16 && user && user.role !== 'Admin') {
+      if (now.getDay() === 5 && now.getHours() >= 16 && user && user.role !== 'Admin' && user.role !== 'Director') {
         const hasFired = localStorage.getItem(`report_reminder_${now.toLocaleDateString()}`);
         if (!hasFired) {
           setNotification({

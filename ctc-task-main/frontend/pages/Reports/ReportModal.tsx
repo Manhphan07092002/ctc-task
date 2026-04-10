@@ -24,18 +24,21 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [directorFeedback, setDirectorFeedback] = useState('');
   
   useEffect(() => {
     if (isOpen) {
       if (initialReport) {
         setTitle(initialReport.title);
         setContent(initialReport.content);
+        setDirectorFeedback(initialReport.directorFeedback || '');
       } else {
         const d = new Date();
         const weekNum = Math.ceil(d.getDate() / 7);
         const monthNum = d.getMonth() + 1;
         setTitle(`Báo cáo tuần ${weekNum} tháng ${monthNum} - ${currentUser.name}`);
         setContent('');
+        setDirectorFeedback('');
       }
     }
   }, [isOpen, initialReport, currentUser.name]);
@@ -75,6 +78,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   const isReadOnly = !!(initialReport && initialReport.status !== 'Draft' && initialReport.authorId !== currentUser.id);
   const isManagerReview = !!(initialReport && initialReport.status === 'Pending' && currentUser.role === 'Manager' && currentUser.department === initialReport.department);
+  const isDirectorReview = !!(initialReport && initialReport.authorId !== currentUser.id && (currentUser.role === 'Director' || currentUser.role === 'Admin'));
 
   const handleSave = (statusToSet: ReportStatus) => {
     const report: Report = {
@@ -86,6 +90,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       status: statusToSet,
       createdAt: initialReport?.createdAt || new Date().toISOString(),
       submittedAt: statusToSet === 'Pending' ? new Date().toISOString() : initialReport?.submittedAt,
+      directorFeedback,
     };
     onSave(report);
     onClose();
@@ -98,6 +103,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       status: statusToSet,
       approvedAt: statusToSet === 'Approved' ? new Date().toISOString() : undefined,
       approvedBy: statusToSet === 'Approved' ? currentUser.id : undefined,
+      directorFeedback,
     };
     onSave(updated);
     onClose();
@@ -151,6 +157,21 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               disabled={isReadOnly}
             />
           </div>
+
+          {(initialReport?.directorFeedback || isDirectorReview) && (
+            <div className="flex-1 flex flex-col min-h-[150px] mb-2 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+              <label className="block text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                Ý kiến Giám đốc (Feedback)
+              </label>
+              <textarea
+                className="w-full flex-1 min-h-[100px] p-3 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none text-blue-900"
+                value={directorFeedback}
+                onChange={e => setDirectorFeedback(e.target.value)}
+                placeholder="Nhập nhận xét của Giám đốc..."
+                disabled={!isDirectorReview}
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer actions */}
@@ -177,6 +198,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 <CheckCircle size={16} className="mr-2" /> Duyệt & Gửi Giám Đốc
               </Button>
             </>
+          )}
+
+          {isDirectorReview && (
+            <Button onClick={() => handleManagerAction(initialReport.status)} className="bg-brand-600 hover:bg-brand-700 text-white border-0">
+              <Save size={16} className="mr-2" /> Lưu Nhận Xét
+            </Button>
           )}
         </div>
       </div>
