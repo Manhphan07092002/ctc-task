@@ -45,17 +45,23 @@ export default function ReportsPage() {
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, user, canApprove]);
 
+  // IDs of users who are department managers
+  const managerIds = useMemo(
+    () => new Set(departments.map(d => d.managerId).filter(Boolean)),
+    [departments]
+  );
+
   const pendingDirectorReports = useMemo(() => {
     return []; // Directors no longer use the Pending tab
   }, []);
 
   const directorReports = useMemo(() => {
     if (!canViewAll) return [];
-    // Director sees ALL Approved reports (from employees approved by managers)
+    // Director only sees Approved reports authored by department managers (Trưởng phòng)
     return reports
-      .filter(r => r.status === 'Approved')
+      .filter(r => r.status === 'Approved' && managerIds.has(r.authorId))
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
-  }, [reports, canViewAll]);
+  }, [reports, canViewAll, managerIds]);
 
   // ── Early return AFTER all hooks ──
   if (!user) return null;
@@ -218,6 +224,7 @@ export default function ReportsPage() {
         tasks={tasks}
         departments={departments}
         users={users}
+        allReports={reports}
         t={t}
       />
     </div>

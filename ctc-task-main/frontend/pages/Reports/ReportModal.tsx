@@ -31,6 +31,7 @@ interface ReportModalProps {
   tasks: Task[];
   departments: Department[];
   users: UserType[];
+  allReports: Report[];
   t: (key: string) => string;
 }
 
@@ -76,7 +77,7 @@ const RESULT_OPTIONS: { value: TaskRow['result']; label: string; color: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export const ReportModal: React.FC<ReportModalProps> = ({
-  isOpen, onClose, onSave, initialReport, currentUser, tasks, departments, users,
+  isOpen, onClose, onSave, initialReport, currentUser, tasks, departments, users, allReports,
 }) => {
   const week = getWeekRange();
 
@@ -174,6 +175,47 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     if (newRows.length) setRows(newRows);
   };
 
+  // ── Aggregate Department Reports ──
+  const importDepartmentReports = () => {
+    if (!allReports) return;
+    
+    // Find Approved reports in current department authored by others (employees)
+    const deptReports = allReports.filter(r => 
+      r.department === currentUser.department && 
+      r.authorId !== currentUser.id && 
+      r.status === 'Approved'
+    );
+
+    let newRows: TaskRow[] = [];
+    deptReports.forEach(r => {
+      const authorName = users.find(u => u.id === r.authorId)?.name || 'Nhân viên';
+      const parsed = parseContent(r.content);
+      if (parsed && parsed.tasks) {
+        // filter out empty rows
+        const validTasks = parsed.tasks.filter(t => t.content.trim() !== '');
+        validTasks.forEach(t => {
+          newRows.push({
+            id: Math.random().toString(36).slice(2),
+            content: `[${authorName}] ${t.content}`,
+            result: t.result,
+            nextAction: t.nextAction,
+            note: t.note,
+          });
+        });
+      }
+    });
+
+    if (newRows.length > 0) {
+      if (rows.length === 1 && rows[0].content.trim() === '') {
+        setRows(newRows);
+      } else {
+        setRows(prev => [...prev, ...newRows]);
+      }
+    } else {
+      alert("Không có báo cáo nào đã được duyệt trong tuần này của phòng để tổng hợp.");
+    }
+  };
+
   // ── Save ──
   const buildContent = (): string => {
     const data: StructuredContent = { tasks: rows, nextWeekPlan, weekStart, weekEnd };
@@ -181,6 +223,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   };
 
   const handleSave = (status: ReportStatus) => {
+    // If a manager (canApprove) is sending their own report globally, it should become Approved so it shows in Toàn Cục directly.
+    const finalStatus = (status === 'Pending' && canApprove) ? 'Approved' : status;
+
     const report: Report = {
       id: initialReport?.id || Math.random().toString(36).slice(2, 9),
       title,
@@ -190,9 +235,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       status,
       createdAt: initialReport?.createdAt || new Date().toISOString(),
       submittedAt: status === 'Pending' ? new Date().toISOString() : initialReport?.submittedAt,
+      approvedAt: finalStatus === 'Approved' ? new Date().toISOString() : undefined,
+      approvedBy: finalStatus === 'Approved' ? currentUser.id : undefined,
       directorFeedback,
     };
-    onSave(report);
+    onSave({ ...report, status: finalStatus });
     onClose();
   };
 
@@ -289,12 +336,22 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 Nội dung công việc tuần này
               </h3>
               {!isReadOnly && (
-                <button
-                  onClick={importDoneTasks}
-                  className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-100"
-                >
-                  ↓ Import từ danh sách công việc
-                </button>
+                <div className="flex items-center gap-2">
+                  {canApprove && (
+                    <button
+                      onClick={importDepartmentReports}
+                      className="text-xs text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-100 font-medium"
+                    >
+                      Tổng hợp báo cáo phòng
+                    </button>
+                  )}
+                  <button
+                    onClick={importDoneTasks}
+                    className="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors border border-blue-100 font-medium"
+                  >
+                    ↓ Import từ danh sách công việc
+                  </button>
+                </div>
               )}
             </div>
 
