@@ -152,16 +152,33 @@ export default function DashboardPage({
           {/* Team Widget */}
           <Card className="p-6">
             <h3 className="text-base font-bold text-gray-800 mb-4">{t('team')}</h3>
-            <div className="flex flex-col gap-3">
-              {users.slice(0, 4).map(u => (
-                <div key={u.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar src={u.avatar} alt={u.name} size={8} />
-                    <span className="text-sm font-medium text-gray-700">{u.name}</span>
+            <div className="flex flex-col gap-4 max-h-96 overflow-y-auto pr-1">
+              {(() => {
+                // Group users by department, skip ADMIN/GIÁM ĐỐC depts for grouping
+                const deptMap = new Map<string, typeof users>();
+                users.forEach(u => {
+                  if (!deptMap.has(u.department)) deptMap.set(u.department, []);
+                  deptMap.get(u.department)!.push(u);
+                });
+                return Array.from(deptMap.entries()).map(([dept, deptUsers]) => (
+                  <div key={dept}>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 border-b border-gray-100 pb-1">
+                      {dept}
+                    </p>
+                    <div className="flex flex-col gap-2.5">
+                      {deptUsers.map(u => (
+                        <div key={u.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Avatar src={u.avatar} alt={u.name} size={8} />
+                            <span className="text-sm font-medium text-gray-700">{u.name}</span>
+                          </div>
+                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{u.role}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{u.role}</span>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </Card>
         </div>
