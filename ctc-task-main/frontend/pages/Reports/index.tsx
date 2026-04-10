@@ -9,7 +9,7 @@ import { Report } from '../../types';
 
 export default function ReportsPage() {
   const { t } = useLanguage();
-  const { reports, tasks, users, departments, saveReport } = useData();
+  const { reports, tasks, users, roles, departments, saveReport } = useData();
   const { user } = useAuth();
 
   // ── All hooks must be called before any conditional return ──
@@ -45,10 +45,26 @@ export default function ReportsPage() {
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, user, canApprove]);
 
-  // IDs of users who are department managers
+  // List of roles that have manager capabilities (approve_dept_reports permission)
+  const managerRoleNames = useMemo(() => {
+    return new Set(
+      roles
+        .filter(r => {
+          try {
+            const perms = JSON.parse(r.permissions as any || '[]');
+            return perms.includes('approve_dept_reports');
+          } catch {
+            return false;
+          }
+        })
+        .map(r => r.name)
+    );
+  }, [roles]);
+
+  // IDs of users who are department managers dynamically computed
   const managerIds = useMemo(
-    () => new Set(departments.map(d => d.managerId).filter(Boolean)),
-    [departments]
+    () => new Set(users.filter(u => managerRoleNames.has(u.role)).map(u => u.id)),
+    [users, managerRoleNames]
   );
 
   const pendingDirectorReports = useMemo(() => {
