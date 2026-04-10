@@ -125,25 +125,22 @@ export const LoginView: React.FC = () => {
               </div>
             </form>
 
-            <div className="mt-10 pt-8 border-t border-gray-200/50 relative">
+            <div className="mt-8 pt-6 border-t border-gray-200/50 relative">
               <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/70 backdrop-blur-xl px-4 text-xs font-bold text-gray-400 uppercase tracking-widest rounded-full border border-gray-100">
                 Quick Access
               </div>
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 scrollbar-thin">
                 {users?.map((u: User) => (
                   <button
                     key={u.id}
                     type="button"
                     onClick={() => fillCredentials(u.email)}
-                    className="flex items-center gap-4 p-3 bg-white/40 hover:bg-white/80 border border-white/50 backdrop-blur-sm shadow-sm rounded-2xl transition-all duration-300 text-left group hover:shadow-md hover:-translate-y-0.5"
+                    className="flex items-center gap-2.5 p-2.5 bg-white/40 hover:bg-white/80 border border-white/50 backdrop-blur-sm shadow-sm rounded-xl transition-all duration-200 text-left group hover:shadow-md hover:-translate-y-0.5"
                   >
-                    <img src={u.avatar} alt="" className="w-10 h-10 rounded-full border-2 border-white shadow-sm" />
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-gray-800">{u.name}</p>
-                      <p className="text-xs font-medium text-gray-500 group-hover:text-brand-600 transition-colors">{u.role}</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ArrowRight size={14} className="text-brand-500" />
+                    <img src={u.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">{u.name}</p>
+                      <p className="text-[10px] font-medium text-gray-400 group-hover:text-brand-600 transition-colors truncate uppercase">{u.role}</p>
                     </div>
                   </button>
                 ))}
