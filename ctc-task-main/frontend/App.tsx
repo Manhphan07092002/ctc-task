@@ -12,6 +12,8 @@ import { MeetingView as MeetingsPage } from './pages/Meetings/index';
 import { JoinMeetingPage } from './pages/Meetings/JoinMeeting';
 import { SettingsView as SettingsPage } from './pages/Settings/index';
 import ReportsPage from './pages/Reports/index';
+import ForgotPasswordPage from './pages/ForgotPassword/index';
+import ResetPasswordPage from './pages/ResetPassword/index';
 
 import { Sparkles } from 'lucide-react';
 
@@ -227,7 +229,15 @@ export default function CTCTaskApp() {
   if (isAuthLoading || isDataLoading) {
     return <div className="h-screen flex items-center justify-center bg-gray-50 text-brand-500"><Sparkles className="animate-spin mr-2" /> Loading...</div>;
   }
-  if (!user) return <LoginView />;
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="*" element={<LoginView />} />
+      </Routes>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-transparent text-gray-800 overflow-hidden font-sans selection:bg-brand-200">
@@ -308,6 +318,8 @@ export default function CTCTaskApp() {
               <Route path="/meetings" element={<MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
               <Route path="/meetings/join/:meetingId" element={<JoinMeetingPage onJoinMeeting={setActiveMeeting} />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/forgot-password" element={<Navigate to="/" replace />} />
+              <Route path="/reset-password" element={<Navigate to="/" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

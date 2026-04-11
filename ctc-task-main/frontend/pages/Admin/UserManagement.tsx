@@ -1,13 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, PlusCircle, Edit2, Trash2, Shield, Briefcase,
   Search, RefreshCw, AlertCircle, X, Mail, User as UserIcon,
-  CheckCircle, ChevronDown
+  CheckCircle, ChevronDown, Lock, ImagePlus, KeyRound, Copy, ExternalLink, Link as LinkIcon
 } from 'lucide-react';
 import { User, UserRole } from '../../types';
 
 interface RoleInfo {
   id: string; name: string; color: string; isSystem: number;
+}
+
+interface PasswordResetRequest {
+  id: string;
+  userId: string;
+  email: string;
+  status: 'pending' | 'resolved';
+  emailStatus?: 'pending' | 'sent' | 'failed' | 'reset_done' | 'unknown';
+  emailSentAt?: string | null;
+  createdAt: string;
+  resetLink?: string;
+  expiresAt?: string;
 }
 
 // Dynamic role badge - uses color from /api/roles
@@ -25,6 +37,24 @@ const RoleBadge: React.FC<{ roleName: string; roles: RoleInfo[] }> = ({ roleName
 
 const DEPARTMENTS_FALLBACK = ['Board', 'Product', 'Marketing', 'Sales', 'IT', 'HR', 'Finance'];
 
+const getInitials = (name?: string) => {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'U';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const AvatarView: React.FC<{ name: string; avatar?: string }> = ({ name, avatar }) => {
+  if (avatar) {
+    return <img src={avatar} alt={name} className="w-16 h-16 rounded-full ring-2 ring-orange-200 object-cover" />;
+  }
+  return (
+    <div className="w-16 h-16 rounded-full ring-2 ring-orange-200 bg-gradient-to-br from-orange-100 to-red-100 text-orange-700 flex items-center justify-center font-black text-xl">
+      {getInitials(name)}
+    </div>
+  );
+};
+
 // ----- User Form Modal -----
 const UserFormModal: React.FC<{
   user: User | null;
@@ -39,15 +69,24 @@ const UserFormModal: React.FC<{
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
+    password: '',
     role: (user?.role || defaultRole) as string,
     department: user?.department || 'Product',
     avatar: user?.avatar || '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handle = (field: string, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleAvatarFile = (file?: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => handle('avatar', String(reader.result || ''));
+    reader.readAsDataURL(file);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,9 +101,10 @@ const UserFormModal: React.FC<{
         id: user?.id || Math.random().toString(36).substring(2, 10),
         name: form.name.trim(),
         email: form.email.trim(),
+        password: form.password.trim() || undefined,
         role: form.role as UserRole,
         department: form.department,
-        avatar: form.avatar || `https://i.pravatar.cc/150?u=${form.email}`,
+        avatar: form.avatar || '',
       };
       await onSave(saved);
       onClose();
@@ -100,20 +140,27 @@ const UserFormModal: React.FC<{
 
           {/* Avatar preview */}
           <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-            <img
-              src={form.avatar || `https://i.pravatar.cc/80?u=${form.email || 'default'}`}
-              alt="Avatar"
-              className="w-16 h-16 rounded-full ring-2 ring-orange-200 object-cover"
-            />
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">URL Avatar</label>
-              <input
-                type="url"
-                value={form.avatar}
-                onChange={e => handle('avatar', e.target.value)}
-                placeholder="https://... (để trống để dùng avatar tự động)"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-300 outline-none"
-              />
+            <AvatarView name={form.name || form.email || 'User'} avatar={form.avatar} />
+            <div className="flex-1 space-y-2 text-sm text-gray-500">
+              <div>Avatar sẽ tự hiển thị theo chữ cái đầu của tên nếu để trống.</div>
+              {isEdit && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => handleAvatarFile(e.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium border border-orange-200 text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+                  >
+                    <ImagePlus size={14} /> Chọn ảnh từ máy
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -139,6 +186,21 @@ const UserFormModal: React.FC<{
                   type="email" required value={form.email}
                   onChange={e => handle('email', e.target.value)}
                   placeholder="email@company.com"
+                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Mật khẩu {!isEdit && <span className="text-red-500">*</span>}</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                <input
+                  type="password"
+                  required={!isEdit}
+                  value={form.password}
+                  onChange={e => handle('password', e.target.value)}
+                  placeholder={isEdit ? 'Để trống nếu không đổi mật khẩu' : 'Nhập mật khẩu đăng nhập'}
                   className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none text-sm"
                 />
               </div>
@@ -190,6 +252,116 @@ const UserFormModal: React.FC<{
   );
 };
 
+// ----- Reset Password Dialog -----
+const ResetPasswordModal: React.FC<{
+  user: User;
+  onCancel: () => void;
+  onConfirm: (newPassword: string) => Promise<{ emailSent?: boolean; generatedPassword?: string; message?: string }>;
+}> = ({ user, onCancel, onConfirm }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ emailSent?: boolean; generatedPassword?: string; message?: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async () => {
+    setError('');
+    setResult(null);
+    if (newPassword.length < 6) {
+      setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await onConfirm(newPassword);
+      setResult(response);
+      setCopied(false);
+    } catch {
+      setError('Đặt lại mật khẩu thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+            <KeyRound size={18} className="text-orange-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Đặt lại mật khẩu</h3>
+            <p className="text-xs text-gray-500">{user.name} · {user.email}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Mật khẩu mới</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Xác nhận mật khẩu mới</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none text-sm"
+            />
+          </div>
+          {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</div>}
+          {result && (
+            <div className={`text-sm rounded-xl px-3 py-3 border ${result.emailSent ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+              <div className="font-semibold">{result.emailSent ? 'Đã gửi mail thành công cho người dùng.' : 'Đã đặt lại mật khẩu nhưng gửi mail chưa thành công.'}</div>
+              {result.generatedPassword && (
+                <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-white/70 px-3 py-2 border border-white/60">
+                  <div>Mật khẩu hiện tại: <span className="font-bold">{result.generatedPassword}</span></div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(result.generatedPassword || '');
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1800);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-bold hover:bg-slate-700 transition-colors"
+                  >
+                    <Copy size={12} /> {copied ? 'Đã copy' : 'Copy'}
+                  </button>
+                </div>
+              )}
+              {result.message && <div className="mt-2 text-xs opacity-80">{result.message}</div>}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-3 mt-5">
+          <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
+            Hủy
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-60"
+          >
+            {submitting ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ----- Confirm Delete Dialog -----
 const ConfirmDeleteModal: React.FC<{
   user: User;
@@ -231,11 +403,14 @@ export default function AdminUserManagement() {
   const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [editingUser, setEditingUser] = useState<User | null | undefined>(undefined);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [resettingUser, setResettingUser] = useState<User | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [showResetRequests, setShowResetRequests] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -245,8 +420,8 @@ export default function AdminUserManagement() {
   const fetchUsers = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [ur, rr, dr] = await Promise.all([
-        fetch('/api/users'), fetch('/api/roles'), fetch('/api/departments')
+      const [ur, rr, dr, pr] = await Promise.all([
+        fetch('/api/users'), fetch('/api/roles'), fetch('/api/departments'), fetch('/api/admin/password-reset-requests')
       ]);
       if (!ur.ok) throw new Error('Không thể tải người dùng');
       setUsers(await ur.json());
@@ -254,6 +429,29 @@ export default function AdminUserManagement() {
       if (dr.ok) {
         const depts = await dr.json();
         setDepartments(depts.map((d: any) => d.name));
+      }
+      if (pr.ok) {
+        const requests = await pr.json();
+        const enriched = await Promise.all(
+          requests.map(async (request: PasswordResetRequest) => {
+            try {
+              const res = await fetch('/api/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: request.email }),
+              });
+              const data = await res.json().catch(() => ({}));
+              return {
+                ...request,
+                resetLink: data.resetLink,
+                expiresAt: data.expiresAt,
+              };
+            } catch {
+              return request;
+            }
+          })
+        );
+        setResetRequests(enriched);
       }
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
@@ -281,11 +479,38 @@ export default function AdminUserManagement() {
     await fetchUsers();
   };
 
+  const handleResetPassword = async (u: User, newPassword: string) => {
+    const res = await fetch(`/api/users/${u.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showToast(data.error || 'Đặt lại mật khẩu thất bại', 'error');
+      throw new Error('Reset failed');
+    }
+    showToast(
+      data.emailSent
+        ? `Đã đặt lại mật khẩu và gửi mail cho ${u.name}`
+        : `Đã đặt lại mật khẩu cho ${u.name}, nhưng gửi mail chưa thành công`,
+      data.emailSent ? 'success' : 'error'
+    );
+    await fetchUsers();
+    return {
+      emailSent: data.emailSent,
+      generatedPassword: data.generatedPassword,
+      message: data.emailSent ? 'Người dùng đã được thông báo qua email.' : 'Anh vui lòng kiểm tra lại cấu hình SMTP hoặc tự gửi mật khẩu cho người dùng.',
+    };
+  };
+
   const filtered = users.filter(u => {
     const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
     const matchRole = !filterRole || u.role === filterRole;
     return matchSearch && matchRole;
   });
+
+  const pendingResetRequests = resetRequests.filter(r => r.status === 'pending');
 
   return (
     <div className="space-y-6 pb-8">
@@ -319,6 +544,67 @@ export default function AdminUserManagement() {
             <PlusCircle size={16} /> Thêm người dùng
           </button>
         </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">Yêu cầu quên mật khẩu</h2>
+            <p className="text-sm text-gray-400">Chỉ hiển thị các request đang chờ xử lý</p>
+          </div>
+          <div className="px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 text-sm font-bold">
+            {pendingResetRequests.length} đang chờ
+          </div>
+        </div>
+
+        {pendingResetRequests.length === 0 ? (
+          <div className="px-5 py-8 text-sm text-gray-400">Hiện chưa có yêu cầu quên mật khẩu nào đang chờ xử lý.</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {pendingResetRequests.map((request) => {
+              const matchedUser = users.find(u => u.id === request.userId);
+              const remainingMs = request.expiresAt ? new Date(request.expiresAt).getTime() - Date.now() : 0;
+              const minutesLeft = Math.max(0, Math.ceil(remainingMs / 60000));
+              return (
+                <div key={request.id} className="px-5 py-4 space-y-3 hover:bg-gray-50/70">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{request.email}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                        <span>{new Date(request.createdAt).toLocaleString('vi-VN')}</span>
+                        {matchedUser && <span>{matchedUser.name}</span>}
+                        {request.expiresAt && <span className="text-amber-600 font-medium">Hết hạn sau {minutesLeft} phút</span>}
+                        <span className={`px-2 py-0.5 rounded-full font-semibold ${request.emailStatus === 'sent' ? 'bg-emerald-50 text-emerald-700' : request.emailStatus === 'failed' ? 'bg-red-50 text-red-600' : request.emailStatus === 'reset_done' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {request.emailStatus === 'sent' ? 'Mail đã gửi' : request.emailStatus === 'failed' ? 'Mail lỗi' : request.emailStatus === 'reset_done' ? 'Đã đổi mật khẩu' : 'Đang chờ mail'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => matchedUser && setResettingUser(matchedUser)}
+                        disabled={!matchedUser}
+                        className="px-4 py-2 text-sm font-bold bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50"
+                      >
+                        Cấp lại mật khẩu
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const res = await fetch(`/api/admin/password-reset-requests/${request.id}`, { method: 'DELETE' });
+                          if (!res.ok) { showToast('Xóa request thất bại', 'error'); return; }
+                          showToast('Đã xóa request quên mật khẩu');
+                          await fetchUsers();
+                        }}
+                        className="px-4 py-2 text-sm font-bold bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -384,8 +670,14 @@ export default function AdminUserManagement() {
                     <tr key={u.id} className="hover:bg-gray-50/70 transition-colors group">
                       <td className="py-3.5 px-5">
                         <div className="flex items-center gap-3">
-                          <img src={u.avatar} alt={u.name}
-                            className="w-9 h-9 rounded-full ring-1 ring-gray-200 object-cover flex-shrink-0" />
+                          {u.avatar ? (
+                            <img src={u.avatar} alt={u.name}
+                              className="w-9 h-9 rounded-full ring-1 ring-gray-200 object-cover flex-shrink-0" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-100 to-red-100 text-orange-700 flex items-center justify-center font-bold text-xs ring-1 ring-orange-200 flex-shrink-0">
+                              {getInitials(u.name)}
+                            </div>
+                          )}
                           <span className="font-semibold text-gray-800">{u.name}</span>
                         </div>
                       </td>
@@ -399,6 +691,10 @@ export default function AdminUserManagement() {
                           <button onClick={() => setEditingUser(u)}
                             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Chỉnh sửa">
                             <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => setResettingUser(u)}
+                            className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Đặt lại mật khẩu">
+                            <KeyRound size={14} />
                           </button>
                           <button onClick={() => setDeletingUser(u)}
                             className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
@@ -423,6 +719,13 @@ export default function AdminUserManagement() {
           departments={departments.length > 0 ? departments : DEPARTMENTS_FALLBACK}
           onClose={() => setEditingUser(undefined)}
           onSave={handleSave}
+        />
+      )}
+      {resettingUser && (
+        <ResetPasswordModal
+          user={resettingUser}
+          onCancel={() => setResettingUser(null)}
+          onConfirm={(newPassword) => handleResetPassword(resettingUser, newPassword)}
         />
       )}
       {deletingUser && (

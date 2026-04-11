@@ -70,15 +70,36 @@ export const SettingsView: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     setPwError('');
     setPwSuccess('');
     if (!currentPassword) { setPwError('Vui lòng nhập mật khẩu hiện tại.'); return; }
     if (newPassword.length < 6) { setPwError('Mật khẩu mới phải có ít nhất 6 ký tự.'); return; }
     if (newPassword !== confirmPassword) { setPwError('Mật khẩu xác nhận không khớp.'); return; }
-    setPwSuccess('Đổi mật khẩu thành công! (Demo)');
-    setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
-    setTimeout(() => setPwSuccess(''), 3000);
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPwError(data.error || 'Đổi mật khẩu thất bại.');
+        return;
+      }
+
+      setPwSuccess('Đổi mật khẩu thành công!');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+      setTimeout(() => setPwSuccess(''), 3000);
+    } catch {
+      setPwError('Đổi mật khẩu thất bại.');
+    }
   };
 
   const TABS = [

@@ -2,10 +2,11 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { User } from '../types';
 
 const API_URL = '/api/users';
+const LOGIN_API_URL = '/api/auth/login';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
   updateUserSession: (updatedUser: User) => void;
@@ -33,16 +34,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
-  const login = async (email: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const res = await fetch(API_URL);
-      const users: User[] = await res.json();
-      const foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (foundUser) {
-        setUser(foundUser);
-        localStorage.setItem('orange_task_user_id', foundUser.id);
-        return true;
-      }
+      const res = await fetch(LOGIN_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) return false;
+      const foundUser: User = await res.json();
+      setUser(foundUser);
+      localStorage.setItem('orange_task_user_id', foundUser.id);
+      return true;
     } catch (e) {
       console.error('Login failed:', e);
     }

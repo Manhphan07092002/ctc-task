@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { User } from '../types';
-import { Layout, ClipboardCheck, ArrowRight, AlertCircle, Sparkles, ShieldCheck, Zap } from 'lucide-react';
+import { Layout, ClipboardCheck, ArrowRight, AlertCircle, Sparkles, ShieldCheck, Zap, Eye, EyeOff } from 'lucide-react';
 import { Button, Input } from './UI';
 
 export const LoginView: React.FC = () => {
@@ -10,6 +11,7 @@ export const LoginView: React.FC = () => {
   const { users } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,7 +21,7 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
 
     setTimeout(async () => {
-      const success = await login(email);
+      const success = await login(email, password);
       if (!success) {
         setError('Invalid email or password');
         setIsLoading(false);
@@ -29,8 +31,9 @@ export const LoginView: React.FC = () => {
 
   const fillCredentials = (email: string) => {
     setEmail(email);
-    setPassword('password');
+    setPassword('Ctcdn.vn@123');
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-transparent relative overflow-hidden">
@@ -104,14 +107,35 @@ export const LoginView: React.FC = () => {
                 placeholder="you@company.com"
               />
 
-              <Input
-                label="Password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm pt-1">
+                <Link
+                  to="/forgot-password"
+                  className="text-orange-500 hover:text-orange-600 font-medium"
+                >
+                  Quên mật khẩu?
+                </Link>
+              </div>
 
               <div className="pt-2">
                 <Button

@@ -19,6 +19,14 @@ interface AdminStats {
   taskDeptBreakdown: { department: string; count: number }[];
 }
 
+interface PasswordResetRequest {
+  id: string;
+  userId: string;
+  email: string;
+  status: 'pending' | 'resolved';
+  createdAt: string;
+}
+
 const ROLE_COLORS: Record<string, string> = {
   Admin: '#ef4444',
   Director: '#8b5cf6',
@@ -95,15 +103,20 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/stats');
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data: AdminStats = await res.json();
+      const [statsRes, resetRes] = await Promise.all([
+        fetch('/api/admin/stats'),
+        fetch('/api/admin/password-reset-requests')
+      ]);
+      if (!statsRes.ok) throw new Error(`Server error: ${statsRes.status}`);
+      const data: AdminStats = await statsRes.json();
       setStats(data);
+      if (resetRes.ok) setResetRequests(await resetRes.json());
       setLastUpdated(new Date());
     } catch (e: any) {
       setError(e.message || 'Không thể tải dữ liệu từ máy chủ.');
@@ -359,6 +372,32 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Password Reset Requests */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <SectionHeader
+          icon={Clock}
+          title="Yêu cầu quên mật khẩu"
+          subtitle="Danh sách người dùng đang chờ admin cấp lại mật khẩu"
+        />
+        {resetRequests.length === 0 ? (
+          <div className="text-sm text-gray-400">Hiện chưa có yêu cầu nào.</div>
+        ) : (
+          <div className="space-y-3">
+            {resetRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{request.email}</p>
+                  <p className="text-xs text-gray-400">{new Date(request.createdAt).toLocaleString('vi-VN')} · {request.status === 'pending' ? 'Đang chờ xử lý' : 'Đã xử lý'}</p>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${request.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {request.status === 'pending' ? 'Pending' : 'Resolved'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Quick Role Summary Table */}
       <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">

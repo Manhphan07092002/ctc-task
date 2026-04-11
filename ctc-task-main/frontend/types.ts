@@ -82,6 +82,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: UserRole;
   department: string;
   avatar: string;
@@ -123,4 +124,12 @@ export interface Department {
   description?: string;
   color: string;
   managerId?: string;
+}
+
+export interface PasswordResetRequest {
+  id: string;
+  userId: string;
+  email: string;
+  status: 'pending' | 'resolved';
+  createdAt: string;
 }

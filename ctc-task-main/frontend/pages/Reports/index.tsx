@@ -3,7 +3,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download } from 'lucide-react';
 import { ReportModal } from './ReportModal';
 import { Report } from '../../types';
 
@@ -80,6 +80,27 @@ export default function ReportsPage() {
   const handleOpenView   = (r: Report) => { setSelectedReport(r); setIsModalOpen(true); };
   const getUserDetails   = (id: string) => users.find(u => u.id === id);
 
+  const exportCsv = () => {
+    const header = ['Tiêu đề', 'Phòng ban', 'Trạng thái', 'Tác giả', 'Người duyệt', 'Ngày tạo'];
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = displayedReports.map(r => [
+      r.title,
+      r.department,
+      r.status,
+      getUserDetails(r.authorId)?.name || r.authorId,
+      (r.approvedBy && getUserDetails(r.approvedBy)?.name) || '',
+      r.approvedAt || r.submittedAt || r.createdAt,
+    ]);
+    const csv = [header, ...rows].map(row => row.map(escape).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bao-cao-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const pendingList = canViewAll ? pendingDirectorReports : pendingManagerReports;
 
   let displayedReports: Report[] = [];
@@ -115,13 +136,18 @@ export default function ReportsPage() {
       <div className="flex justify-between items-end mb-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Quản lý Báo cáo</h2>
-          <p className="text-gray-500 text-sm mt-1">Gửi hoặc xem báo cáo công việc hàng tuần</p>
+          <p className="text-gray-500 text-sm mt-1">Gửi, xem và xuất báo cáo công việc hàng tuần</p>
         </div>
-        {canCreate && !canViewAll && (
-          <Button onClick={handleOpenCreate}>
-            <PlusCircle size={18} className="mr-2" /> Tạo báo cáo tuần này
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={exportCsv}>
+            <Download size={18} className="mr-2" /> Xuất CSV
           </Button>
-        )}
+          {canCreate && !canViewAll && (
+            <Button onClick={handleOpenCreate}>
+              <PlusCircle size={18} className="mr-2" /> Tạo báo cáo tuần này
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

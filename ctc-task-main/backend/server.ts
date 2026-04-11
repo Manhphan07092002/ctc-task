@@ -5,6 +5,10 @@ import { fileURLToPath } from 'url';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import nodemailer from 'nodemailer';
+import multer from 'multer';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +16,105 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
+  const upload = multer({ dest: path.join(__dirname, '../tmp') });
+
+  const generateRandomPassword = (length = 8) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
+    return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  };
+
+  const getSystemConfig = async () => {
+    const rows = await db.all('SELECT key, value FROM system_config');
+    const config = Object.fromEntries(rows.map((row: any) => [row.key, row.value]));
+    return {
+      SMTP_HOST: config.SMTP_HOST || process.env.SMTP_HOST || '',
+      SMTP_PORT: config.SMTP_PORT || process.env.SMTP_PORT || '587',
+      SMTP_SECURE: config.SMTP_SECURE || process.env.SMTP_SECURE || 'false',
+      SMTP_USER: config.SMTP_USER || process.env.SMTP_USER || '',
+      SMTP_PASS: config.SMTP_PASS || process.env.SMTP_PASS || '',
+      SMTP_FROM: config.SMTP_FROM || process.env.SMTP_FROM || '',
+    };
+  };
+
+  const createTransporter = async () => {
+    const smtp = await getSystemConfig();
+    const smtpConfigured = Boolean(smtp.SMTP_HOST && smtp.SMTP_USER && smtp.SMTP_PASS && smtp.SMTP_FROM);
+    if (!smtpConfigured) return { transporter: null, smtp };
+
+    const transporter = nodemailer.createTransport({
+      host: smtp.SMTP_HOST,
+      port: Number(smtp.SMTP_PORT || 587),
+      secure: String(smtp.SMTP_SECURE || 'false') === 'true',
+      auth: {
+        user: smtp.SMTP_USER,
+        pass: smtp.SMTP_PASS,
+      },
+    });
+
+    return { transporter, smtp };
+  };
+
+  const sendResetPasswordEmail = async (to: string, newPassword: string) => {
+    const { transporter, smtp } = await createTransporter();
+    if (!transporter) {
+      console.warn('SMTP is not configured, skipping password reset email for', to);
+      return false;
+    }
+
+    await transporter.sendMail({
+      from: smtp.SMTP_FROM,
+      replyTo: smtp.SMTP_FROM,
+      to,
+      subject: 'CTC Task - Cấp lại mật khẩu',
+      text: `Xin chào,\n\nMật khẩu đăng nhập mới của bạn là: ${newPassword}\n\nVui lòng đăng nhập và đổi lại mật khẩu ngay.\n\nTrân trọng,\nCTC Task`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
+        <div style="max-width:560px;margin:0 auto;padding:24px">
+          <div style="padding:18px 20px;border-radius:16px 16px 0 0;background:#111827;color:#fff;text-align:center;font-weight:800;font-size:20px">CTC Task</div>
+          <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 16px 16px">
+            <p style="margin:0 0 12px">Xin chào,</p>
+            <p style="margin:0 0 16px">Mật khẩu đăng nhập mới của bạn là:</p>
+            <div style="display:inline-block;padding:12px 16px;background:#f3f4f6;border-radius:12px;font-size:20px;font-weight:800;letter-spacing:1px">${newPassword}</div>
+            <p style="margin:16px 0 0">Vui lòng đăng nhập và đổi lại mật khẩu ngay sau khi vào hệ thống.</p>
+            <p style="margin:24px 0 0;color:#6b7280;font-size:13px">Trân trọng,<br/>CTC Task</p>
+          </div>
+        </div>
+      </div>`,
+    });
+    return true;
+  };
+
+  const sendResetLinkEmail = async (to: string, resetLink: string) => {
+    const { transporter, smtp } = await createTransporter();
+    if (!transporter) {
+      console.warn('SMTP is not configured, skipping reset link email for', to);
+      return false;
+    }
+
+    await transporter.sendMail({
+      from: smtp.SMTP_FROM,
+      replyTo: smtp.SMTP_FROM,
+      to,
+      subject: 'CTC Task - Link đặt lại mật khẩu',
+      text: `Xin chào,\n\nBạn vừa yêu cầu đặt lại mật khẩu cho tài khoản CTC Task.\n\nMở link này để đặt lại mật khẩu:\n${resetLink}\n\nLink sẽ hết hạn sau 30 phút.\n\nNếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.\n\nTrân trọng,\nCTC Task`,
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
+        <div style="max-width:560px;margin:0 auto;padding:24px">
+          <div style="padding:18px 20px;border-radius:16px 16px 0 0;background:#111827;color:#fff;text-align:center;font-weight:800;font-size:20px">CTC Task</div>
+          <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 16px 16px">
+            <p style="margin:0 0 12px">Xin chào,</p>
+            <p style="margin:0 0 16px">Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản CTC Task.</p>
+            <div style="text-align:center;margin:20px 0">
+              <a href="${resetLink}" style="display:inline-block;padding:12px 20px;background:#f97316;color:#fff;text-decoration:none;border-radius:12px;font-weight:800">Đặt lại mật khẩu</a>
+            </div>
+            <div style="padding:12px 14px;background:#f9fafb;border-radius:12px;word-break:break-all;font-size:13px;color:#374151">${resetLink}</div>
+            <p style="margin:16px 0 0;color:#b45309;font-weight:700">Link này sẽ hết hạn sau 30 phút.</p>
+            <p style="margin:0 0 16px">Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
+            <p style="margin:24px 0 0;color:#6b7280;font-size:13px">Trân trọng,<br/>CTC Task</p>
+          </div>
+        </div>
+      </div>`,
+    });
+    return true;
+  };
 
   app.use(cors());
   app.use(express.json());
@@ -50,6 +153,7 @@ async function startServer() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT NOT NULL,
+      password TEXT,
       role TEXT NOT NULL,
       department TEXT NOT NULL,
       avatar TEXT NOT NULL
@@ -110,8 +214,41 @@ async function startServer() {
       color TEXT NOT NULL DEFAULT '#6366f1',
       managerId TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS password_reset_requests (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      emailStatus TEXT NOT NULL DEFAULT 'unknown',
+      emailSentAt TEXT,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expiresAt TEXT NOT NULL,
+      usedAt TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS system_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 
+  try {
+    await db.exec('ALTER TABLE users ADD COLUMN password TEXT;');
+  } catch(e) { /* ignores if column already exists */ }
+  try {
+    await db.exec("ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';");
+  } catch(e) { /* ignores if column already exists */ }
+  try {
+    await db.exec('ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;');
+  } catch(e) { /* ignores if column already exists */ }
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN directorFeedback TEXT;');
   } catch(e) { /* ignores if column already exists */ }
@@ -170,13 +307,13 @@ async function startServer() {
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
     const INITIAL_USERS = [
-      { id: 'u1', name: 'Alice Wilson', email: 'alice@ctc.com', role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
-      { id: 'u2', name: 'Bob Smith', email: 'bob@ctc.com', role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
-      { id: 'u3', name: 'Charlie Davis', email: 'charlie@ctc.com', role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
-      { id: 'u4', name: 'Thái Hưng (Giám đốc)', email: 'director@ctc.com', role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=director' },
+      { id: 'u1', name: 'Alice Wilson', email: 'alice@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
+      { id: 'u2', name: 'Bob Smith', email: 'bob@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
+      { id: 'u3', name: 'Charlie Davis', email: 'charlie@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
+      { id: 'u4', name: 'Thái Hưng (Giám đốc)', email: 'director@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=director' },
     ];
     for (const u of INITIAL_USERS) {
-      await db.run('INSERT INTO users (id, name, email, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.role, u.department, u.avatar]);
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar]);
     }
   }
 
@@ -214,7 +351,7 @@ async function startServer() {
   app.get('/api/users', async (req, res) => {
     try {
       const users = await db.all(`
-        SELECT u.*, r.permissions 
+        SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, r.permissions 
         FROM users u 
         LEFT JOIN roles r ON u.role = r.name
       `);
@@ -222,16 +359,22 @@ async function startServer() {
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.post('/api/users', async (req, res) => {
-    const { id, name, email, role, department, avatar } = req.body;
+    const { id, name, email, password, role, department, avatar } = req.body;
     try {
-      await db.run('INSERT INTO users (id, name, email, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?)', [id, name, email, role, department, avatar]);
+      const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, name, email, hashedPassword, role, department, avatar]);
       res.json({ id });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.put('/api/users/:id', async (req, res) => {
-    const { name, email, role, department, avatar } = req.body;
+    const { name, email, password, role, department, avatar } = req.body;
     try {
-      await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=? WHERE id=?', [name, email, role, department, avatar, req.params.id]);
+      if (password) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await db.run('UPDATE users SET name=?, email=?, password=?, role=?, department=?, avatar=? WHERE id=?', [name, email, hashedPassword, role, department, avatar, req.params.id]);
+      } else {
+        await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=? WHERE id=?', [name, email, role, department, avatar, req.params.id]);
+      }
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
@@ -240,6 +383,353 @@ async function startServer() {
       await db.run('DELETE FROM users WHERE id=?', [req.params.id]);
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+      const user = await db.get('SELECT * FROM users WHERE lower(email) = lower(?)', [email]);
+      if (!user || !user.password || !password) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        avatar: user.avatar,
+        permissions: role?.permissions ? JSON.parse(role.permissions) : [],
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/auth/change-password', async (req, res) => {
+    const { userId, currentPassword, newPassword } = req.body;
+    try {
+      const user = await db.get('SELECT id, password FROM users WHERE id = ?', [userId]);
+      if (!user || !user.password) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword || '', user.password);
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+      return res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/users/:id/reset-password', async (req, res) => {
+    const { newPassword } = req.body;
+    try {
+      const user = await db.get('SELECT id, email, name FROM users WHERE id = ?', [req.params.id]);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const finalPassword = newPassword && String(newPassword).trim().length >= 6
+        ? String(newPassword).trim()
+        : generateRandomPassword(8);
+
+      const hashedPassword = await bcrypt.hash(finalPassword, 10);
+      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.params.id]);
+      await db.run("UPDATE password_reset_requests SET status = 'resolved' WHERE userId = ? AND status = 'pending'", [req.params.id]);
+
+      const emailSent = await sendResetPasswordEmail(user.email, finalPassword);
+      return res.json({ success: true, emailSent, generatedPassword: finalPassword });
+    } catch (e) {
+      console.error('reset-password error', e);
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+      const user = await db.get('SELECT id, email FROM users WHERE lower(email) = lower(?)', [email]);
+      if (!user) {
+        return res.status(404).json({ error: 'Email không tồn tại trong hệ thống' });
+      }
+
+      const recentPending = await db.get(
+        "SELECT id, createdAt FROM password_reset_requests WHERE userId = ? AND status = 'pending' ORDER BY createdAt DESC LIMIT 1",
+        [user.id]
+      );
+      if (recentPending) {
+        const elapsed = Date.now() - new Date(recentPending.createdAt).getTime();
+        if (elapsed < 10 * 60 * 1000) {
+          return res.status(429).json({ error: 'Bạn vừa yêu cầu gần đây. Vui lòng đợi vài phút rồi thử lại.' });
+        }
+      }
+
+      const token = crypto.randomUUID() + crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const appBaseUrl = process.env.APP_BASE_URL || 'https://ai.hieuhomecloud.online';
+      const resetLink = `${appBaseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+      await db.run('DELETE FROM password_reset_tokens WHERE userId = ? AND usedAt IS NULL', [user.id]);
+      await db.run(
+        'INSERT INTO password_reset_tokens (id, userId, email, token, expiresAt, usedAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [crypto.randomUUID(), user.id, user.email, token, expiresAt, null]
+      );
+
+      if (recentPending) {
+        await db.run(
+          'UPDATE password_reset_requests SET email = ?, emailStatus = ?, emailSentAt = ?, createdAt = ? WHERE id = ?',
+          [user.email, 'pending', null, new Date().toISOString(), recentPending.id]
+        );
+      } else {
+        await db.run(
+          "INSERT INTO password_reset_requests (id, userId, email, status, emailStatus, emailSentAt, createdAt) VALUES (?, ?, ?, 'pending', 'pending', NULL, ?)",
+          [crypto.randomUUID(), user.id, user.email, new Date().toISOString()]
+        );
+      }
+
+      let emailSent = false;
+      let message = 'Đã tạo link đặt lại mật khẩu.';
+      try {
+        emailSent = await sendResetLinkEmail(user.email, resetLink);
+        if (emailSent) {
+          message = 'Đã gửi link đặt lại mật khẩu qua email.';
+        } else {
+          message = 'Đã tạo link đặt lại mật khẩu nhưng chưa gửi được email.';
+        }
+      } catch (mailError: any) {
+        console.error('forgot-password mail error', mailError);
+        message = mailError?.message || 'Đã tạo link đặt lại mật khẩu nhưng gửi email thất bại.';
+      }
+
+      await db.run("UPDATE password_reset_requests SET emailStatus = ?, emailSentAt = ? WHERE userId = ? AND status = 'pending'", [emailSent ? 'sent' : 'failed', emailSent ? new Date().toISOString() : null, user.id]);
+      return res.json({ success: true, emailSent, message, resetLink, expiresAt });
+    } catch (e) {
+      console.error('forgot-password error', e);
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.get('/api/auth/reset-password/:token', async (req, res) => {
+    try {
+      const resetToken = await db.get(
+        'SELECT userId, email, expiresAt, usedAt FROM password_reset_tokens WHERE token = ?',
+        [req.params.token]
+      );
+      if (!resetToken) {
+        return res.status(404).json({ error: 'Link đặt lại mật khẩu không tồn tại' });
+      }
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: 'Link này đã được sử dụng' });
+      }
+      if (new Date(resetToken.expiresAt).getTime() < Date.now()) {
+        return res.status(400).json({ error: 'Link đặt lại mật khẩu đã hết hạn' });
+      }
+      return res.json({ success: true, email: resetToken.email });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+      if (!newPassword || String(newPassword).trim().length < 6) {
+        return res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
+      }
+
+      const resetToken = await db.get(
+        'SELECT userId, email, expiresAt, usedAt FROM password_reset_tokens WHERE token = ?',
+        [token]
+      );
+      if (!resetToken) {
+        return res.status(404).json({ error: 'Link đặt lại mật khẩu không tồn tại' });
+      }
+      if (resetToken.usedAt) {
+        return res.status(400).json({ error: 'Link này đã được sử dụng' });
+      }
+      if (new Date(resetToken.expiresAt).getTime() < Date.now()) {
+        return res.status(400).json({ error: 'Link đặt lại mật khẩu đã hết hạn' });
+      }
+
+      const hashedPassword = await bcrypt.hash(String(newPassword).trim(), 10);
+      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, resetToken.userId]);
+      const now = new Date().toISOString();
+      await db.run('UPDATE password_reset_tokens SET usedAt = ? WHERE token = ?', [now, token]);
+      await db.run("UPDATE password_reset_requests SET status = 'resolved', emailStatus = 'reset_done', emailSentAt = COALESCE(emailSentAt, ?) WHERE userId = ? AND status = 'pending'", [now, resetToken.userId]);
+
+      return res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.get('/api/admin/password-reset-requests', async (req, res) => {
+    try {
+      const includeResolved = String(req.query.includeResolved || '') === '1';
+      const requests = includeResolved
+        ? await db.all("SELECT * FROM password_reset_requests ORDER BY createdAt DESC")
+        : await db.all("SELECT * FROM password_reset_requests WHERE status = 'pending' ORDER BY createdAt DESC");
+      res.json(requests);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.delete('/api/admin/password-reset-requests/:id', async (req, res) => {
+    try {
+      await db.run('DELETE FROM password_reset_tokens WHERE userId = (SELECT userId FROM password_reset_requests WHERE id = ?) ', [req.params.id]);
+      await db.run('DELETE FROM password_reset_requests WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.get('/api/admin/database/tables', async (req, res) => {
+    try {
+      const tables = await db.all(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC`);
+      const data = [] as { name: string; count: number | null }[];
+      for (const table of tables) {
+        try {
+          const row = await db.get(`SELECT COUNT(*) as count FROM ${table.name}`);
+          data.push({ name: table.name, count: row?.count ?? 0 });
+        } catch {
+          data.push({ name: table.name, count: null });
+        }
+      }
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.get('/api/admin/database/table/:table', async (req, res) => {
+    try {
+      const { table } = req.params;
+      const limit = Math.min(Math.max(Number(req.query.limit || 20), 1), 100);
+      const offset = Math.max(Number(req.query.offset || 0), 0);
+      const totalRow = await db.get(`SELECT COUNT(*) as count FROM ${table}`);
+      const rows = await db.all(`SELECT * FROM ${table} LIMIT ? OFFSET ?`, [limit, offset]);
+      res.json({ table, total: totalRow?.count ?? 0, rows });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.delete('/api/admin/database/table/:table/row/:id', async (req, res) => {
+    try {
+      const { table, id } = req.params;
+      await db.run(`DELETE FROM ${table} WHERE id = ?`, [id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.get('/api/admin/database/export', async (req, res) => {
+    try {
+      const file = process.env.DB_PATH || path.join(__dirname, 'database.sqlite');
+      if (!fs.existsSync(file)) {
+        return res.status(404).json({ error: 'Database file not found' });
+      }
+      res.setHeader('Content-Type', 'application/x-sqlite3');
+      res.setHeader('Content-Disposition', 'attachment; filename="database.sqlite"');
+      fs.createReadStream(file).pipe(res);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/admin/database/import', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Thiếu file import' });
+      const sourcePath = req.file.path;
+      const targetPath = process.env.DB_PATH || './database.sqlite';
+      await fs.promises.copyFile(sourcePath, targetPath);
+      await fs.promises.unlink(sourcePath).catch(() => {});
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Import thất bại' });
+    }
+  });
+
+
+  app.get('/api/admin/system-config/smtp', async (req, res) => {
+    try {
+      const smtp = await getSystemConfig();
+      res.json({
+        SMTP_HOST: smtp.SMTP_HOST,
+        SMTP_PORT: smtp.SMTP_PORT,
+        SMTP_SECURE: smtp.SMTP_SECURE,
+        SMTP_USER: smtp.SMTP_USER,
+        SMTP_PASS: smtp.SMTP_PASS ? '********' : '',
+        SMTP_FROM: smtp.SMTP_FROM,
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/admin/system-config/smtp', async (req, res) => {
+    try {
+      const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM } = req.body;
+      const entries = [
+        ['SMTP_HOST', SMTP_HOST || ''],
+        ['SMTP_PORT', String(SMTP_PORT || '587')],
+        ['SMTP_SECURE', String(SMTP_SECURE || 'false')],
+        ['SMTP_USER', SMTP_USER || ''],
+        ['SMTP_FROM', SMTP_FROM || ''],
+      ];
+
+      if (SMTP_PASS && SMTP_PASS !== '********') {
+        entries.push(['SMTP_PASS', SMTP_PASS]);
+      }
+
+      for (const [key, value] of entries) {
+        await db.run(
+          'INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+          [key, value]
+        );
+      }
+
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/admin/system-config/smtp/test', async (req, res) => {
+    try {
+      const { testEmail } = req.body;
+      const { transporter, smtp } = await createTransporter();
+      if (!transporter) {
+        return res.status(400).json({ error: 'SMTP chưa được cấu hình đầy đủ' });
+      }
+      await transporter.sendMail({
+        from: smtp.SMTP_FROM,
+        to: testEmail || smtp.SMTP_USER,
+        subject: 'CTC Task - Test cấu hình SMTP',
+        text: 'Chúc mừng, cấu hình SMTP của anh đã hoạt động.',
+        html: '<div style="font-family:Arial,sans-serif"><h3>CTC Task</h3><p>Chúc mừng, cấu hình SMTP của anh đã hoạt động.</p></div>',
+      });
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error('smtp test failed', e);
+      res.status(500).json({ error: e?.message || 'Failed' });
+    }
   });
 
   // --- Notes API ---
