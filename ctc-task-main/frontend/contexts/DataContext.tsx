@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Task, Note, User, Report, Role, Department } from '../types';
 import { getTasks as fetchTasks, saveTask as apiSaveTask, deleteTask as apiDeleteTask } from '../services/taskService';
 import { getNotes as fetchNotes, saveNote as apiSaveNote, deleteNote as apiDeleteNote } from '../services/noteService';
@@ -30,83 +31,76 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks });
+  const { data: notes = [], isLoading: notesLoading, error: notesError } = useQuery({ queryKey: ['notes'], queryFn: fetchNotes });
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
+  const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useQuery({ queryKey: ['roles'], queryFn: fetchRoles });
+  const { data: departments = [], isLoading: departmentsLoading, error: deptsError } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments });
+
+  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading;
+  
+  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError;
+  const error = anyError ? 'Failed to fetch data' : null;
 
   const refreshData = async () => {
-    setIsLoading(true);
-    try {
-      const [tRes, nRes, uRes, rRes, rolesRes, deptsRes] = await Promise.all([
-        fetchTasks(), fetchNotes(), fetchUsers(), fetchReports(), fetchRoles(), fetchDepartments()
-      ]);
-      setTasks(tRes);
-      setNotes(nRes);
-      setUsers(uRes);
-      setReports(rRes);
-      setRoles(rolesRes);
-      setDepartments(deptsRes);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch data');
-    } finally {
-      setIsLoading(false);
-    }
+    await queryClient.invalidateQueries();
   };
 
-  useEffect(() => {
-    refreshData();
-  }, []);
+  const saveTaskMutation = useMutation({
+    mutationFn: apiSaveTask,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  });
 
-  const saveTask = async (task: Task) => {
-    await apiSaveTask(task);
-    await refreshData();
-  };
+  const deleteTaskMutation = useMutation({
+    mutationFn: apiDeleteTask,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  });
 
-  const deleteTask = async (id: string) => {
-    await apiDeleteTask(id);
-    await refreshData();
-  };
+  const saveNoteMutation = useMutation({
+    mutationFn: apiSaveNote,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+  });
 
-  const saveNote = async (note: Note) => {
-    await apiSaveNote(note);
-    await refreshData();
-  };
+  const deleteNoteMutation = useMutation({
+    mutationFn: apiDeleteNote,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+  });
 
-  const deleteNote = async (id: string) => {
-    await apiDeleteNote(id);
-    await refreshData();
-  };
+  const saveUserMutation = useMutation({
+    mutationFn: apiSaveUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  });
 
-  const saveUser = async (user: User) => {
-    await apiSaveUser(user);
-    await refreshData();
-  };
+  const deleteUserMutation = useMutation({
+    mutationFn: apiDeleteUser,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+  });
 
-  const deleteUser = async (id: string) => {
-    await apiDeleteUser(id);
-    await refreshData();
-  };
+  const saveReportMutation = useMutation({
+    mutationFn: apiSaveReport,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
+  });
 
-  const saveReport = async (report: Report) => {
-    await apiSaveReport(report);
-    await refreshData();
-  };
-
-  const deleteReport = async (id: string) => {
-    await apiDeleteReport(id);
-    await refreshData();
-  };
+  const deleteReportMutation = useMutation({
+    mutationFn: apiDeleteReport,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
+  });
 
   return (
     <DataContext.Provider value={{
       tasks, notes, users, reports, roles, departments, isLoading, error,
-      saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser, saveReport, deleteReport, refreshData
+      saveTask: async (t) => { await saveTaskMutation.mutateAsync(t); },
+      deleteTask: async (id) => { await deleteTaskMutation.mutateAsync(id); },
+      saveNote: async (n) => { await saveNoteMutation.mutateAsync(n); },
+      deleteNote: async (id) => { await deleteNoteMutation.mutateAsync(id); },
+      saveUser: async (u) => { await saveUserMutation.mutateAsync(u); },
+      deleteUser: async (id) => { await deleteUserMutation.mutateAsync(id); },
+      saveReport: async (r) => { await saveReportMutation.mutateAsync(r); },
+      deleteReport: async (id) => { await deleteReportMutation.mutateAsync(id); },
+      refreshData
     }}>
       {children}
     </DataContext.Provider>

@@ -8,8 +8,8 @@ import TasksPage from './pages/Tasks/index';
 import NotesPage from './pages/Notes/index';
 import TeamPage from './pages/Team/index';
 import { CalendarView as CalendarPage } from './pages/Calendar/index';
-import { MeetingView as MeetingsPage } from './pages/Meetings/index';
-import { JoinMeetingPage } from './pages/Meetings/JoinMeeting';
+const MeetingsPage = React.lazy(() => import('./pages/Meetings/index').then(module => ({ default: module.MeetingView })));
+const JoinMeetingPage = React.lazy(() => import('./pages/Meetings/JoinMeeting').then(module => ({ default: module.JoinMeetingPage })));
 import { SettingsView as SettingsPage } from './pages/Settings/index';
 import ReportsPage from './pages/Reports/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';
@@ -23,8 +23,8 @@ import { NoteModal } from './components/NoteModal';
 import { UserModal } from './components/UserModal';
 import { InviteModal } from './components/InviteModal';
 import { TaskSuggestionModal } from './components/TaskSuggestionModal';
-import { MeetingModal } from './components/MeetingModal';
-import { MeetingRoom } from './components/MeetingRoom';
+const MeetingModal = React.lazy(() => import('./components/MeetingModal').then(module => ({ default: module.MeetingModal })));
+const MeetingRoom = React.lazy(() => import('./components/MeetingRoom').then(module => ({ default: module.MeetingRoom })));
 import { AIAssistant, AIAssistantHandle } from './components/AIAssistant';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAuth } from './contexts/AuthContext';
@@ -315,8 +315,8 @@ export default function CTCTaskApp() {
 
               <Route path="/reports" element={<ReportsPage />} />
 
-              <Route path="/meetings" element={<MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} />} />
-              <Route path="/meetings/join/:meetingId" element={<JoinMeetingPage onJoinMeeting={setActiveMeeting} />} />
+              <Route path="/meetings" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meetings...</div>}><MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} /></React.Suspense>} />
+              <Route path="/meetings/join/:meetingId" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meeting Room...</div>}><JoinMeetingPage onJoinMeeting={setActiveMeeting} /></React.Suspense>} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/forgot-password" element={<Navigate to="/" replace />} />
               <Route path="/reset-password" element={<Navigate to="/" replace />} />
@@ -332,8 +332,12 @@ export default function CTCTaskApp() {
       <NoteModal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} onSave={handleSaveNote} onDelete={handleDeleteNote} initialNote={editingNote} />
       <UserModal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} onSave={handleSaveUser} initialUser={editingUser} />
       <InviteModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} />
-      {activeMeeting && <MeetingRoom meeting={activeMeeting} onLeave={() => setActiveMeeting(null)} allUsers={users} />}
-      <MeetingModal isOpen={isMeetingModalOpen} onClose={() => setIsMeetingModalOpen(false)} allUsers={users} />
+      <React.Suspense fallback={null}>
+        {activeMeeting && <MeetingRoom meeting={activeMeeting} onLeave={() => setActiveMeeting(null)} allUsers={users} />}
+      </React.Suspense>
+      <React.Suspense fallback={null}>
+        <MeetingModal isOpen={isMeetingModalOpen} onClose={() => setIsMeetingModalOpen(false)} allUsers={users} />
+      </React.Suspense>
       <ConfirmDialog isOpen={confirmDialog.isOpen} title={confirmDialog.title} message={confirmDialog.message} onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))} type={confirmDialog.type} confirmText={t('delete')} cancelText={t('cancel')} />
     </div>
   );

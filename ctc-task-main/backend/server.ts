@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { PrismaClient } from '@prisma/client';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import cors from 'cors';
@@ -17,6 +18,7 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
   const upload = multer({ dest: path.join(__dirname, '../tmp') });
+  const prisma = new PrismaClient();
 
   const generateRandomPassword = (length = 8) => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%';
@@ -350,19 +352,21 @@ async function startServer() {
   // --- Users API ---
   app.get('/api/users', async (req, res) => {
     try {
-      const users = await db.all(`
-        SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, r.permissions 
-        FROM users u 
-        LEFT JOIN roles r ON u.role = r.name
-      `);
-      res.json(users.map(u => ({ ...u, permissions: u.permissions ? JSON.parse(u.permissions) : [] })));
+      const users = await prisma.users.findMany();
+      const roles = await prisma.roles.findMany();
+      res.json(users.map(u => {
+        const role = roles.find(r => r.name === u.role);
+        return { ...u, permissions: role?.permissions ? JSON.parse(role.permissions) : [] };
+      }));
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.post('/api/users', async (req, res) => {
     const { id, name, email, password, role, department, avatar } = req.body;
     try {
       const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
-      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, name, email, hashedPassword, role, department, avatar]);
+      await prisma.users.create({
+        data: { id, name, email, password: hashedPassword, role, department, avatar }
+      });
       res.json({ id });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
@@ -371,16 +375,22 @@ async function startServer() {
     try {
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        await db.run('UPDATE users SET name=?, email=?, password=?, role=?, department=?, avatar=? WHERE id=?', [name, email, hashedPassword, role, department, avatar, req.params.id]);
+        await prisma.users.update({
+          where: { id: req.params.id },
+          data: { name, email, password: hashedPassword, role, department, avatar }
+        });
       } else {
-        await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=? WHERE id=?', [name, email, role, department, avatar, req.params.id]);
+        await prisma.users.update({
+          where: { id: req.params.id },
+          data: { name, email, role, department, avatar }
+        });
       }
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.delete('/api/users/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM users WHERE id=?', [req.params.id]);
+      await prisma.users.delete({ where: { id: req.params.id } });
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
@@ -735,27 +745,34 @@ async function startServer() {
   // --- Notes API ---
   app.get('/api/notes', async (req, res) => {
     try {
-      const notes = await db.all('SELECT * FROM notes');
+      const notes = await prisma.notes.findMany();
       res.json(notes);
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.post('/api/notes', async (req, res) => {
     const { id, title, content, color, createdAt } = req.body;
     try {
-      await db.run('INSERT INTO notes (id, title, content, color, createdAt) VALUES (?, ?, ?, ?, ?)', [id, title, content, color, createdAt]);
+      await prisma.notes.create({
+        data: { id, title, content, color, createdAt }
+      });
       res.json({ id });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.put('/api/notes/:id', async (req, res) => {
     const { title, content, color } = req.body;
     try {
-      await db.run('UPDATE notes SET title=?, content=?, color=? WHERE id=?', [title, content, color, req.params.id]);
+      await prisma.notes.update({
+        where: { id: req.params.id },
+        data: { title, content, color }
+      });
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
   app.delete('/api/notes/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM notes WHERE id=?', [req.params.id]);
+      await prisma.notes.delete({
+        where: { id: req.params.id }
+      });
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
@@ -763,8 +780,8 @@ async function startServer() {
   // --- Tasks API ---
   app.get('/api/tasks', async (req, res) => {
     try {
-      const tasks = await db.all('SELECT * FROM tasks');
-      res.json(tasks.map(t => ({
+      const allTasks = await prisma.tasks.findMany();
+      res.json(allTasks.map(t => ({
         ...t,
         assignees: t.assignees ? JSON.parse(t.assignees) : [],
         tags: t.tags ? JSON.parse(t.tags) : [],
@@ -776,26 +793,57 @@ async function startServer() {
   app.post('/api/tasks', async (req, res) => {
     const t = req.body;
     try {
-      await db.run(
-        'INSERT INTO tasks (id, title, description, startDate, dueDate, estimatedEndAt, priority, status, assignees, tags, createdBy, department, recurrence, subtasks, comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [t.id, t.title, t.description, t.startDate, t.dueDate, t.estimatedEndAt, t.priority, t.status, JSON.stringify(t.assignees||[]), JSON.stringify(t.tags||[]), t.createdBy, t.department, t.recurrence, JSON.stringify(t.subtasks||[]), JSON.stringify(t.comments||[])]
-      );
+      await prisma.tasks.create({
+        data: {
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          startDate: t.startDate,
+          dueDate: t.dueDate,
+          estimatedEndAt: t.estimatedEndAt,
+          priority: t.priority,
+          status: t.status,
+          assignees: JSON.stringify(t.assignees || []),
+          tags: JSON.stringify(t.tags || []),
+          createdBy: t.createdBy,
+          department: t.department,
+          recurrence: t.recurrence,
+          subtasks: JSON.stringify(t.subtasks || []),
+          comments: JSON.stringify(t.comments || [])
+        }
+      });
       res.json({ id: t.id });
     } catch(e) { res.status(500).json({error: 'Failed task create'}); }
   });
   app.put('/api/tasks/:id', async (req, res) => {
     const t = req.body;
     try {
-      await db.run(
-        'UPDATE tasks SET title=?, description=?, startDate=?, dueDate=?, estimatedEndAt=?, priority=?, status=?, assignees=?, tags=?, department=?, recurrence=?, subtasks=?, comments=? WHERE id=?',
-        [t.title, t.description, t.startDate, t.dueDate, t.estimatedEndAt, t.priority, t.status, JSON.stringify(t.assignees||[]), JSON.stringify(t.tags||[]), t.department, t.recurrence, JSON.stringify(t.subtasks||[]), JSON.stringify(t.comments||[]), req.params.id]
-      );
+      await prisma.tasks.update({
+        where: { id: req.params.id },
+        data: {
+          title: t.title,
+          description: t.description,
+          startDate: t.startDate,
+          dueDate: t.dueDate,
+          estimatedEndAt: t.estimatedEndAt,
+          priority: t.priority,
+          status: t.status,
+          assignees: JSON.stringify(t.assignees || []),
+          tags: JSON.stringify(t.tags || []),
+          department: t.department,
+          recurrence: t.recurrence,
+          subtasks: JSON.stringify(t.subtasks || []),
+          comments: JSON.stringify(t.comments || [])
+        }  
+      });
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed task update'}); }
   });
   app.delete('/api/tasks/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM tasks WHERE id=?', [req.params.id]);
+      await prisma.tasks.delete({
+        where: { id: req.params.id }
+      });
       res.json({ success: true });
     } catch(e) { res.status(500).json({error: 'Failed'}); }
   });
@@ -803,13 +851,13 @@ async function startServer() {
   // --- Meetings & Signals (Existing) ---
   app.get('/api/meetings', async (req, res) => {
     try {
-      const meetings = await db.all('SELECT * FROM meetings');
+      const meetings = await prisma.meetings.findMany();
       res.json(meetings.map(m => ({ ...m, participants: JSON.parse(m.participants) })));
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.get('/api/meetings/:id', async (req, res) => {
     try {
-      const m = await db.get('SELECT * FROM meetings WHERE id=?', [req.params.id]);
+      const m = await prisma.meetings.findUnique({ where: { id: req.params.id } });
       if (!m) return res.status(404).json({ error: 'Not found' });
       res.json({ ...m, participants: JSON.parse(m.participants) });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
@@ -817,7 +865,9 @@ async function startServer() {
   app.post('/api/meetings', async (req, res) => {
     const { id, title, description, hostId, startTime, endTime, meetingLink, status, participants } = req.body;
     try {
-      await db.run('INSERT INTO meetings (id, title, description, hostId, startTime, endTime, meetingLink, status, participants) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, title, description, hostId, startTime, endTime, meetingLink, status, JSON.stringify(participants)]);
+      await prisma.meetings.create({
+        data: { id, title, description, hostId, startTime, endTime, meetingLink, status, participants: JSON.stringify(participants) }
+      });
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -825,7 +875,10 @@ async function startServer() {
     const { id } = req.params;
     const { title, description, status, participants, startTime, endTime } = req.body;
     try {
-      await db.run('UPDATE meetings SET title=?, description=?, status=?, participants=?, startTime=?, endTime=? WHERE id=?', [title, description, status, JSON.stringify(participants), startTime, endTime, id]);
+      await prisma.meetings.update({
+        where: { id },
+        data: { title, description, status, participants: JSON.stringify(participants), startTime, endTime }
+      });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -833,12 +886,15 @@ async function startServer() {
     const { id } = req.params;
     const { userId } = req.body;
     try {
-      const meeting = await db.get('SELECT participants FROM meetings WHERE id=?', [id]);
+      const meeting = await prisma.meetings.findUnique({ where: { id } });
       if (meeting) {
         const participants = JSON.parse(meeting.participants);
         if (!participants.includes(userId)) {
           participants.push(userId);
-          await db.run('UPDATE meetings SET participants=? WHERE id=?', [JSON.stringify(participants), id]);
+          await prisma.meetings.update({
+            where: { id },
+            data: { participants: JSON.stringify(participants) }
+          });
         }
       }
       res.json({ success: true });
@@ -848,19 +904,22 @@ async function startServer() {
     const { id } = req.params;
     const { userId } = req.body;
     try {
-      const meeting = await db.get('SELECT participants FROM meetings WHERE id=?', [id]);
+      const meeting = await prisma.meetings.findUnique({ where: { id } });
       if (meeting) {
         const participants = JSON.parse(meeting.participants);
         const updated = participants.filter((p: string) => p !== userId);
-        await db.run('UPDATE meetings SET participants=? WHERE id=?', [JSON.stringify(updated), id]);
+        await prisma.meetings.update({
+          where: { id },
+          data: { participants: JSON.stringify(updated) }
+        });
       }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.delete('/api/meetings/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM meetings WHERE id=?', [req.params.id]);
-      await db.run('DELETE FROM signals WHERE meetingId=?', [req.params.id]);
+      await prisma.meetings.delete({ where: { id: req.params.id } });
+      await prisma.signals.deleteMany({ where: { meetingId: req.params.id } });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -887,10 +946,9 @@ async function startServer() {
   // --- Roles API ---
   app.get('/api/roles', async (req, res) => {
     try {
-      const roles = await db.all('SELECT * FROM roles ORDER BY isSystem DESC, name ASC');
-      // Attach user count to each role
+      const roles = await prisma.roles.findMany({ orderBy: [{ isSystem: 'desc' }, { name: 'asc' }] });
       const result = await Promise.all(roles.map(async (r) => {
-        const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [r.name]);
+        const count = await prisma.users.count({ where: { role: r.name } });
         return { ...r, permissions: JSON.parse(r.permissions || '[]'), userCount: count };
       }));
       res.json(result);
@@ -902,13 +960,12 @@ async function startServer() {
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     try {
       const newId = id || `role-${Date.now()}`;
-      await db.run(
-        'INSERT INTO roles (id, name, description, color, permissions, isSystem) VALUES (?, ?, ?, ?, ?, 0)',
-        [newId, name.trim(), description || '', color || '#6366f1', JSON.stringify(permissions || [])]
-      );
+      await prisma.roles.create({
+        data: { id: newId, name: name.trim(), description: description || '', color: color || '#6366f1', permissions: JSON.stringify(permissions || []), isSystem: 0 }
+      });
       res.status(201).json({ id: newId });
     } catch(e: any) {
-      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
       res.status(500).json({ error: 'Failed to create role' });
     }
   });
@@ -916,36 +973,39 @@ async function startServer() {
   app.put('/api/roles/:id', async (req, res) => {
     const { name, description, color, permissions } = req.body;
     try {
-      const existing = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
+      const existing = await prisma.roles.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Not found' });
-      // System roles: only allow description and color update, not name or permissions
       if (existing.isSystem) {
-        await db.run(
-          'UPDATE roles SET description = ?, color = ? WHERE id = ?',
-          [description ?? existing.description, color ?? existing.color, req.params.id]
-        );
+        await prisma.roles.update({
+          where: { id: req.params.id },
+          data: { description: description ?? existing.description, color: color ?? existing.color }
+        });
       } else {
-        await db.run(
-          'UPDATE roles SET name = ?, description = ?, color = ?, permissions = ? WHERE id = ?',
-          [name ?? existing.name, description ?? existing.description, color ?? existing.color,
-           JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]')), req.params.id]
-        );
+        await prisma.roles.update({
+          where: { id: req.params.id },
+          data: { 
+            name: name ?? existing.name, 
+            description: description ?? existing.description, 
+            color: color ?? existing.color, 
+            permissions: JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]'))
+          }
+        });
       }
       res.json({ success: true });
     } catch(e: any) {
-      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
       res.status(500).json({ error: 'Failed to update role' });
     }
   });
 
   app.delete('/api/roles/:id', async (req, res) => {
     try {
-      const role = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
+      const role = await prisma.roles.findUnique({ where: { id: req.params.id } });
       if (!role) return res.status(404).json({ error: 'Not found' });
       if (role.isSystem) return res.status(403).json({ error: 'Không thể xóa vai trò hệ thống' });
-      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [role.name]);
+      const count = await prisma.users.count({ where: { role: role.name } });
       if (count > 0) return res.status(409).json({ error: `Đang có ${count} người dùng với vai trò này` });
-      await db.run('DELETE FROM roles WHERE id = ?', [req.params.id]);
+      await prisma.roles.delete({ where: { id: req.params.id } });
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: 'Failed to delete role' }); }
   });
@@ -953,11 +1013,11 @@ async function startServer() {
   // --- Departments API ---
   app.get('/api/departments', async (req, res) => {
     try {
-      const depts = await db.all('SELECT * FROM departments ORDER BY name ASC');
+      const depts = await prisma.departments.findMany({ orderBy: { name: 'asc' } });
       const result = await Promise.all(depts.map(async (d) => {
-        const { count: userCount } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [d.name]);
-        const { count: taskCount } = await db.get('SELECT COUNT(*) as count FROM tasks WHERE department = ?', [d.name]);
-        const manager = d.managerId ? await db.get('SELECT id, name, avatar FROM users WHERE id = ?', [d.managerId]) : null;
+        const userCount = await prisma.users.count({ where: { department: d.name } });
+        const taskCount = await prisma.tasks.count({ where: { department: d.name } });
+        const manager = d.managerId ? await prisma.users.findUnique({ where: { id: d.managerId }, select: { id: true, name: true, avatar: true } }) : null;
         return { ...d, userCount, taskCount, manager };
       }));
       res.json(result);
@@ -969,11 +1029,12 @@ async function startServer() {
     if (!name?.trim()) return res.status(400).json({ error: 'Tên phòng ban không được trống' });
     try {
       const newId = id || `dept-${Date.now()}`;
-      await db.run('INSERT INTO departments (id, name, description, color, managerId) VALUES (?, ?, ?, ?, ?)',
-        [newId, name.trim(), description || '', color || '#6366f1', managerId || null]);
+      await prisma.departments.create({
+        data: { id: newId, name: name.trim(), description: description || '', color: color || '#6366f1', managerId: managerId || null }
+      });
       res.status(201).json({ id: newId });
     } catch(e: any) {
-      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
       res.status(500).json({ error: 'Failed to create department' });
     }
   });
@@ -981,31 +1042,33 @@ async function startServer() {
   app.put('/api/departments/:id', async (req, res) => {
     const { name, description, color, managerId } = req.body;
     try {
-      const existing = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
+      const existing = await prisma.departments.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Not found' });
       const oldName = existing.name;
       const newName = name?.trim() ?? oldName;
-      await db.run('UPDATE departments SET name = ?, description = ?, color = ?, managerId = ? WHERE id = ?',
-        [newName, description ?? existing.description, color ?? existing.color, managerId ?? existing.managerId, req.params.id]);
+      await prisma.departments.update({
+        where: { id: req.params.id },
+        data: { name: newName, description: description ?? existing.description, color: color ?? existing.color, managerId: managerId ?? existing.managerId }
+      });
       // Update users and tasks if name changed
       if (newName !== oldName) {
-        await db.run('UPDATE users SET department = ? WHERE department = ?', [newName, oldName]);
-        await db.run('UPDATE tasks SET department = ? WHERE department = ?', [newName, oldName]);
+        await prisma.users.updateMany({ where: { department: oldName }, data: { department: newName } });
+        await prisma.tasks.updateMany({ where: { department: oldName }, data: { department: newName } });
       }
       res.json({ success: true });
     } catch(e: any) {
-      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
       res.status(500).json({ error: 'Failed to update department' });
     }
   });
 
   app.delete('/api/departments/:id', async (req, res) => {
     try {
-      const dept = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
+      const dept = await prisma.departments.findUnique({ where: { id: req.params.id } });
       if (!dept) return res.status(404).json({ error: 'Not found' });
-      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [dept.name]);
+      const count = await prisma.users.count({ where: { department: dept.name } });
       if (count > 0) return res.status(409).json({ error: `Đang có ${count} nhân viên trong phòng ban này` });
-      await db.run('DELETE FROM departments WHERE id = ?', [req.params.id]);
+      await prisma.departments.delete({ where: { id: req.params.id } });
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: 'Failed to delete department' }); }
   });
@@ -1013,23 +1076,23 @@ async function startServer() {
   // --- Admin Analytics API ---
   app.get('/api/admin/stats', async (req, res) => {
     try {
-      const userCountDesc = await db.get('SELECT COUNT(*) as count FROM users');
-      const taskCountDesc = await db.get('SELECT COUNT(*) as count FROM tasks');
-      const reportCountDesc = await db.get('SELECT COUNT(*) as count FROM reports');
-      const meetingCountDesc = await db.get('SELECT COUNT(*) as count FROM meetings WHERE status != "ended"');
+      const userCount = await prisma.users.count();
+      const taskCount = await prisma.tasks.count();
+      const reportCount = await prisma.reports.count();
+      const activeMeetings = await prisma.meetings.count({ where: { status: { not: 'ended' } } });
       
-      const roleBreakdown = await db.all('SELECT role, COUNT(*) as count FROM users GROUP BY role');
-      const taskStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM tasks GROUP BY status');
-      const taskDeptBreakdown = await db.all('SELECT department, COUNT(*) as count FROM tasks GROUP BY department');
+      const roleBreakdown = await prisma.users.groupBy({ by: ['role'], _count: { role: true } });
+      const taskStatusBreakdown = await prisma.tasks.groupBy({ by: ['status'], _count: { status: true } });
+      const taskDeptBreakdown = await prisma.tasks.groupBy({ by: ['department'], _count: { department: true } });
       
       res.json({
-        totalUsers: userCountDesc.count,
-        totalTasks: taskCountDesc.count,
-        totalReports: reportCountDesc.count,
-        activeMeetings: meetingCountDesc.count,
-        roleBreakdown,
-        taskStatusBreakdown,
-        taskDeptBreakdown
+        totalUsers: userCount,
+        totalTasks: taskCount,
+        totalReports: reportCount,
+        activeMeetings: activeMeetings,
+        roleBreakdown: roleBreakdown.map(r => ({ role: r.role, count: r._count.role })),
+        taskStatusBreakdown: taskStatusBreakdown.map(t => ({ status: t.status, count: t._count.status })),
+        taskDeptBreakdown: taskDeptBreakdown.map(t => ({ department: t.department, count: t._count.department }))
       });
     } catch (e) {
       res.status(500).json({ error: 'Failed to fetch admin stats' });
@@ -1039,7 +1102,7 @@ async function startServer() {
   // --- Reports API ---
   app.get('/api/reports', async (req, res) => {
     try {
-      const reports = await db.all('SELECT * FROM reports');
+      const reports = await prisma.reports.findMany();
       res.json(reports);
     } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
   });
@@ -1047,10 +1110,9 @@ async function startServer() {
   app.post('/api/reports', async (req, res) => {
     const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
-      await db.run(
-        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, title, content, authorId, department, status, createdAt, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, managerFeedback || null]
-      );
+      await prisma.reports.create({
+        data: { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
+      });
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
   });
@@ -1058,17 +1120,19 @@ async function startServer() {
   app.put('/api/reports/:id', async (req, res) => {
     const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
-      await db.run(
-        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=?, directorFeedback=?, managerFeedback=? WHERE id=?',
-        [title, content, status, submittedAt || null, approvedAt || null, approvedBy || null, directorFeedback || null, managerFeedback || null, req.params.id]
-      );
+      await prisma.reports.update({
+        where: { id: req.params.id },
+        data: { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
+      });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
   });
 
   app.delete('/api/reports/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM reports WHERE id=?', [req.params.id]);
+      await prisma.reports.delete({
+        where: { id: req.params.id }
+      });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });

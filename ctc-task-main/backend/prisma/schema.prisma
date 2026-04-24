@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../database.sqlite"
+}
+
+model meetings {
+  id           String  @id
+  title        String
+  description  String?
+  hostId       String
+  startTime    String
+  endTime      String
+  meetingLink  String
+  status       String
+  participants String
+}
+
+model signals {
+  id        String @id
+  meetingId String
+  from      String
+  to        String
+  type      String
+  data      String
+  timestamp BigInt
+}
+
+model users {
+  id         String  @id
+  name       String
+  email      String
+  password   String?
+  role       String
+  department String
+  avatar     String
+}
+
+model tasks {
+  id             String  @id
+  title          String
+  description    String?
+  startDate      String?
+  dueDate        String?
+  estimatedEndAt String?
+  priority       String?
+  status         String?
+  assignees      String?
+  tags           String?
+  createdBy      String?
+  department     String?
+  recurrence     String?
+  subtasks       String?
+  comments       String?
+}
+
+model notes {
+  id        String  @id
+  title     String
+  content   String?
+  color     String?
+  createdAt String?
+}
+
+model reports {
+  id               String  @id
+  title            String
+  content          String?
+  authorId         String
+  department       String
+  status           String
+  createdAt        String
+  submittedAt      String?
+  approvedAt       String?
+  approvedBy       String?
+  directorFeedback String?
+  managerFeedback  String?
+}
+
+model roles {
+  id          String  @id
+  name        String  @unique
+  description String?
+  color       String  @default("#6366f1")
+  permissions String  @default("[]")
+  isSystem    Int     @default(0)
+}
+
+model departments {
+  id          String  @id
+  name        String  @unique
+  description String?
+  color       String  @default("#6366f1")
+  managerId   String?
+}
+
+model password_reset_requests {
+  id          String  @id
+  userId      String
+  email       String
+  status      String  @default("pending")
+  emailStatus String  @default("unknown")
+  emailSentAt String?
+  createdAt   String
+}
+
+model password_reset_tokens {
+  id        String  @id
+  userId    String
+  email     String
+  token     String  @unique
+  expiresAt String
+  usedAt    String?
+}
+
+model system_config {
+  key   String @id
+  value String
+}
