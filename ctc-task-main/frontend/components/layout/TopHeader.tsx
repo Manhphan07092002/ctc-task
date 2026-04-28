@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Globe, Search, X, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications, AppNotification } from '../../contexts/NotificationContext';
 
 const getGreeting = (t: (key: string) => string) => {
@@ -45,15 +45,17 @@ const fmtRelative = (iso: string) => {
   return `${Math.floor(h / 24)} ngày trước`;
 };
 
-const NotificationItem: React.FC<{ n: AppNotification; onRead: () => void; onDelete: () => void }> = ({ n, onRead, onDelete }) => (
+const NotificationItem: React.FC<{ n: AppNotification; onClick: () => void; onDelete: () => void }> = ({ n, onClick, onDelete }) => (
   <div
     className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/60' : ''}`}
-    onClick={onRead}
+    onClick={onClick}
   >
-    <div className="text-2xl leading-none select-none">{n.title.slice(0, 2)}</div>
+    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 font-bold text-lg flex-shrink-0 uppercase">
+      {n.title.charAt(0)}
+    </div>
     <div className="flex-1 min-w-0">
       <p className={`text-sm leading-tight ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-        {n.title.slice(2).trim()}
+        {n.title}
       </p>
       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
       <p className="text-[10px] text-gray-400 mt-1">{fmtRelative(n.createdAt)}</p>
@@ -82,9 +84,25 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const { user } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const location = useLocation();
+  const navigate = useNavigate();
   const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleNotificationClick = (n: AppNotification) => {
+    if (!n.isRead) markRead(n.id);
+    setOpen(false);
+    
+    if (n.type.startsWith('report_') || n.title.toLowerCase().includes('báo cáo') || n.title.toLowerCase().includes('bao cao')) {
+      navigate('/reports');
+    } else if (n.type.startsWith('task_') || n.title.toLowerCase().includes('công việc')) {
+      navigate('/tasks');
+    } else if (n.type.startsWith('meeting_') || n.title.toLowerCase().includes('họp')) {
+      navigate('/meetings');
+    } else {
+      navigate('/');
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -196,7 +214,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     <NotificationItem
                       key={n.id}
                       n={n}
-                      onRead={() => { if (!n.isRead) markRead(n.id); }}
+                      onClick={() => handleNotificationClick(n)}
                       onDelete={() => deleteNotification(n.id)}
                     />
                   ))

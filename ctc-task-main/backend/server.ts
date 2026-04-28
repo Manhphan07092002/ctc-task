@@ -1198,8 +1198,8 @@ async function startServer() {
             await db.run(
               'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
               [nid(), dir.id, 'report_submitted',
-               'Bao cao tong hop phong cho phe duyet',
-               'Truong phong ' + (author?.name || '') + ' da gui bao cao tong hop chо phe duyet.',
+               'Báo cáo tổng hợp phòng cho phê duyệt',
+               'Trưởng phòng ' + (author?.name || '') + ' đã gửi báo cáo tổng hợp cho phê duyệt.',
                id, now]
             );
           }
@@ -1214,8 +1214,8 @@ async function startServer() {
             await db.run(
               'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
               [nid(), mgr.id, 'report_submitted',
-               'Co bao cao moi can duyet',
-               (author?.name || 'Nhan vien') + ' da gui bao cao cong viec cho ban duyet.',
+               'Có báo cáo mới cần duyệt',
+               (author?.name || 'Nhân viên') + ' đã gửi báo cáo công việc cho bạn duyệt.',
                id, now]
             );
           }
@@ -1250,12 +1250,12 @@ async function startServer() {
              WHERE u.department = ? AND r.permissions LIKE '%approve_dept_reports%'`,
             [oldReport.department]
           );
-          const authorName = author?.name || 'Nhan vien';
+          const authorName = author?.name || 'Nhân viên';
           for (const mgr of managers) {
             await db.run(
               'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-              [nid(), mgr.id, 'report_submitted', 'Co bao cao moi can duyet',
-               authorName + ' da gui bao cao cong viec cho ban duyet.',
+              [nid(), mgr.id, 'report_submitted', 'Có báo cáo mới cần duyệt',
+               authorName + ' đã gửi báo cáo công việc cho bạn duyệt.',
                req.params.id, now]
             );
           }
@@ -1272,8 +1272,8 @@ async function startServer() {
             for (const dir of directors) {
               await db.run(
                 'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-                [nid(), dir.id, 'report_submitted', 'Bao cao tong hop phong cho phe duyet',
-                 'Truong phong ' + authorName + ' da gui bao cao tong hop chо phe duyet.',
+                [nid(), dir.id, 'report_submitted', 'Báo cáo tổng hợp phòng cho phê duyệt',
+                 'Trưởng phòng ' + authorName + ' đã gửi báo cáo tổng hợp cho phê duyệt.',
                  req.params.id, now]
               );
             }
@@ -1283,8 +1283,8 @@ async function startServer() {
         if (status === 'Approved') {
           await db.run(
             'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-            [nid(), oldReport.authorId, 'report_approved', 'Bao cao da duoc phe duyet',
-             'Bao cao cua ban da duoc phe duyet thanh cong.',
+            [nid(), oldReport.authorId, 'report_approved', 'Báo cáo đã được phê duyệt',
+             'Báo cáo của bạn đã được phê duyệt thành công.',
              req.params.id, now]
           );
         }
@@ -1292,8 +1292,8 @@ async function startServer() {
         if (status === 'Rejected') {
           await db.run(
             'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-            [nid(), oldReport.authorId, 'report_rejected', 'Bao cao bi tu choi',
-             'Bao cao cua ban da bi tu choi. Vui long xem nhan xet va chinh sua lai.',
+            [nid(), oldReport.authorId, 'report_rejected', 'Báo cáo bị từ chối',
+             'Báo cáo của bạn đã bị từ chối. Vui lòng xem nhận xét và chỉnh sửa lại.',
              req.params.id, now]
           );
         }
