@@ -1216,18 +1216,29 @@ async function startServer() {
 
       if (dayOfWeek !== 5 || hours !== 16 || minutes !== 0) return;
 
-      // Get start of this week's Friday (to avoid duplicate notifications)
-      const weekFridayKey = `${nowVN.getUTCFullYear()}-W${nowVN.getUTCMonth()}-F${Math.floor(nowVN.getUTCDate() / 7)}`;
-
       try {
-        const users = await db.all('SELECT id FROM users');
-        if (!users || users.length === 0) return;
+        // Only notify users whose role has 'create_report' permission (employees/managers)
+        const allUsers = await db.all('SELECT u.id, u.role FROM users u');
+        const allRoles = await db.all('SELECT name, permissions FROM roles');
+        if (!allUsers || allUsers.length === 0) return;
 
-        for (const u of users) {
+        const rolePermMap = new Map<string, string[]>();
+        for (const r of allRoles) {
+          try { rolePermMap.set(r.name, JSON.parse(r.permissions)); } catch { rolePermMap.set(r.name, []); }
+        }
+
+        const eligibleUsers = allUsers.filter(u => {
+          const perms = rolePermMap.get(u.role) || [];
+          return perms.includes('create_report');
+        });
+
+        const todayIso = new Date(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()).toISOString();
+        let notified = 0;
+        for (const u of eligibleUsers) {
           // Check if already notified this Friday
           const existing = await db.get(
             `SELECT id FROM notifications WHERE userId = ? AND type = 'report_reminder' AND createdAt >= ?`,
-            [u.id, new Date(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()).toISOString()]
+            [u.id, todayIso]
           );
           if (existing) continue;
 
@@ -1243,8 +1254,9 @@ async function startServer() {
               new Date().toISOString(),
             ]
           );
+          notified++;
         }
-        console.log(`[Scheduler] Sent Friday report reminders to ${users.length} users.`);
+        console.log(`[Scheduler] Sent Friday report reminders to ${notified} eligible users.`);
       } catch (err) {
         console.error('[Scheduler] Friday reminder error:', err);
       }
@@ -1262,11 +1274,9 @@ async function startServer() {
     const checkAndNotifyNotes = async () => {
       try {
         const now = new Date();
-        const notes = await db.all('SELECT * FROM notes WHERE reminderAt IS NOT NULL');
+        // Only fetch notes that have a userId (private notes) and a reminderAt
+        const notes = await db.all('SELECT * FROM notes WHERE reminderAt IS NOT NULL AND userId IS NOT NULL');
         if (!notes || notes.length === 0) return;
-
-        const users = await db.all('SELECT id FROM users');
-        if (!users || users.length === 0) return;
 
         for (const note of notes) {
           const remTime = new Date(note.reminderAt);
@@ -1279,22 +1289,20 @@ async function startServer() {
           );
           if (existing) continue;
 
-          // Due and not notified yet! Create notification for ALL users
-          for (const u of users) {
-            const notifId = crypto.randomUUID();
-            await db.run(
-              `INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt)
-               VALUES (?, ?, 'note_reminder', ?, ?, ?, 0, ?)`,
-              [
-                notifId,
-                u.id,
-                `📌 ${note.title || 'Ghi chú'}`,
-                note.content ? note.content.slice(0, 100) + (note.content.length > 100 ? '...' : '') : 'Đã đến giờ nhắc nhở!',
-                note.id,
-                new Date().toISOString(),
-              ]
-            );
-          }
+          // Due and not notified yet — only notify the note owner
+          const notifId = crypto.randomUUID();
+          await db.run(
+            `INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt)
+             VALUES (?, ?, 'note_reminder', ?, ?, ?, 0, ?)`,
+            [
+              notifId,
+              note.userId,   // ← only the owner gets notified
+              `📌 ${note.title || 'Ghi chú'}`,
+              note.content ? note.content.slice(0, 100) + (note.content.length > 100 ? '...' : '') : 'Đã đến giờ nhắc nhở!',
+              note.id,
+              new Date().toISOString(),
+            ]
+          );
         }
       } catch (err) {
         console.error('[Scheduler] Note reminder error:', err);
