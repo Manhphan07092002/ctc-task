@@ -800,10 +800,42 @@ async function startServer() {
       });
       res.json({ success: true });
     } catch (e: any) {
-      console.error('smtp test failed', e);
-      res.status(500).json({ error: e?.message || 'Failed' });
+      console.error(e);
+      res.status(500).json({ error: e.message || 'Lỗi gửi mail' });
     }
   });
+
+  // ===== AI KEYS CONFIG ENDPOINTS =====
+  app.get('/api/admin/system-config/ai-keys', async (req, res) => {
+    try {
+      const config = await db.get(`SELECT value FROM system_config WHERE key = 'gemini_api_keys'`);
+      if (config && config.value) {
+        return res.json({ keys: JSON.parse(config.value) });
+      }
+      res.json({ keys: [] });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.post('/api/admin/system-config/ai-keys', async (req, res) => {
+    try {
+      const { keys } = req.body;
+      if (!Array.isArray(keys)) {
+        return res.status(400).json({ error: 'Invalid keys format' });
+      }
+      
+      await db.run(
+        'INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+        ['gemini_api_keys', JSON.stringify(keys)]
+      );
+
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
 
   // --- Notes API (private per user) ---
   app.get('/api/notes', async (req, res) => {

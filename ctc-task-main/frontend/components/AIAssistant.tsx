@@ -51,9 +51,12 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   }));
 
   useEffect(() => {
-    if (isOpen && !chatSessionRef.current) {
-      chatSessionRef.current = createChatSession();
-    }
+    const initChat = async () => {
+      if (isOpen && !chatSessionRef.current) {
+        chatSessionRef.current = await createChatSession();
+      }
+    };
+    initChat();
     const timer = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timer);
   }, [isOpen, messages]);
@@ -79,7 +82,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     try {
       if (!chatSessionRef.current) {
-        chatSessionRef.current = createChatSession();
+        chatSessionRef.current = await createChatSession();
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: hiddenSystemPrompt });
@@ -118,7 +121,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     try {
       if (!chatSessionRef.current) {
-        chatSessionRef.current = createChatSession();
+        chatSessionRef.current = await createChatSession();
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: userMsg.text });

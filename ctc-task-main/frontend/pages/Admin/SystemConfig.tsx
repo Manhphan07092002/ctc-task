@@ -59,6 +59,11 @@ export default function AdminSystemConfig() {
   const [smtpMessage, setSmtpMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testEmail, setTestEmail] = useState('');
 
+  const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [aiKeysLoading, setAiKeysLoading] = useState(false);
+  const [aiKeysSaving, setAiKeysSaving] = useState(false);
+  const [aiMessage, setAiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(id);
@@ -67,10 +72,12 @@ export default function AdminSystemConfig() {
   const fetchInfo = useCallback(async () => {
     setLoading(true);
     setSmtpLoading(true);
+    setAiKeysLoading(true);
     try {
-      const [statsRes, smtpRes] = await Promise.all([
+      const [statsRes, smtpRes, aiKeysRes] = await Promise.all([
         fetch('/api/admin/stats'),
-        fetch('/api/admin/system-config/smtp')
+        fetch('/api/admin/system-config/smtp'),
+        fetch('/api/admin/system-config/ai-keys')
       ]);
       if (statsRes.ok) {
         const data = await statsRes.json();
@@ -84,11 +91,16 @@ export default function AdminSystemConfig() {
         setSmtpConfig(smtpData);
         if (!testEmail && smtpData.SMTP_USER) setTestEmail(smtpData.SMTP_USER);
       }
+      if (aiKeysRes.ok) {
+        const aiData = await aiKeysRes.json();
+        if (aiData.keys) setAiKeys(aiData.keys);
+      }
     } catch {
       setBackendOk(false);
     } finally {
       setLoading(false);
       setSmtpLoading(false);
+      setAiKeysLoading(false);
     }
   }, [testEmail]);
 
@@ -134,6 +146,35 @@ export default function AdminSystemConfig() {
       setSmtpMessage({ type: 'error', text: e.message || 'Test SMTP thất bại.' });
     } finally {
       setSmtpTesting(false);
+    }
+  };
+
+  const handleAddAiKey = () => setAiKeys([...aiKeys, '']);
+  const handleRemoveAiKey = (index: number) => setAiKeys(aiKeys.filter((_, i) => i !== index));
+  const handleChangeAiKey = (index: number, value: string) => {
+    const newKeys = [...aiKeys];
+    newKeys[index] = value;
+    setAiKeys(newKeys);
+  };
+
+  const saveAiKeysConfig = async () => {
+    setAiKeysSaving(true);
+    setAiMessage(null);
+    try {
+      const filteredKeys = aiKeys.map(k => k.trim()).filter(k => k.length > 0);
+      const res = await fetch('/api/admin/system-config/ai-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: filteredKeys }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Lưu cấu hình AI Keys thất bại');
+      setAiMessage({ type: 'success', text: 'Đã lưu danh sách AI Keys thành công.' });
+      setAiKeys(filteredKeys);
+    } catch (e: any) {
+      setAiMessage({ type: 'error', text: e.message || 'Lưu cấu hình AI Keys thất bại.' });
+    } finally {
+      setAiKeysSaving(false);
     }
   };
 
@@ -305,6 +346,74 @@ export default function AdminSystemConfig() {
             <div className="flex justify-end">
               <button onClick={saveSmtpConfig} disabled={smtpSaving} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold shadow-lg shadow-orange-200 hover:shadow-orange-300 transition-all disabled:opacity-60">
                 <Save size={16} /> {smtpSaving ? 'Đang lưu...' : 'Lưu cấu hình SMTP'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* AI API Keys Configuration */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <Settings size={18} className="text-gray-600" />
+            <h3 className="font-bold text-gray-700">Cấu hình Gemini API Keys</h3>
+          </div>
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+            <ShieldCheck size={12} /> Rotate tự động
+          </span>
+        </div>
+
+        {aiMessage && (
+          <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium border ${aiMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+            {aiMessage.text}
+          </div>
+        )}
+
+        {aiKeysLoading ? (
+          <div className="py-8 text-center text-gray-400">Đang tải cấu hình AI Keys...</div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500 mb-2">Hệ thống sẽ tự động dùng key đầu tiên. Nếu bị giới hạn (Rate Limit), sẽ tự động chuyển sang key tiếp theo trong danh sách.</p>
+            
+            <div className="space-y-3">
+              {aiKeys.map((key, index) => (
+                <div key={index} className="flex gap-2">
+                  <span className="inline-flex items-center justify-center w-10 bg-gray-100 text-gray-500 font-mono text-sm rounded-xl border border-gray-200">
+                    {index + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={key}
+                    onChange={(e) => handleChangeAiKey(index, e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-400 outline-none font-mono text-sm"
+                  />
+                  <button
+                    onClick={() => handleRemoveAiKey(index)}
+                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                    title="Xóa key"
+                  >
+                    <AlertCircle size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={handleAddAiKey}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors"
+              >
+                + Thêm API Key mới
+              </button>
+              
+              <button
+                onClick={saveAiKeysConfig}
+                disabled={aiKeysSaving}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand-500 text-white font-bold shadow-lg shadow-brand-200 hover:bg-brand-600 transition-all disabled:opacity-60"
+              >
+                <Save size={16} /> {aiKeysSaving ? 'Đang lưu...' : 'Lưu danh sách Keys'}
               </button>
             </div>
           </div>
