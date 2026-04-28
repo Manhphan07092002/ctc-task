@@ -41,9 +41,11 @@ export default function NotificationsPage() {
 
   const getIconForType = (type: string, title: string) => {
     const tLower = (type + title).toLowerCase();
+    if (type === 'daily_task_reminder') return <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl"><CheckSquare size={20}/></div>;
     if (tLower.includes('report') || tLower.includes('báo cáo')) return <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><FileText size={20}/></div>;
     if (tLower.includes('task') || tLower.includes('công việc')) return <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl"><CheckSquare size={20}/></div>;
     if (tLower.includes('meeting') || tLower.includes('họp')) return <div className="p-2.5 bg-purple-50 text-purple-500 rounded-xl"><Clock size={20}/></div>;
+    if (tLower.includes('note') || tLower.includes('ghi chú')) return <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><Bell size={20}/></div>;
     return <div className="p-2.5 bg-gray-50 text-gray-500 rounded-xl"><Bell size={20}/></div>;
   };
 

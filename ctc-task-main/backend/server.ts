@@ -1317,6 +1317,81 @@ async function startServer() {
 
   scheduleNoteReminders();
 
+  // ===== DAILY TASK REMINDER SCHEDULER (08:00 working days) =====
+  const scheduleDailyTaskReminder = () => {
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
+
+    const checkAndNotifyDailyTasks = async () => {
+      const nowUTC  = Date.now();
+      const nowVN   = new Date(nowUTC + VN_OFFSET_MS);
+
+      const dayOfWeek = nowVN.getUTCDay();  // 0=Sun, 6=Sat
+      const hours     = nowVN.getUTCHours();
+      const minutes   = nowVN.getUTCMinutes();
+
+      // Only fire Mon–Fri at exactly 08:00 VN time
+      if (dayOfWeek === 0 || dayOfWeek === 6) return; // skip weekend
+      if (hours !== 8 || minutes !== 0) return;
+
+      const todayIso = `${nowVN.getUTCFullYear()}-${String(nowVN.getUTCMonth()+1).padStart(2,'0')}-${String(nowVN.getUTCDate()).padStart(2,'0')}`;
+
+      try {
+        // Fetch all Daily recurring tasks that are not Done
+        const tasks = await db.all(
+          `SELECT * FROM tasks WHERE recurrence = 'Daily' AND (status IS NULL OR status != 'Done')`
+        );
+        if (!tasks || tasks.length === 0) return;
+
+        let totalSent = 0;
+
+        for (const task of tasks) {
+          // Parse assignees JSON array stored as string
+          let assigneeIds: string[] = [];
+          try { assigneeIds = JSON.parse(task.assignees || '[]'); } catch { continue; }
+          if (assigneeIds.length === 0) continue;
+
+          for (const userId of assigneeIds) {
+            // Deduplicate: skip if already sent today for this task + user
+            const existing = await db.get(
+              `SELECT id FROM notifications
+               WHERE userId = ? AND type = 'daily_task_reminder' AND relatedId = ? AND createdAt >= ?`,
+              [userId, task.id, `${todayIso}T00:00:00.000Z`]
+            );
+            if (existing) continue;
+
+            const notifId = crypto.randomUUID();
+            const dueText = task.dueDate ? ` · Hạn: ${task.dueDate}` : '';
+            await db.run(
+              `INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt)
+               VALUES (?, ?, 'daily_task_reminder', ?, ?, ?, 0, ?)`,
+              [
+                notifId,
+                userId,
+                `📋 Công việc hôm nay: ${task.title}`,
+                `Nhắc nhở công việc lặp lại hằng ngày của bạn${dueText}. Hãy cập nhật tiến độ nhé!`,
+                task.id,
+                new Date().toISOString(),
+              ]
+            );
+            totalSent++;
+          }
+        }
+
+        if (totalSent > 0) {
+          console.log(`[Scheduler] Sent ${totalSent} daily task reminder(s) at 08:00.`);
+        }
+      } catch (err) {
+        console.error('[Scheduler] Daily task reminder error:', err);
+      }
+    };
+
+    // Check every minute
+    setInterval(checkAndNotifyDailyTasks, 60_000);
+    console.log('[Scheduler] Daily task reminder scheduler started (fires Mon–Fri 08:00 VN).');
+  };
+
+  scheduleDailyTaskReminder();
+
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));
 

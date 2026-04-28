@@ -129,25 +129,29 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       {/* Toast Portal */}
       <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
         {toasts.map(t => {
-          const isReportReminder = t.type === 'report_reminder';
-          const isNoteReminder   = t.type === 'note_reminder';
+          const isReportReminder   = t.type === 'report_reminder';
+          const isNoteReminder     = t.type === 'note_reminder';
+          const isDailyTaskReminder = t.type === 'daily_task_reminder';
           return (
             <div
               key={t.id}
               className={`pointer-events-auto w-[340px] backdrop-blur-xl border shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300
-                ${isReportReminder ? 'bg-violet-600 border-violet-500/50 text-white'
-                  : isNoteReminder  ? 'bg-amber-50 border-amber-200 text-gray-800'
+                ${isReportReminder  ? 'bg-violet-600 border-violet-500/50 text-white'
+                  : isNoteReminder   ? 'bg-amber-50 border-amber-200 text-gray-800'
+                  : isDailyTaskReminder ? 'bg-blue-600 border-blue-500/50 text-white'
                   : 'bg-white/95 border-gray-100 text-gray-800'}
               `}
             >
               <div className={`p-2.5 rounded-xl flex-shrink-0 shadow-sm
                 ${isReportReminder ? 'bg-white/20'
                   : isNoteReminder  ? 'bg-amber-400'
+                  : isDailyTaskReminder ? 'bg-white/20'
                   : 'bg-blue-50 border border-blue-100/50'}
               `}>
                 <Bell size={20} className={
-                  isReportReminder ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
-                  : isNoteReminder  ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
+                  isReportReminder   ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
+                  : isNoteReminder    ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
+                  : isDailyTaskReminder ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
                   : 'text-blue-600 animate-[wiggle_1s_ease-in-out_infinite]'
                 }/>
               </div>
