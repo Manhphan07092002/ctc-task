@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Send, Save, CheckCircle, XCircle, Plus, Trash2,
-  CalendarDays, Building2, User, FileText, ChevronDown
+  CalendarDays, Building2, User, FileText, ChevronDown, GripVertical
 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Button } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report, ReportStatus, Task, User as UserType, Department } from '../../types';
@@ -116,6 +117,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showConfirmHardDelete, setShowConfirmHardDelete] = useState(false);
 
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const items = Array.from(rows);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    setRows(items);
+  };
+
   const isAdmin = (currentUser.permissions || []).includes('admin_panel');
 
   // ── Permissions ──
@@ -163,7 +172,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   );
   const isDirectorReview = isDirectorFeedbackReview || isDirectorPendingReview;
 
-  // ── Load initial data ──
+  // ── Load initial data & Autosave ──
   useEffect(() => {
     if (!isOpen) return;
     if (initialReport) {
@@ -182,6 +191,21 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       }
     } else {
       const w = getWeekRange();
+      const draftKey = `draft_report_${currentUser.id}_new`;
+      const draft = localStorage.getItem(draftKey);
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.rows && parsed.rows.length) {
+            setTitle(parsed.title || '');
+            setNextWeekPlan(parsed.nextWeekPlan || '');
+            setWeekStart(parsed.weekStart || w.start);
+            setWeekEnd(parsed.weekEnd || w.end);
+            setRows(parsed.rows);
+            return;
+          }
+        } catch {}
+      }
       setWeekStart(w.start); setWeekEnd(w.end);
       setTitle(`Báo cáo tuần ${fmtDate(w.start)} – ${fmtDate(w.end)} · ${currentUser.name}`);
       setRows([newRow()]);
@@ -189,6 +213,16 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       setDirectorFeedback('');
     }
   }, [isOpen, initialReport]);
+
+  useEffect(() => {
+    if (isFormReadOnly || !isOpen) return;
+    const data = { title, nextWeekPlan, weekStart, weekEnd, rows };
+    const key = `draft_report_${currentUser.id}_${initialReport?.id || 'new'}`;
+    const timer = setTimeout(() => {
+      localStorage.setItem(key, JSON.stringify(data));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [title, nextWeekPlan, weekStart, weekEnd, rows, isFormReadOnly, isOpen, currentUser.id, initialReport?.id]);
 
   if (!isOpen) return null;
 
@@ -270,6 +304,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       managerFeedback,
     };
     onSave({ ...report });
+    localStorage.removeItem(`draft_report_${currentUser.id}_${initialReport?.id || 'new'}`);
     onClose();
   };
 
@@ -499,8 +534,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </div>
 
             <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-              <div className="grid bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider" style={{ gridTemplateColumns: '40px 1fr 140px 1fr 140px 140px 40px' }}>
-                <div className="px-3 py-3.5 text-center">STT</div>
+              <div className="grid bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider" style={{ gridTemplateColumns: '32px 40px 1fr 140px 1fr 140px 140px 40px' }}>
+                <div className="px-2 py-3.5" />
+                <div className="px-1 py-3.5 text-center">STT</div>
                 <div className="px-3 py-3.5">Nội dung</div>
                 <div className="px-3 py-3.5 text-center">Kết quả</div>
                 <div className="px-3 py-3.5">Bước tiếp theo</div>
@@ -509,11 +545,24 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 <div className="px-2 py-3.5" />
               </div>
 
-              <div className="divide-y divide-gray-100">
-                {rows.map((row, idx) => (
-                  <div key={row.id} className="grid items-start hover:bg-blue-50/30 transition-colors group relative" style={{ gridTemplateColumns: '40px 1fr 140px 1fr 140px 140px 40px' }}>
-                    <div className="px-3 py-4 text-center text-xs font-semibold text-gray-400 mt-1">{idx + 1}</div>
-                    <div className="px-2 py-3">
+              <DragDropContext onDragEnd={onDragEnd}>
+                <Droppable droppableId="tasks-list">
+                  {(provided) => (
+                    <div {...provided.droppableProps} ref={provided.innerRef} className="divide-y divide-gray-100">
+                      {rows.map((row, idx) => (
+                        <Draggable key={row.id} draggableId={row.id} index={idx} isDragDisabled={isFormReadOnly}>
+                          {(provided, snapshot) => (
+                            <div 
+                              ref={provided.innerRef} 
+                              {...provided.draggableProps} 
+                              className={`grid items-start transition-colors group relative ${snapshot.isDragging ? 'bg-blue-50 shadow-lg ring-1 ring-blue-200 rounded-xl z-50' : 'hover:bg-blue-50/30 bg-white'}`} 
+                              style={{ ...provided.draggableProps.style, gridTemplateColumns: '32px 40px 1fr 140px 1fr 140px 140px 40px' }}
+                            >
+                              <div className="px-1 py-4 flex items-center justify-center mt-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" {...provided.dragHandleProps}>
+                                {!isFormReadOnly && <GripVertical size={16} />}
+                              </div>
+                              <div className="px-1 py-4 text-center text-xs font-semibold text-gray-400 mt-1">{idx + 1}</div>
+                              <div className="px-2 py-3">
                       <textarea value={row.content} onChange={e => updateRow(row.id, 'content', e.target.value)} disabled={isFormReadOnly} rows={2} placeholder="Mô tả công việc..." className="w-full resize-none text-sm font-medium text-gray-800 bg-transparent border-0 outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-xl p-2.5 transition-all disabled:cursor-default placeholder-gray-300" />
                     </div>
                     <div className="px-2 py-3 flex items-start justify-center mt-1">
@@ -546,9 +595,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                         </button>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
 
               {!isReadOnly && (
                 <div className="p-2 bg-gray-50/50 border-t border-gray-100">

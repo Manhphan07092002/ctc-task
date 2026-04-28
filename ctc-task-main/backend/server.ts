@@ -255,22 +255,19 @@ async function startServer() {
 
   try {
     await db.exec('ALTER TABLE users ADD COLUMN password TEXT;');
-  } catch(e) { /* ignores if column already exists */ }
+  } catch (e) { /* ignores if column already exists */ }
   try {
     await db.exec("ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';");
-  } catch(e) { /* ignores if column already exists */ }
+  } catch (e) { /* ignores if column already exists */ }
   try {
     await db.exec('ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;');
-  } catch(e) { /* ignores if column already exists */ }
+  } catch (e) { /* ignores if column already exists */ }
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN directorFeedback TEXT;');
-  } catch(e) { /* ignores if column already exists */ }
+  } catch (e) { /* ignores if column already exists */ }
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN managerFeedback TEXT;');
-  } catch(e) { /* ignores if column already exists */ }
-  try {
-    await db.exec('ALTER TABLE reports ADD COLUMN deletedAt TEXT;');
-  } catch(e) { /* ignores if column already exists */ }
+  } catch (e) { /* ignores if column already exists */ }
 
   // Seed Roles
   const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
@@ -278,19 +275,19 @@ async function startServer() {
     const INITIAL_ROLES = [
       {
         id: 'role-admin', name: 'Admin', description: 'Toàn quyền hệ thống: quản lý người dùng, xem tất cả dữ liệu, cấu hình hệ thống.',
-        color: '#ef4444', permissions: JSON.stringify(['manage_users','view_all_tasks','view_all_reports','manage_meetings','admin_panel']), isSystem: 1
+        color: '#ef4444', permissions: JSON.stringify(['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'admin_panel']), isSystem: 1
       },
       {
         id: 'role-director', name: 'Director', description: 'Xem toàn bộ báo cáo đã phê duyệt, cung cấp phản hồi Giám đốc. Chỉ xem công việc.',
-        color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports','director_feedback','view_all_tasks']), isSystem: 1
+        color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports', 'director_feedback', 'view_all_tasks']), isSystem: 1
       },
       {
         id: 'role-manager', name: 'Manager', description: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.',
-        color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks','approve_dept_reports','view_dept_users']), isSystem: 1
+        color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users']), isSystem: 1
       },
       {
         id: 'role-employee', name: 'Employee', description: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần của bản thân.',
-        color: '#10b981', permissions: JSON.stringify(['view_own_tasks','create_report','join_meetings']), isSystem: 1
+        color: '#10b981', permissions: JSON.stringify(['view_own_tasks', 'create_report', 'join_meetings']), isSystem: 1
       },
     ];
     for (const r of INITIAL_ROLES) {
@@ -305,13 +302,13 @@ async function startServer() {
   const deptCount = await db.get('SELECT COUNT(*) as count FROM departments');
   if (deptCount.count === 0) {
     const INITIAL_DEPTS = [
-      { id: 'dept-board',     name: 'Board',     description: 'Hội đồng quản trị và ban lãnh đạo công ty.',         color: '#ef4444' },
-      { id: 'dept-product',   name: 'Product',   description: 'Phát triển và quản lý sản phẩm.',                      color: '#3b82f6' },
-      { id: 'dept-marketing', name: 'Marketing', description: 'Tiếp thị và truyền thông thương hiệu.',              color: '#f59e0b' },
-      { id: 'dept-sales',     name: 'Sales',     description: 'Kiến tạo doanh thu và phát triển thị trường.',         color: '#10b981' },
-      { id: 'dept-it',        name: 'IT',        description: 'Hạ tầng công nghệ và hệ thống nội bộ.',              color: '#8b5cf6' },
-      { id: 'dept-hr',        name: 'HR',        description: 'Nhân sự, tuyển dụng và phát triển văn hoá doanh nghiệp.', color: '#ec4899' },
-      { id: 'dept-finance',   name: 'Finance',   description: 'Kế toán, tài chính và kiểm soát ngân sách.',         color: '#14b8a6' },
+      { id: 'dept-board', name: 'Board', description: 'Hội đồng quản trị và ban lãnh đạo công ty.', color: '#ef4444' },
+      { id: 'dept-product', name: 'Product', description: 'Phát triển và quản lý sản phẩm.', color: '#3b82f6' },
+      { id: 'dept-marketing', name: 'Marketing', description: 'Tiếp thị và truyền thông thương hiệu.', color: '#f59e0b' },
+      { id: 'dept-sales', name: 'Sales', description: 'Kiến tạo doanh thu và phát triển thị trường.', color: '#10b981' },
+      { id: 'dept-it', name: 'IT', description: 'Hạ tầng công nghệ và hệ thống nội bộ.', color: '#8b5cf6' },
+      { id: 'dept-hr', name: 'HR', description: 'Nhân sự, tuyển dụng và phát triển văn hoá doanh nghiệp.', color: '#ec4899' },
+      { id: 'dept-finance', name: 'Finance', description: 'Kế toán, tài chính và kiểm soát ngân sách.', color: '#14b8a6' },
     ];
     for (const d of INITIAL_DEPTS) {
       await db.run('INSERT INTO departments (id, name, description, color) VALUES (?, ?, ?, ?)',
@@ -366,47 +363,39 @@ async function startServer() {
   // --- Users API ---
   app.get('/api/users', async (req, res) => {
     try {
-      const users = await prisma.users.findMany();
-      const roles = await prisma.roles.findMany();
-      res.json(users.map(u => {
-        const role = roles.find(r => r.name === u.role);
-        return { ...u, permissions: role?.permissions ? JSON.parse(role.permissions) : [] };
-      }));
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+      const users = await db.all(`
+        SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, r.permissions 
+        FROM users u 
+        LEFT JOIN roles r ON u.role = r.name
+      `);
+      res.json(users.map(u => ({ ...u, permissions: u.permissions ? JSON.parse(u.permissions) : [] })));
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.post('/api/users', async (req, res) => {
     const { id, name, email, password, role, department, avatar } = req.body;
     try {
       const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
-      await prisma.users.create({
-        data: { id, name, email, password: hashedPassword, role, department, avatar }
-      });
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, name, email, hashedPassword, role, department, avatar]);
       res.json({ id });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.put('/api/users/:id', async (req, res) => {
     const { name, email, password, role, department, avatar } = req.body;
     try {
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        await prisma.users.update({
-          where: { id: req.params.id },
-          data: { name, email, password: hashedPassword, role, department, avatar }
-        });
+        await db.run('UPDATE users SET name=?, email=?, password=?, role=?, department=?, avatar=? WHERE id=?', [name, email, hashedPassword, role, department, avatar, req.params.id]);
       } else {
-        await prisma.users.update({
-          where: { id: req.params.id },
-          data: { name, email, role, department, avatar }
-        });
+        await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=? WHERE id=?', [name, email, role, department, avatar, req.params.id]);
       }
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.delete('/api/users/:id', async (req, res) => {
     try {
-      await prisma.users.delete({ where: { id: req.params.id } });
+      await db.run('DELETE FROM users WHERE id=?', [req.params.id]);
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   app.post('/api/auth/login', async (req, res) => {
@@ -422,28 +411,6 @@ async function startServer() {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
-      return res.json({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department,
-        avatar: user.avatar,
-        permissions: role?.permissions ? JSON.parse(role.permissions) : [],
-      });
-    } catch (e) {
-      res.status(500).json({ error: 'Failed' });
-    }
-  });
-
-  // Quick-login: login bằng userId không cần password (chỉ dùng nội bộ / dev)
-  app.post('/api/auth/quick-login', async (req, res) => {
-    const { userId } = req.body;
-    try {
-      if (!userId) return res.status(400).json({ error: 'userId required' });
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
-      if (!user) return res.status(404).json({ error: 'User not found' });
       const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
       return res.json({
         id: user.id,
@@ -622,6 +589,56 @@ async function startServer() {
     }
   });
 
+  app.post('/api/auth/quick-login', async (req, res) => {
+    const { userId } = req.body;
+    try {
+      const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+      if (user) {
+        return res.json({ success: true, user });
+      }
+      return res.status(401).json({ error: 'Invalid user id' });
+    } catch (e) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
+  // --- NOTIFICATIONS ---
+  app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+      const notifications = await db.all('SELECT * FROM notifications WHERE userId = ? ORDER BY createdAt DESC LIMIT 50', [req.params.userId]);
+      res.json(notifications);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', async (req, res) => {
+    try {
+      await db.run('UPDATE notifications SET isRead = 1 WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.patch('/api/notifications/read-all/:userId', async (req, res) => {
+    try {
+      await db.run('UPDATE notifications SET isRead = 1 WHERE userId = ? AND isRead = 0', [req.params.userId]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  app.delete('/api/notifications/:id', async (req, res) => {
+    try {
+      await db.run('DELETE FROM notifications WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
   app.get('/api/admin/password-reset-requests', async (req, res) => {
     try {
       const includeResolved = String(req.query.includeResolved || '') === '1';
@@ -705,7 +722,7 @@ async function startServer() {
       const sourcePath = req.file.path;
       const targetPath = process.env.DB_PATH || './database.sqlite';
       await fs.promises.copyFile(sourcePath, targetPath);
-      await fs.promises.unlink(sourcePath).catch(() => {});
+      await fs.promises.unlink(sourcePath).catch(() => { });
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: 'Import thất bại' });
@@ -783,7 +800,7 @@ async function startServer() {
     try {
       const notes = await prisma.notes.findMany();
       res.json(notes);
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.post('/api/notes', async (req, res) => {
     const { id, title, content, color, createdAt } = req.body;
@@ -792,7 +809,7 @@ async function startServer() {
         data: { id, title, content, color, createdAt }
       });
       res.json({ id });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.put('/api/notes/:id', async (req, res) => {
     const { title, content, color } = req.body;
@@ -802,7 +819,7 @@ async function startServer() {
         data: { title, content, color }
       });
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.delete('/api/notes/:id', async (req, res) => {
     try {
@@ -810,7 +827,7 @@ async function startServer() {
         where: { id: req.params.id }
       });
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   // --- Tasks API ---
@@ -824,7 +841,7 @@ async function startServer() {
         subtasks: t.subtasks ? JSON.parse(t.subtasks) : [],
         comments: t.comments ? JSON.parse(t.comments) : []
       })));
-    } catch(e) { res.status(500).json({error: 'Failed to fetch tasks'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch tasks' }); }
   });
   app.post('/api/tasks', async (req, res) => {
     const t = req.body;
@@ -849,7 +866,7 @@ async function startServer() {
         }
       });
       res.json({ id: t.id });
-    } catch(e) { res.status(500).json({error: 'Failed task create'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed task create' }); }
   });
   app.put('/api/tasks/:id', async (req, res) => {
     const t = req.body;
@@ -870,10 +887,10 @@ async function startServer() {
           recurrence: t.recurrence,
           subtasks: JSON.stringify(t.subtasks || []),
           comments: JSON.stringify(t.comments || [])
-        }  
+        }
       });
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed task update'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed task update' }); }
   });
   app.delete('/api/tasks/:id', async (req, res) => {
     try {
@@ -881,7 +898,7 @@ async function startServer() {
         where: { id: req.params.id }
       });
       res.json({ success: true });
-    } catch(e) { res.status(500).json({error: 'Failed'}); }
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   // --- Meetings & Signals (Existing) ---
@@ -982,13 +999,14 @@ async function startServer() {
   // --- Roles API ---
   app.get('/api/roles', async (req, res) => {
     try {
-      const roles = await prisma.roles.findMany({ orderBy: [{ isSystem: 'desc' }, { name: 'asc' }] });
+      const roles = await db.all('SELECT * FROM roles ORDER BY isSystem DESC, name ASC');
+      // Attach user count to each role
       const result = await Promise.all(roles.map(async (r) => {
-        const count = await prisma.users.count({ where: { role: r.name } });
+        const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [r.name]);
         return { ...r, permissions: JSON.parse(r.permissions || '[]'), userCount: count };
       }));
       res.json(result);
-    } catch(e) { res.status(500).json({ error: 'Failed to fetch roles' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch roles' }); }
   });
 
   app.post('/api/roles', async (req, res) => {
@@ -996,12 +1014,13 @@ async function startServer() {
     if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
     try {
       const newId = id || `role-${Date.now()}`;
-      await prisma.roles.create({
-        data: { id: newId, name: name.trim(), description: description || '', color: color || '#6366f1', permissions: JSON.stringify(permissions || []), isSystem: 0 }
-      });
+      await db.run(
+        'INSERT INTO roles (id, name, description, color, permissions, isSystem) VALUES (?, ?, ?, ?, ?, 0)',
+        [newId, name.trim(), description || '', color || '#6366f1', JSON.stringify(permissions || [])]
+      );
       res.status(201).json({ id: newId });
-    } catch(e: any) {
-      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+    } catch (e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
       res.status(500).json({ error: 'Failed to create role' });
     }
   });
@@ -1009,55 +1028,52 @@ async function startServer() {
   app.put('/api/roles/:id', async (req, res) => {
     const { name, description, color, permissions } = req.body;
     try {
-      const existing = await prisma.roles.findUnique({ where: { id: req.params.id } });
+      const existing = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
       if (!existing) return res.status(404).json({ error: 'Not found' });
+      // System roles: only allow description and color update, not name or permissions
       if (existing.isSystem) {
-        await prisma.roles.update({
-          where: { id: req.params.id },
-          data: { description: description ?? existing.description, color: color ?? existing.color }
-        });
+        await db.run(
+          'UPDATE roles SET description = ?, color = ? WHERE id = ?',
+          [description ?? existing.description, color ?? existing.color, req.params.id]
+        );
       } else {
-        await prisma.roles.update({
-          where: { id: req.params.id },
-          data: { 
-            name: name ?? existing.name, 
-            description: description ?? existing.description, 
-            color: color ?? existing.color, 
-            permissions: JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]'))
-          }
-        });
+        await db.run(
+          'UPDATE roles SET name = ?, description = ?, color = ?, permissions = ? WHERE id = ?',
+          [name ?? existing.name, description ?? existing.description, color ?? existing.color,
+          JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]')), req.params.id]
+        );
       }
       res.json({ success: true });
-    } catch(e: any) {
-      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
+    } catch (e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên vai trò đã tồn tại' });
       res.status(500).json({ error: 'Failed to update role' });
     }
   });
 
   app.delete('/api/roles/:id', async (req, res) => {
     try {
-      const role = await prisma.roles.findUnique({ where: { id: req.params.id } });
+      const role = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
       if (!role) return res.status(404).json({ error: 'Not found' });
       if (role.isSystem) return res.status(403).json({ error: 'Không thể xóa vai trò hệ thống' });
-      const count = await prisma.users.count({ where: { role: role.name } });
+      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE role = ?', [role.name]);
       if (count > 0) return res.status(409).json({ error: `Đang có ${count} người dùng với vai trò này` });
-      await prisma.roles.delete({ where: { id: req.params.id } });
+      await db.run('DELETE FROM roles WHERE id = ?', [req.params.id]);
       res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: 'Failed to delete role' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to delete role' }); }
   });
 
   // --- Departments API ---
   app.get('/api/departments', async (req, res) => {
     try {
-      const depts = await prisma.departments.findMany({ orderBy: { name: 'asc' } });
+      const depts = await db.all('SELECT * FROM departments ORDER BY name ASC');
       const result = await Promise.all(depts.map(async (d) => {
-        const userCount = await prisma.users.count({ where: { department: d.name } });
-        const taskCount = await prisma.tasks.count({ where: { department: d.name } });
-        const manager = d.managerId ? await prisma.users.findUnique({ where: { id: d.managerId }, select: { id: true, name: true, avatar: true } }) : null;
+        const { count: userCount } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [d.name]);
+        const { count: taskCount } = await db.get('SELECT COUNT(*) as count FROM tasks WHERE department = ?', [d.name]);
+        const manager = d.managerId ? await db.get('SELECT id, name, avatar FROM users WHERE id = ?', [d.managerId]) : null;
         return { ...d, userCount, taskCount, manager };
       }));
       res.json(result);
-    } catch(e) { res.status(500).json({ error: 'Failed to fetch departments' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch departments' }); }
   });
 
   app.post('/api/departments', async (req, res) => {
@@ -1065,12 +1081,11 @@ async function startServer() {
     if (!name?.trim()) return res.status(400).json({ error: 'Tên phòng ban không được trống' });
     try {
       const newId = id || `dept-${Date.now()}`;
-      await prisma.departments.create({
-        data: { id: newId, name: name.trim(), description: description || '', color: color || '#6366f1', managerId: managerId || null }
-      });
+      await db.run('INSERT INTO departments (id, name, description, color, managerId) VALUES (?, ?, ?, ?, ?)',
+        [newId, name.trim(), description || '', color || '#6366f1', managerId || null]);
       res.status(201).json({ id: newId });
-    } catch(e: any) {
-      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+    } catch (e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
       res.status(500).json({ error: 'Failed to create department' });
     }
   });
@@ -1078,57 +1093,55 @@ async function startServer() {
   app.put('/api/departments/:id', async (req, res) => {
     const { name, description, color, managerId } = req.body;
     try {
-      const existing = await prisma.departments.findUnique({ where: { id: req.params.id } });
+      const existing = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
       if (!existing) return res.status(404).json({ error: 'Not found' });
       const oldName = existing.name;
       const newName = name?.trim() ?? oldName;
-      await prisma.departments.update({
-        where: { id: req.params.id },
-        data: { name: newName, description: description ?? existing.description, color: color ?? existing.color, managerId: managerId ?? existing.managerId }
-      });
+      await db.run('UPDATE departments SET name = ?, description = ?, color = ?, managerId = ? WHERE id = ?',
+        [newName, description ?? existing.description, color ?? existing.color, managerId ?? existing.managerId, req.params.id]);
       // Update users and tasks if name changed
       if (newName !== oldName) {
-        await prisma.users.updateMany({ where: { department: oldName }, data: { department: newName } });
-        await prisma.tasks.updateMany({ where: { department: oldName }, data: { department: newName } });
+        await db.run('UPDATE users SET department = ? WHERE department = ?', [newName, oldName]);
+        await db.run('UPDATE tasks SET department = ? WHERE department = ?', [newName, oldName]);
       }
       res.json({ success: true });
-    } catch(e: any) {
-      if (String(e.code) === 'P2002' || e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
+    } catch (e: any) {
+      if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Tên phòng ban đã tồn tại' });
       res.status(500).json({ error: 'Failed to update department' });
     }
   });
 
   app.delete('/api/departments/:id', async (req, res) => {
     try {
-      const dept = await prisma.departments.findUnique({ where: { id: req.params.id } });
+      const dept = await db.get('SELECT * FROM departments WHERE id = ?', [req.params.id]);
       if (!dept) return res.status(404).json({ error: 'Not found' });
-      const count = await prisma.users.count({ where: { department: dept.name } });
+      const { count } = await db.get('SELECT COUNT(*) as count FROM users WHERE department = ?', [dept.name]);
       if (count > 0) return res.status(409).json({ error: `Đang có ${count} nhân viên trong phòng ban này` });
-      await prisma.departments.delete({ where: { id: req.params.id } });
+      await db.run('DELETE FROM departments WHERE id = ?', [req.params.id]);
       res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: 'Failed to delete department' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to delete department' }); }
   });
 
   // --- Admin Analytics API ---
   app.get('/api/admin/stats', async (req, res) => {
     try {
-      const userCount = await prisma.users.count();
-      const taskCount = await prisma.tasks.count();
-      const reportCount = await prisma.reports.count();
-      const activeMeetings = await prisma.meetings.count({ where: { status: { not: 'ended' } } });
-      
-      const roleBreakdown = await prisma.users.groupBy({ by: ['role'], _count: { role: true } });
-      const taskStatusBreakdown = await prisma.tasks.groupBy({ by: ['status'], _count: { status: true } });
-      const taskDeptBreakdown = await prisma.tasks.groupBy({ by: ['department'], _count: { department: true } });
-      
+      const userCountDesc = await db.get('SELECT COUNT(*) as count FROM users');
+      const taskCountDesc = await db.get('SELECT COUNT(*) as count FROM tasks');
+      const reportCountDesc = await db.get('SELECT COUNT(*) as count FROM reports');
+      const meetingCountDesc = await db.get('SELECT COUNT(*) as count FROM meetings WHERE status != "ended"');
+
+      const roleBreakdown = await db.all('SELECT role, COUNT(*) as count FROM users GROUP BY role');
+      const taskStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM tasks GROUP BY status');
+      const taskDeptBreakdown = await db.all('SELECT department, COUNT(*) as count FROM tasks GROUP BY department');
+
       res.json({
-        totalUsers: userCount,
-        totalTasks: taskCount,
-        totalReports: reportCount,
-        activeMeetings: activeMeetings,
-        roleBreakdown: roleBreakdown.map(r => ({ role: r.role, count: r._count.role })),
-        taskStatusBreakdown: taskStatusBreakdown.map(t => ({ status: t.status, count: t._count.status })),
-        taskDeptBreakdown: taskDeptBreakdown.map(t => ({ department: t.department, count: t._count.department }))
+        totalUsers: userCountDesc.count,
+        totalTasks: taskCountDesc.count,
+        totalReports: reportCountDesc.count,
+        activeMeetings: meetingCountDesc.count,
+        roleBreakdown,
+        taskStatusBreakdown,
+        taskDeptBreakdown
       });
     } catch (e) {
       res.status(500).json({ error: 'Failed to fetch admin stats' });
@@ -1138,34 +1151,9 @@ async function startServer() {
   // --- Reports API ---
   app.get('/api/reports', async (req, res) => {
     try {
-      // Exclude soft-deleted reports
-      const reports = await db.all('SELECT * FROM reports WHERE deletedAt IS NULL');
+      const reports = await prisma.reports.findMany();
       res.json(reports);
-    } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
-  });
-
-  // Admin: get all reports including soft-deleted
-  app.get('/api/admin/reports', async (req, res) => {
-    try {
-      const reports = await db.all('SELECT * FROM reports ORDER BY createdAt DESC');
-      res.json(reports);
-    } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
-  });
-
-  // Admin: hard delete a report permanently
-  app.delete('/api/admin/reports/:id', async (req, res) => {
-    try {
-      await prisma.reports.delete({ where: { id: req.params.id } });
-      res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: 'Failed to hard-delete report' }); }
-  });
-
-  // Admin: restore a soft-deleted report
-  app.put('/api/admin/reports/:id/restore', async (req, res) => {
-    try {
-      await db.run('UPDATE reports SET deletedAt = NULL WHERE id = ?', [req.params.id]);
-      res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: 'Failed to restore report' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch reports' }); }
   });
 
   app.post('/api/reports', async (req, res) => {
@@ -1174,54 +1162,6 @@ async function startServer() {
       await prisma.reports.create({
         data: { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
       });
-
-      // ── Notification khi tạo báo cáo mới với status Pending ──
-      if (status === 'Pending') {
-        const now = new Date().toISOString();
-        const nid = () => Math.random().toString(36).slice(2, 11);
-        const author = await db.get('SELECT name, role FROM users WHERE id = ?', [authorId]);
-        const shortTitle = (title || '').slice(0, 50);
-
-        // Kiểm tra tác giả có phải Trưởng phòng không
-        const isManager = author ? await db.get(
-          `SELECT 1 FROM roles r WHERE r.name = ? AND r.permissions LIKE '%approve_dept_reports%'`,
-          [author.role]
-        ) : null;
-
-        if (isManager) {
-          // Truong phong gui bao cao tong hop → thong bao Giam doc
-          const directors = await db.all(
-            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
-             WHERE r.permissions LIKE '%view_all_reports%'`
-          );
-          for (const dir of directors) {
-            await db.run(
-              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-              [nid(), dir.id, 'report_submitted',
-               'Báo cáo tổng hợp phòng cho phê duyệt',
-               'Trưởng phòng ' + (author?.name || '') + ' đã gửi báo cáo tổng hợp cho phê duyệt.',
-               id, now]
-            );
-          }
-        } else {
-          // Nhan vien gui bao cao → thong bao Truong phong cung phong
-          const managers = await db.all(
-            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
-             WHERE u.department = ? AND r.permissions LIKE '%approve_dept_reports%'`,
-            [department]
-          );
-          for (const mgr of managers) {
-            await db.run(
-              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-              [nid(), mgr.id, 'report_submitted',
-               'Có báo cáo mới cần duyệt',
-               (author?.name || 'Nhân viên') + ' đã gửi báo cáo công việc cho bạn duyệt.',
-               id, now]
-            );
-          }
-        }
-      }
-
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
   });
@@ -1229,119 +1169,77 @@ async function startServer() {
   app.put('/api/reports/:id', async (req, res) => {
     const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
-      // Get old report to detect status change
-      const oldReport = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
-
       await prisma.reports.update({
         where: { id: req.params.id },
         data: { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
       });
-
-      // ── Auto-create notifications on status change ──
-      if (oldReport && status && status !== oldReport.status) {
-        const now = new Date().toISOString();
-        const nid = () => Math.random().toString(36).slice(2, 11);
-        const author = await db.get('SELECT name, role FROM users WHERE id = ?', [oldReport.authorId]);
-        const shortTitle = (title || oldReport.title || '').slice(0, 50);
-
-        if (status === 'Pending') {
-          const managers = await db.all(
-            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
-             WHERE u.department = ? AND r.permissions LIKE '%approve_dept_reports%'`,
-            [oldReport.department]
-          );
-          const authorName = author?.name || 'Nhân viên';
-          for (const mgr of managers) {
-            await db.run(
-              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-              [nid(), mgr.id, 'report_submitted', 'Có báo cáo mới cần duyệt',
-               authorName + ' đã gửi báo cáo công việc cho bạn duyệt.',
-               req.params.id, now]
-            );
-          }
-          // Notify directors if author is manager
-          const isAuthorManager = await db.get(
-            `SELECT 1 FROM roles r WHERE r.name = ? AND r.permissions LIKE '%approve_dept_reports%'`,
-            [author?.role]
-          );
-          if (isAuthorManager) {
-            const directors = await db.all(
-              `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
-               WHERE r.permissions LIKE '%view_all_reports%'`
-            );
-            for (const dir of directors) {
-              await db.run(
-                'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-                [nid(), dir.id, 'report_submitted', 'Báo cáo tổng hợp phòng cho phê duyệt',
-                 'Trưởng phòng ' + authorName + ' đã gửi báo cáo tổng hợp cho phê duyệt.',
-                 req.params.id, now]
-              );
-            }
-          }
-        }
-
-        if (status === 'Approved') {
-          await db.run(
-            'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-            [nid(), oldReport.authorId, 'report_approved', 'Báo cáo đã được phê duyệt',
-             'Báo cáo của bạn đã được phê duyệt thành công.',
-             req.params.id, now]
-          );
-        }
-
-        if (status === 'Rejected') {
-          await db.run(
-            'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
-            [nid(), oldReport.authorId, 'report_rejected', 'Báo cáo bị từ chối',
-             'Báo cáo của bạn đã bị từ chối. Vui lòng xem nhận xét và chỉnh sửa lại.',
-             req.params.id, now]
-          );
-        }
-      }
-
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
   });
 
   app.delete('/api/reports/:id', async (req, res) => {
     try {
-      // Soft delete: just mark deletedAt timestamp
-      await db.run('UPDATE reports SET deletedAt = ? WHERE id = ?', [new Date().toISOString(), req.params.id]);
+      await prisma.reports.delete({
+        where: { id: req.params.id }
+      });
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });
 
-  // ── Notifications API ──────────────────────────────────────────────────────
-  app.get('/api/notifications/:userId', async (req, res) => {
-    try {
-      const notifs = await db.all(
-        'SELECT * FROM notifications WHERE userId = ? ORDER BY createdAt DESC',
-        [req.params.userId]
-      );
-      res.json(notifs);
-    } catch (e) { res.status(500).json({ error: 'Failed' }); }
-  });
+  // ===== FRIDAY 16:00 REPORT REMINDER SCHEDULER =====
+  const scheduleFridayReminder = () => {
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000; // UTC+7
 
-  app.patch('/api/notifications/:id/read', async (req, res) => {
-    try {
-      await db.run('UPDATE notifications SET isRead = 1 WHERE id = ?', [req.params.id]);
-      res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: 'Failed' }); }
-  });
+    const checkAndNotify = async () => {
+      const nowUTC = Date.now();
+      const nowVN = new Date(nowUTC + VN_OFFSET_MS);
 
-  app.patch('/api/notifications/read-all/:userId', async (req, res) => {
-    try {
-      await db.run('UPDATE notifications SET isRead = 1 WHERE userId = ?', [req.params.userId]);
-      res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: 'Failed' }); }
-  });
+      const dayOfWeek = nowVN.getUTCDay();  // 5 = Friday
+      const hours     = nowVN.getUTCHours();
+      const minutes   = nowVN.getUTCMinutes();
 
-  app.delete('/api/notifications/:id', async (req, res) => {
-    try {
-      await db.run('DELETE FROM notifications WHERE id = ?', [req.params.id]);
-      res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: 'Failed' }); }
-  });
+      if (dayOfWeek !== 5 || hours !== 16 || minutes !== 0) return;
+
+      // Get start of this week's Friday (to avoid duplicate notifications)
+      const weekFridayKey = `${nowVN.getUTCFullYear()}-W${nowVN.getUTCMonth()}-F${Math.floor(nowVN.getUTCDate() / 7)}`;
+
+      try {
+        const users = await db.all('SELECT id FROM users');
+        if (!users || users.length === 0) return;
+
+        for (const u of users) {
+          // Check if already notified this Friday
+          const existing = await db.get(
+            `SELECT id FROM notifications WHERE userId = ? AND type = 'report_reminder' AND createdAt >= ?`,
+            [u.id, new Date(nowVN.getUTCFullYear(), nowVN.getUTCMonth(), nowVN.getUTCDate()).toISOString()]
+          );
+          if (existing) continue;
+
+          const id = crypto.randomUUID();
+          await db.run(
+            `INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt)
+             VALUES (?, ?, 'report_reminder', ?, ?, NULL, 0, ?)`,
+            [
+              id,
+              u.id,
+              '📋 Nhắc nhở: Nộp báo cáo công việc',
+              'Đã 16:00 Thứ 6 — Hãy hoàn thành và nộp báo cáo công việc tuần này trước khi kết thúc ngày.',
+              new Date().toISOString(),
+            ]
+          );
+        }
+        console.log(`[Scheduler] Sent Friday report reminders to ${users.length} users.`);
+      } catch (err) {
+        console.error('[Scheduler] Friday reminder error:', err);
+      }
+    };
+
+    // Check every minute
+    setInterval(checkAndNotify, 60_000);
+    console.log('[Scheduler] Friday 16:00 report reminder scheduler started.');
+  };
+
+  scheduleFridayReminder();
 
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));
@@ -1358,5 +1256,6 @@ async function startServer() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
+
 
 startServer();

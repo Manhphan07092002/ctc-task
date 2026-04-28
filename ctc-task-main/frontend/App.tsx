@@ -14,6 +14,7 @@ import { SettingsView as SettingsPage } from './pages/Settings/index';
 import ReportsPage from './pages/Reports/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';
 import ResetPasswordPage from './pages/ResetPassword/index';
+import NotificationsPage from './pages/Notifications/index';
 
 import { Sparkles } from 'lucide-react';
 
@@ -315,6 +316,7 @@ export default function CTCTaskApp() {
               } />
 
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
 
               <Route path="/meetings" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meetings...</div>}><MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} /></React.Suspense>} />
               <Route path="/meetings/join/:meetingId" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meeting Room...</div>}><JoinMeetingPage onJoinMeeting={setActiveMeeting} /></React.Suspense>} />

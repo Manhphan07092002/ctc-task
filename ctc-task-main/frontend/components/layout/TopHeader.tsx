@@ -222,18 +222,22 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               </div>
 
               {/* Footer */}
-              {notifications.length > 0 && (
-                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 text-center">
+              <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-1.5">
+                <button
+                  onClick={() => { setOpen(false); navigate('/notifications'); }}
+                  className="w-full text-center text-sm font-semibold text-brand-600 hover:text-brand-700 bg-white hover:bg-brand-50 py-2 rounded-xl transition-colors shadow-sm border border-brand-100"
+                >
+                  Xem tất cả thông báo
+                </button>
+                {notifications.length > 0 && (
                   <button
-                    onClick={() => {
-                      notifications.forEach(n => deleteNotification(n.id));
-                    }}
-                    className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    onClick={() => notifications.forEach(n => deleteNotification(n.id))}
+                    className="w-full text-center text-xs text-gray-400 hover:text-red-500 py-1 transition-colors"
                   >
                     Xóa tất cả thông báo
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

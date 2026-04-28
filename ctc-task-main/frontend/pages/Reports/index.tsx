@@ -4,7 +4,8 @@ import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, CalendarDays, Building2, Trash2 } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, CalendarDays, Building2, Trash2, Search, Filter, PieChart, BarChart } from 'lucide-react';
+import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { ReportModal } from './ReportModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report } from '../../types';
@@ -20,6 +21,10 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [filterDept, setFilterDept] = useState<string>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const perms      = user?.permissions || [];
   const canApprove = perms.includes('approve_dept_reports');
@@ -200,6 +205,18 @@ export default function ReportsPage() {
     displayedReports = displayedReports.filter(r => r.department === filterDept);
   }
 
+  // Search & Filter
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    displayedReports = displayedReports.filter(r => 
+      r.title.toLowerCase().includes(q) || 
+      (getUserDetails(r.authorId)?.name || '').toLowerCase().includes(q)
+    );
+  }
+  if (statusFilter !== 'all') {
+    displayedReports = displayedReports.filter(r => r.status === statusFilter);
+  }
+
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case 'Draft':    return <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full flex items-center gap-1"><FileEdit size={12}/> Nháp</span>;
@@ -217,6 +234,47 @@ export default function ReportsPage() {
     rejected: myReports.filter(r => r.status === 'Rejected').length,
   };
 
+  const pieData = [
+    { name: 'Đã duyệt', value: myStats.approved, color: '#10b981' },
+    { name: 'Chờ duyệt', value: myStats.pending, color: '#f59e0b' },
+    { name: 'Từ chối', value: myStats.rejected, color: '#ef4444' },
+  ].filter(d => d.value > 0);
+  
+  const deptData = canViewAll ? departments.filter(d => !['GIÁM ĐỐC','ADMIN'].includes(d.name)).map(dept => {
+    return {
+      name: dept.name,
+      approved: reports.filter(r => r.department === dept.name && r.status === 'Approved').length,
+      pending: reports.filter(r => r.department === dept.name && r.status === 'Pending').length,
+    };
+  }) : [];
+
+  const currentWeekStart = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff)).setHours(0,0,0,0);
+  }, []);
+
+  const unsubmittedEmployees = useMemo(() => {
+    if (canViewAll || !canApprove) return [];
+    if (!user) return [];
+    const myDept = user.department;
+    const deptUsers = users.filter(u => u.department === myDept && u.role !== 'Admin');
+    const submittedIds = new Set(
+      reports.filter(r => r.department === myDept && new Date(r.createdAt).getTime() >= currentWeekStart).map(r => r.authorId)
+    );
+    return deptUsers.filter(u => !submittedIds.has(u.id));
+  }, [canViewAll, canApprove, user, users, reports, currentWeekStart]);
+
+  const unsubmittedDepts = useMemo(() => {
+    if (!canViewAll) return [];
+    const activeDepts = departments.filter(d => !['GIÁM ĐỐC', 'ADMIN'].includes(d.name)).map(d => d.name);
+    const submittedDepts = new Set(
+      reports.filter(r => new Date(r.createdAt).getTime() >= currentWeekStart).map(r => r.department)
+    );
+    return activeDepts.filter(d => !submittedDepts.has(d));
+  }, [canViewAll, departments, reports, currentWeekStart]);
+
   return (
     <div className="space-y-5">
       {/* HEADER */}
@@ -226,6 +284,9 @@ export default function ReportsPage() {
           <p className="text-gray-500 text-sm mt-0.5">Gửi, theo dõi và xuất báo cáo công việc hàng tuần</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={() => setShowAnalytics(!showAnalytics)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors shadow-sm border ${showAnalytics ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
+            <PieChart size={16}/> Thống kê
+          </button>
           <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
             <Download size={16}/> Xuất CSV
           </button>
@@ -255,6 +316,93 @@ export default function ReportsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ANALYTICS DASHBOARD */}
+      {showAnalytics && (
+        <div className={`grid grid-cols-1 ${canViewAll ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4 animate-in fade-in slide-in-from-top-4 duration-300`}>
+          {!canViewAll ? (
+            <>
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2"><PieChart size={16}/> Tỷ lệ trạng thái báo cáo</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                    <RePieChart>
+                      <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                      </Pie>
+                      <ReTooltip />
+                      <Legend verticalAlign="bottom" height={36}/>
+                    </RePieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              {canApprove && (
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full max-h-[330px]">
+                  <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2"><Clock size={16} className="text-amber-500"/> Chưa nộp báo cáo tuần này</h3>
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                    {unsubmittedEmployees.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400 py-6">
+                        <CheckCircle size={32} className="text-green-400 mb-2 opacity-50"/>
+                        <span className="text-sm font-medium">Tất cả nhân viên đã nộp</span>
+                      </div>
+                    ) : (
+                      unsubmittedEmployees.map(u => (
+                        <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
+                          <Avatar src={u.avatar} alt={u.name} size={8}/>
+                          <div>
+                            <p className="text-sm font-bold text-gray-800">{u.name}</p>
+                            <p className="text-xs text-red-500 font-medium">Chưa nộp</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm lg:col-span-2">
+                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2"><BarChart size={16}/> Thống kê theo phòng ban</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                    <ReBarChart data={deptData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                      <ReTooltip cursor={{fill: '#f3f4f6'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                      <Legend />
+                      <Bar dataKey="approved" name="Đã duyệt" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="pending" name="Chờ duyệt" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </ReBarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full max-h-[360px]">
+                <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2"><Building2 size={16} className="text-amber-500"/> Phòng ban chưa nộp tuần này</h3>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                  {unsubmittedDepts.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-6">
+                      <CheckCircle size={32} className="text-green-400 mb-2 opacity-50"/>
+                      <span className="text-sm font-medium">Tất cả phòng ban đã nộp</span>
+                    </div>
+                  ) : (
+                    unsubmittedDepts.map(d => (
+                      <div key={d} className="flex items-center gap-3 p-3 rounded-xl border border-red-100 bg-red-50/50 hover:bg-red-50 transition-colors">
+                        <div className="p-2 bg-white text-red-500 rounded-lg shadow-sm border border-red-100">
+                          <Building2 size={16}/>
+                        </div>
+                        <p className="text-sm font-bold text-gray-800 flex-1">{d}</p>
+                        <span className="text-[10px] font-bold text-red-500 bg-white px-2 py-1 rounded shadow-sm border border-red-100">Thiếu</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -295,16 +443,48 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* DEPT FILTER */}
-      {activeTab==='all'&&canViewAll&&(
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-gray-500 font-medium">Phòng:</span>
-          {['all',...departments.filter(d=>!['GIÁM ĐỐC','ADMIN'].includes(d.name)).map(d=>d.name)].map(n=>(
-            <button key={n} onClick={()=>setFilterDept(n)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filterDept===n?'bg-blue-600 text-white shadow-sm':'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>
-              {n==='all'?'Tất cả':n}
-            </button>
-          ))}
+      {/* FILTERS & SEARCH */}
+      {activeTab !== 'weekly_summary' && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Tìm kiếm báo cáo..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-gray-50/50 hover:bg-white focus:bg-white"
+            />
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white cursor-pointer hover:border-blue-300 transition-colors"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="Pending">Chờ duyệt</option>
+                <option value="Approved">Đã duyệt</option>
+                <option value="Rejected">Từ chối</option>
+                <option value="Draft">Nháp</option>
+              </select>
+            </div>
+
+            {/* DEPT FILTER */}
+            {activeTab === 'all' && canViewAll && (
+              <div className="flex items-center gap-2 bg-gray-100/50 p-1 rounded-xl border border-gray-200">
+                {['all',...departments.filter(d=>!['GIÁM ĐỐC','ADMIN'].includes(d.name)).map(d=>d.name)].map(n=>(
+                  <button key={n} onClick={()=>setFilterDept(n)}
+                    className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${filterDept===n?'bg-white text-blue-700 shadow-sm border border-gray-200':'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent'}`}>
+                    {n==='all'?'Tất cả phòng':n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

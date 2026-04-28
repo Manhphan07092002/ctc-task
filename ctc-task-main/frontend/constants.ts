@@ -8,7 +8,8 @@ import {
   Settings,
   Video,
   FileText,
-  Shield
+  Shield,
+  Bell
 } from 'lucide-react';
 import { User, TaskPriority } from './types';
 
@@ -21,6 +22,7 @@ export const NAV_ITEMS = [
   { id: 'meetings', icon: Video },
   { id: 'reports', icon: FileText },
   { id: 'team', icon: Users },
+  { id: 'notifications', icon: Bell },
   { id: 'settings', icon: Settings },
 ];
 
