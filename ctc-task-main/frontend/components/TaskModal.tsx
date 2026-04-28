@@ -58,12 +58,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Determine assignable users based on Permissions
-  const assignableUsers = allUsers.filter(u => {
-    const perms = user.permissions || [];
-    if (perms.includes('manage_users') || perms.includes('view_all_tasks')) return true;
-    return u.department === user.department;
-  });
+  // Determine assignable users based on role/permissions
+  const perms = user.permissions || [];
+  const isAdminOrDirector = perms.includes('manage_users') || perms.includes('view_all_tasks');
+  const isManager        = perms.includes('manage_dept_tasks');
+  // Employee: can only assign to themselves
+  const assignableUsers = isAdminOrDirector
+    ? allUsers                                              // Admin/Director: everyone
+    : isManager
+      ? allUsers.filter(u => u.department === user.department) // Manager: own dept only
+      : allUsers.filter(u => u.id === user.id);              // Employee: self only
 
   useEffect(() => {
     if (isOpen) {
@@ -83,7 +87,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
       } else {
         resetForm();
         if (initialDate) setStartDate(initialDate);
-        // Auto-assign creator
+        // Auto-assign creator (always pre-select self)
         setAssignees([user.id]);
       }
     }
@@ -528,6 +532,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <UserIcon size={16}/> {t('assignees')}
+                {!isAdminOrDirector && !isManager && (
+                  <span className="text-[10px] font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Lock size={9}/> Tự động gán cho bạn
+                  </span>
+                )}
               </label>
               <div className="flex gap-3 flex-wrap">
                 {assignableUsers.map(u => (
@@ -535,12 +544,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                     type="button"
                     key={u.id}
                     onClick={() => toggleAssignee(u.id)}
-                    disabled={readOnly}
+                    // Employee cannot toggle – locked to self
+                    disabled={readOnly || (!isAdminOrDirector && !isManager)}
                     className={`relative group rounded-full p-0.5 transition-all ${
-                      assignees.includes(u.id) 
-                        ? 'ring-2 ring-brand-500 ring-offset-2' 
+                      assignees.includes(u.id)
+                        ? 'ring-2 ring-brand-500 ring-offset-2'
                         : 'opacity-60 hover:opacity-100'
-                    } ${readOnly ? 'cursor-default' : ''}`}
+                    } ${(readOnly || (!isAdminOrDirector && !isManager)) ? 'cursor-default' : ''}`}
                   >
                     <img src={u.avatar} alt={u.name} className="w-10 h-10 rounded-full" />
                     {assignees.includes(u.id) && (
