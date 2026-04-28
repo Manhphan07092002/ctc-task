@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
-import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Flame } from 'lucide-react';
+import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Flame, Trash2 } from 'lucide-react';
 import { Task, User, TaskStatus, TaskPriority } from '../../types';
 import { AIAssistantHandle } from '../../components/AIAssistant';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -202,7 +202,9 @@ export default function TasksPage({
                         {...provided.droppableProps}
                         className={`flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar transition-colors \${snapshot.isDraggingOver ? 'bg-brand-50/50' : ''}`}
                       >
-                        {columns[column.id].map((task, index) => (
+                        {columns[column.id].map((task, index) => {
+                          const canDelete = checkPermission('delete', task, user);
+                          return (
                           <Draggable key={task.id} draggableId={task.id} index={index}>
                             {(provided, snapshot) => (
                               <div
@@ -210,14 +212,25 @@ export default function TasksPage({
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 onClick={() => openEditModal(task)}
-                                className={`bg-white p-4 rounded-xl border transition-all ${
+                                className={`group bg-white p-4 rounded-xl border transition-all ${
                                   snapshot.isDragging ? 'shadow-xl border-brand-300 scale-[1.02]' : 'shadow-sm border-gray-100 hover:border-brand-200 hover:shadow-md'
                                 }`}
                                 style={{ ...provided.draggableProps.style }}
                               >
                                 <div className="flex items-start justify-between mb-2 gap-2">
                                   <h4 className="font-semibold text-sm text-gray-800 line-clamp-2 leading-snug">{task.title}</h4>
-                                  {task.status === TaskStatus.DONE && <CheckCircle2 size={16} className="text-green-500 flex-shrink-0" />}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {task.status === TaskStatus.DONE && <CheckCircle2 size={16} className="text-green-500" />}
+                                    {canDelete && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                                        className="text-gray-400 hover:text-red-500 transition-colors p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 rounded-md"
+                                        title={t('deleteTask')}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 
                                 {task.description && (
@@ -260,7 +273,7 @@ export default function TasksPage({
                               </div>
                             )}
                           </Draggable>
-                        ))}
+                        )})}
                         {provided.placeholder}
                         
                         {/* Empty state for column */}
