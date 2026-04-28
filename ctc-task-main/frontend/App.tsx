@@ -43,7 +43,7 @@ const getNextDate = (dateStr: string, type: RecurrenceType): string => {
 export default function CTCTaskApp() {
   const { t } = useLanguage();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { tasks, notes, users, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
+  const { tasks, notes, users, reports, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -258,7 +258,7 @@ export default function CTCTaskApp() {
               <Route path="/" element={
                  <DashboardPage
                  roleBasedTasks={roleBasedTasks} filteredTasks={filteredTasks} filteredNotes={filteredNotes} 
-                 notes={notes} users={users} user={user} searchQuery={searchQuery} 
+                 notes={notes} users={users} user={user} reports={reports} searchQuery={searchQuery} 
                  openCreateModal={openCreateModal} openEditModal={openEditModal} 
                  handleStatusToggle={handleStatusToggle} handleDeleteTask={handleDeleteTask} 
                  checkPermission={checkPermission}
@@ -284,6 +284,7 @@ export default function CTCTaskApp() {
                   users={users}
                   aiAssistantRef={aiAssistantRef}
                   setIsSuggestionModalOpen={setIsSuggestionModalOpen}
+                  handleSaveTask={handleSaveTask}
                 />
               } />
 
