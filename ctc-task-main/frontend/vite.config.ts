@@ -18,3 +18,4 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+// Force Vite restart

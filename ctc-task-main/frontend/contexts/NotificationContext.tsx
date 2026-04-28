@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { Bell, X, FileText } from 'lucide-react';
+import { Bell, X, FileText, StickyNote } from 'lucide-react';
+import { Note } from '../types';
 
 export interface AppNotification {
   id: string;
@@ -20,6 +21,7 @@ interface NotificationContextType {
   markAllRead: () => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
+  setNotes: (notes: Note[]) => void; // feed notes from App for reminder checking
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -28,27 +30,39 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [toasts, setToasts] = useState<AppNotification[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const isFirstLoad = useRef(true);
   const prevIds = useRef<Set<string>>(new Set());
+  const firedReminders = useRef<Set<string>>(new Set()); // note ids already reminded
 
   const playSound = () => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContext) return;
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
-      gainNode.gain.setValueAtTime(0, ctx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
-      gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
-      osc.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.4);
-    } catch(e) {}
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // Bell chord: 3 harmonic notes played in sequence (ding - dong - ding)
+      const notes = [
+        { freq: 1046.50, delay: 0,    dur: 0.8 },  // C6
+        { freq:  880.00, delay: 0.15, dur: 0.8 },  // A5
+        { freq: 1318.51, delay: 0.30, dur: 1.0 },  // E6
+      ];
+
+      notes.forEach(({ freq, delay, dur }) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+        // Bell decay envelope
+        gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+        gain.gain.linearRampToValueAtTime(0.28, ctx.currentTime + delay + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + dur + 0.05);
+      });
+    } catch (e) {}
   };
 
   const dismissToast = (id: string) => setToasts(curr => curr.filter(t => t.id !== id));
@@ -109,31 +123,37 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh, setNotes }}>
       {children}
       
       {/* Toast Portal */}
       <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
         {toasts.map(t => {
           const isReportReminder = t.type === 'report_reminder';
+          const isNoteReminder   = t.type === 'note_reminder';
           return (
             <div
               key={t.id}
               className={`pointer-events-auto w-[340px] backdrop-blur-xl border shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300
-                ${isReportReminder
-                  ? 'bg-violet-600 border-violet-500/50 text-white'
+                ${isReportReminder ? 'bg-violet-600 border-violet-500/50 text-white'
+                  : isNoteReminder  ? 'bg-amber-50 border-amber-200 text-gray-800'
                   : 'bg-white/95 border-gray-100 text-gray-800'}
               `}
             >
-              <div className={`p-2.5 rounded-xl flex-shrink-0 shadow-sm ${isReportReminder ? 'bg-white/20' : 'bg-blue-50 border border-blue-100/50'}`}>
-                {isReportReminder
-                  ? <FileText size={20} className="text-white"/>
-                  : <Bell size={20} className="text-blue-600 animate-[wiggle_1s_ease-in-out_infinite]"/>
-                }
+              <div className={`p-2.5 rounded-xl flex-shrink-0 shadow-sm
+                ${isReportReminder ? 'bg-white/20'
+                  : isNoteReminder  ? 'bg-amber-400'
+                  : 'bg-blue-50 border border-blue-100/50'}
+              `}>
+                <Bell size={20} className={
+                  isReportReminder ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
+                  : isNoteReminder  ? 'text-white animate-[wiggle_1s_ease-in-out_infinite]'
+                  : 'text-blue-600 animate-[wiggle_1s_ease-in-out_infinite]'
+                }/>
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
-                <h4 className={`text-sm font-bold truncate ${isReportReminder ? 'text-white' : 'text-gray-800'}`}>{t.title}</h4>
-                <p className={`text-xs line-clamp-2 mt-1 leading-relaxed ${isReportReminder ? 'text-violet-200' : 'text-gray-500'}`}>{t.message}</p>
+                <h4 className={`text-sm font-bold truncate ${isReportReminder ? 'text-white' : isNoteReminder ? 'text-amber-900' : 'text-gray-800'}`}>{t.title}</h4>
+                <p className={`text-xs line-clamp-2 mt-1 leading-relaxed ${isReportReminder ? 'text-violet-200' : isNoteReminder ? 'text-amber-700' : 'text-gray-500'}`}>{t.message}</p>
               </div>
               <button
                 onClick={() => dismissToast(t.id)}

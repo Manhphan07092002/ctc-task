@@ -5,6 +5,7 @@ import { X, Calendar as CalendarIcon, User as UserIcon, Repeat, Send, MessageSqu
 import { Button, Avatar } from './UI';
 import { generateSubtasksFromTitle, generateTaskDetails } from '../services/aiService';
 import { useLanguage } from '../contexts/LanguageContext';
+import Flatpickr from 'react-flatpickr';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -372,11 +373,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('estCompletion')}</label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input 
-                    type="datetime-local"
+                  <Flatpickr
+                    value={estimatedEndAt ? new Date(estimatedEndAt) : ''}
+                    onChange={([date]) => setEstimatedEndAt(date ? date.toISOString() : '')}
+                    options={{ 
+                      enableTime: true, 
+                      time_24hr: true, 
+                      dateFormat: 'd/m/Y H:i',
+                      defaultHour: new Date().getHours(),
+                      defaultMinute: new Date().getMinutes()
+                    }}
                     disabled={readOnly}
-                    value={estimatedEndAt}
-                    onChange={(e) => setEstimatedEndAt(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none text-sm disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>

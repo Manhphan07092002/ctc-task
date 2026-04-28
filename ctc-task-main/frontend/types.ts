@@ -55,6 +55,7 @@ export interface Note {
   content: string;
   color: string;
   createdAt: string;
+  reminderAt?: string; // ISO datetime string, optional
 }
 
 // Core roles are the 4 built-in system roles.

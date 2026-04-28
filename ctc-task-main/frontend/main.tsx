@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { DataProvider } from './contexts/DataContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import 'flatpickr/dist/flatpickr.min.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

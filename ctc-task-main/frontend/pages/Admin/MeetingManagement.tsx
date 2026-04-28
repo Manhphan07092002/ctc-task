@@ -5,6 +5,7 @@ import {
   Edit2, X, Save, ChevronDown
 } from 'lucide-react';
 import { Meeting, User } from '../../types';
+import Flatpickr from 'react-flatpickr';
 
 const STATUS_META: Record<string, { cls: string; label: string; icon: React.ReactNode }> = {
   scheduled:  { cls: 'bg-blue-100 text-blue-700 border-blue-200',     label: 'Đã lên lịch',   icon: <Calendar size={11} /> },
@@ -90,13 +91,33 @@ const MeetingFormModal: React.FC<{
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Bắt đầu</label>
-              <input type="datetime-local" value={form.startTime} onChange={e => set('startTime', e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-300 outline-none" />
+              <Flatpickr 
+                value={form.startTime ? new Date(form.startTime) : ''}
+                onChange={([date]) => set('startTime', date ? date.toISOString() : '')}
+                options={{ 
+                  enableTime: true, 
+                  time_24hr: true, 
+                  dateFormat: 'd/m/Y H:i',
+                  defaultHour: new Date().getHours(),
+                  defaultMinute: new Date().getMinutes()
+                }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-300 outline-none bg-white"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Kết thúc</label>
-              <input type="datetime-local" value={form.endTime} onChange={e => set('endTime', e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-300 outline-none" />
+              <Flatpickr 
+                value={form.endTime ? new Date(form.endTime) : ''}
+                onChange={([date]) => set('endTime', date ? date.toISOString() : '')}
+                options={{ 
+                  enableTime: true, 
+                  time_24hr: true, 
+                  dateFormat: 'd/m/Y H:i',
+                  defaultHour: new Date().getHours(),
+                  defaultMinute: new Date().getMinutes()
+                }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-300 outline-none bg-white"
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">

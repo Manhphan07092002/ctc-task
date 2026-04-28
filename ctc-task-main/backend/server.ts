@@ -184,7 +184,8 @@ async function startServer() {
       title TEXT NOT NULL,
       content TEXT,
       color TEXT,
-      createdAt TEXT
+      createdAt TEXT,
+      reminderAt TEXT
     );
 
     CREATE TABLE IF NOT EXISTS reports (
@@ -798,34 +799,38 @@ async function startServer() {
   // --- Notes API ---
   app.get('/api/notes', async (req, res) => {
     try {
-      const notes = await prisma.notes.findMany();
+      const notes = await db.all('SELECT * FROM notes');
       res.json(notes);
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.post('/api/notes', async (req, res) => {
-    const { id, title, content, color, createdAt } = req.body;
+    const { id, title, content, color, createdAt, reminderAt } = req.body;
     try {
-      await prisma.notes.create({
-        data: { id, title, content, color, createdAt }
-      });
+      await db.run(
+        'INSERT INTO notes (id, title, content, color, createdAt, reminderAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, title, content, color, createdAt, reminderAt]
+      );
       res.json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.put('/api/notes/:id', async (req, res) => {
-    const { title, content, color } = req.body;
+    const { title, content, color, reminderAt } = req.body;
     try {
-      await prisma.notes.update({
-        where: { id: req.params.id },
-        data: { title, content, color }
-      });
+      await db.run(
+        'UPDATE notes SET title = ?, content = ?, color = ?, reminderAt = ? WHERE id = ?',
+        [title, content, color, reminderAt, req.params.id]
+      );
+      // Delete old notifications for this note so the scheduler can fire again if time was changed
+      await db.run(
+        "DELETE FROM notifications WHERE relatedId = ? AND type = 'note_reminder'",
+        [req.params.id]
+      );
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.delete('/api/notes/:id', async (req, res) => {
     try {
-      await prisma.notes.delete({
-        where: { id: req.params.id }
-      });
+      await db.run('DELETE FROM notes WHERE id = ?', [req.params.id]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -1240,6 +1245,58 @@ async function startServer() {
   };
 
   scheduleFridayReminder();
+
+  // ===== NOTE REMINDER SCHEDULER =====
+  const scheduleNoteReminders = () => {
+    const checkAndNotifyNotes = async () => {
+      try {
+        const now = new Date();
+        const notes = await db.all('SELECT * FROM notes WHERE reminderAt IS NOT NULL');
+        if (!notes || notes.length === 0) return;
+
+        const users = await db.all('SELECT id FROM users');
+        if (!users || users.length === 0) return;
+
+        for (const note of notes) {
+          const remTime = new Date(note.reminderAt);
+          if (remTime > now) continue; // not due yet
+
+          // Check if we already created a notification for this note (relatedId = note.id)
+          const existing = await db.get(
+            `SELECT id FROM notifications WHERE relatedId = ? AND type = 'note_reminder'`,
+            [note.id]
+          );
+          if (existing) continue;
+
+          // Due and not notified yet! Create notification for ALL users
+          for (const u of users) {
+            const notifId = crypto.randomUUID();
+            await db.run(
+              `INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt)
+               VALUES (?, ?, 'note_reminder', ?, ?, ?, 0, ?)`,
+              [
+                notifId,
+                u.id,
+                `📌 ${note.title || 'Ghi chú'}`,
+                note.content ? note.content.slice(0, 100) + (note.content.length > 100 ? '...' : '') : 'Đã đến giờ nhắc nhở!',
+                note.id,
+                new Date().toISOString(),
+              ]
+            );
+          }
+        }
+      } catch (err) {
+        console.error('[Scheduler] Note reminder error:', err);
+      }
+    };
+
+    // Check every 30 seconds
+    setInterval(checkAndNotifyNotes, 30_000);
+    checkAndNotifyNotes(); // run immediately on startup
+    console.log('[Scheduler] Note reminder scheduler started.');
+  };
+
+  scheduleNoteReminders();
 
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));

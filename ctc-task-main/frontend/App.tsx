@@ -30,6 +30,7 @@ import { AIAssistant, AIAssistantHandle } from './components/AIAssistant';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAuth } from './contexts/AuthContext';
 import { useData } from './contexts/DataContext';
+import { useNotifications } from './contexts/NotificationContext';
 import { LoginView } from './components/LoginView';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
@@ -45,6 +46,13 @@ export default function CTCTaskApp() {
   const { t } = useLanguage();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { tasks, notes, users, reports, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
+  const { setNotes } = useNotifications();
+
+  useEffect(() => {
+    if (setNotes && notes) {
+      setNotes(notes);
+    }
+  }, [notes, setNotes]);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -228,7 +236,31 @@ export default function CTCTaskApp() {
   const openEditUserModal = (u: User) => { setEditingUser(u); setIsUserModalOpen(true); };
 
   if (isAuthLoading || isDataLoading) {
-    return <div className="h-screen flex items-center justify-center bg-gray-50 text-brand-500"><Sparkles className="animate-spin mr-2" /> Loading...</div>;
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 via-white to-brand-50/30 relative overflow-hidden">
+        <div className="absolute top-[-15%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-brand-300/20 to-rose-200/20 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-15%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-gradient-to-tr from-brand-400/15 to-orange-300/15 blur-[100px] pointer-events-none" />
+
+        {/* Logo + spinner */}
+        <div className="relative flex items-center justify-center mb-5">
+          <div className="absolute w-16 h-16 rounded-full border-[3px] border-transparent border-t-brand-500 border-r-brand-300 animate-spin" style={{ animationDuration: '1s' }} />
+          <div className="absolute w-20 h-20 rounded-full border-2 border-transparent border-b-brand-200/60 border-l-brand-100/40 animate-spin" style={{ animationDuration: '1.8s', animationDirection: 'reverse' }} />
+          <div className="w-11 h-11 rounded-xl bg-white shadow-lg shadow-brand-100/50 border border-white flex items-center justify-center overflow-hidden">
+            <img src="/logo1.jpg" alt="CTC Task" className="w-full h-full object-cover" />
+          </div>
+        </div>
+
+        <h1 className="text-base font-extrabold text-gray-800 tracking-tight mb-0.5">CTC Task</h1>
+        <p className="text-xs text-gray-400 font-medium mb-5">Đang tải dữ liệu...</p>
+
+        <div className="flex items-center gap-1.5">
+          {[0, 1, 2, 3].map(i => (
+            <span key={i} className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.8s' }} />
+          ))}
+        </div>
+      </div>
+    );
   }
   if (!user) {
     return (

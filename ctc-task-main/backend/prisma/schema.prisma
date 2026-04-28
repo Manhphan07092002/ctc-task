@@ -58,11 +58,12 @@ model tasks {
 }
 
 model notes {
-  id        String  @id
-  title     String
-  content   String?
-  color     String?
-  createdAt String?
+  id         String  @id
+  title      String
+  content    String?
+  color      String?
+  createdAt  String?
+  reminderAt String?
 }
 
 model reports {
@@ -119,4 +120,15 @@ model password_reset_tokens {
 model system_config {
   key   String @id
   value String
+}
+
+model notifications {
+  id        String  @id
+  userId    String
+  type      String
+  title     String
+  message   String
+  relatedId String?
+  isRead    Int     @default(0)
+  createdAt String
 }

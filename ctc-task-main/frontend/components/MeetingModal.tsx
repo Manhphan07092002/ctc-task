@@ -6,6 +6,7 @@ import { saveMeeting } from '../services/meetingService';
 import { Button, Modal, Input, TextArea } from './UI';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import Flatpickr from 'react-flatpickr';
 
 interface MeetingModalProps {
   isOpen: boolean;
@@ -98,11 +99,17 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, all
                 <Calendar size={16} className="text-brand-500" />
                 {t('startTime')}
               </label>
-              <Input 
-                type="datetime-local" 
-                required 
-                value={startTime} 
-                onChange={(e) => setStartTime(e.target.value)} 
+              <Flatpickr 
+                value={startTime ? new Date(startTime) : ''}
+                onChange={([date]) => setStartTime(date ? date.toISOString() : '')}
+                options={{ 
+                  enableTime: true, 
+                  time_24hr: true, 
+                  dateFormat: 'd/m/Y H:i',
+                  defaultHour: new Date().getHours(),
+                  defaultMinute: new Date().getMinutes()
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none text-sm bg-white"
               />
             </div>
             <div>
@@ -110,11 +117,17 @@ export const MeetingModal: React.FC<MeetingModalProps> = ({ isOpen, onClose, all
                 <Clock size={16} className="text-brand-500" />
                 {t('endTime')}
               </label>
-              <Input 
-                type="datetime-local" 
-                required 
-                value={endTime} 
-                onChange={(e) => setEndTime(e.target.value)} 
+              <Flatpickr 
+                value={endTime ? new Date(endTime) : ''}
+                onChange={([date]) => setEndTime(date ? date.toISOString() : '')}
+                options={{ 
+                  enableTime: true, 
+                  time_24hr: true, 
+                  dateFormat: 'd/m/Y H:i',
+                  defaultHour: new Date().getHours(),
+                  defaultMinute: new Date().getMinutes()
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none text-sm bg-white"
               />
             </div>
           </div>
