@@ -181,7 +181,7 @@ export default function TasksPage({
                 { id: TaskStatus.IN_PROGRESS, title: 'Đang làm', icon: <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" /> },
                 { id: TaskStatus.DONE, title: 'Hoàn thành', icon: <div className="w-2 h-2 rounded-full bg-green-500" /> }
               ] as const).map(column => (
-                <div key={column.id} className="flex flex-col min-w-[320px] w-[320px] max-w-[320px] bg-gray-50/80 rounded-2xl border border-gray-200/60 overflow-hidden shadow-sm">
+                <div key={column.id} className="flex flex-col flex-1 min-w-[260px] bg-gray-50/80 rounded-2xl border border-gray-200/60 overflow-hidden shadow-sm">
                   
                   {/* Column Header */}
                   <div className="p-4 bg-white/50 border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 backdrop-blur-md">
