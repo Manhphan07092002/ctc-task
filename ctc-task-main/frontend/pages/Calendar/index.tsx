@@ -126,12 +126,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const calendarEl = (e.currentTarget as HTMLElement).closest('.calendar-root') as HTMLElement;
     const calRect = calendarEl?.getBoundingClientRect() || { top: 0, left: 0, width: 800, height: 600 };
-    const popupW = 288, popupH = 380;
+    const popupW = 380, popupH = 520;
     let left = rect.left - calRect.left + rect.width / 2 - popupW / 2;
     let top  = rect.bottom - calRect.top + 8;
     if (left + popupW > calRect.width - 8) left = calRect.width - popupW - 8;
     if (left < 8) left = 8;
     if (top + popupH > calRect.height - 8) top = rect.top - calRect.top - popupH - 8;
+    if (top < 8) top = 8;
     setSelectedDate(dateStr); setPopupPos({ top, left });
   };
 
@@ -335,8 +336,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
         return (
         <div
           ref={popupRef}
-          className="absolute z-50 w-72 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/60 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
-          style={{ top: popupPos.top, left: popupPos.left }}
+          className="absolute z-50 w-96 bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/60 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          style={{ top: popupPos.top, left: popupPos.left, maxHeight: '80vh' }}
         >
           {/* Popup Header */}
           <div className="px-4 py-3 bg-gradient-to-br from-brand-500 to-brand-600 text-white">
@@ -373,7 +374,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
           )}
 
           {/* Task list */}
-          <div className="max-h-60 overflow-y-auto p-3 space-y-1.5">
+          <div className="overflow-y-auto p-3 space-y-1.5" style={{ maxHeight: '420px' }}>
             {selectedTasks.length === 0 ? (
               <div className="py-8 text-center">
                 <CalendarIcon size={28} strokeWidth={1.2} className="text-gray-200 mx-auto mb-2"/>
