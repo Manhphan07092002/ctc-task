@@ -4,6 +4,7 @@ import { X, Sparkles, Loader2, CheckCircle2, Circle, ArrowRight } from 'lucide-r
 import { Button } from './UI';
 import { generateTasksFromGoal, SuggestedTask } from '../services/aiService';
 import { TaskPriority, TaskStatus, User, Task, RecurrenceType } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface TaskSuggestionModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface TaskSuggestionModalProps {
 }
 
 export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen, onClose, onAddTasks, currentUser }) => {
+  const { t } = useLanguage();
   const [goal, setGoal] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestedTask[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,9 +87,9 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
         <div className="bg-gradient-to-r from-brand-500 to-brand-600 p-6 flex justify-between items-start text-white shrink-0">
           <div>
             <h3 className="text-xl font-bold flex items-center gap-2">
-              <Sparkles size={20} className="text-yellow-300" /> AI Plan Generator
+              <Sparkles size={20} className="text-yellow-300" /> {t('aiPlanGenerator')}
             </h3>
-            <p className="text-brand-100 text-sm mt-1">Describe a goal, and I'll suggest a list of tasks.</p>
+            <p className="text-brand-100 text-sm mt-1">{t('aiPlanDesc')}</p>
           </div>
           <button onClick={resetAndClose} className="text-brand-100 hover:text-white transition-colors">
             <X size={24} />
@@ -99,11 +101,11 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
           {suggestions.length === 0 ? (
             <form onSubmit={handleGenerate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">What is your goal?</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('aiPlanGoalLabel')}</label>
                 <textarea
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  placeholder="e.g., Plan a marketing campaign for Q4 launch, Organize a team building event, Launch a new product feature..."
+                  placeholder={t('aiPlanGoalPlaceholder')}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-400 outline-none resize-none h-32"
                   autoFocus
                 />
@@ -112,11 +114,11 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
                 <Button type="submit" disabled={!goal.trim() || isLoading} className="w-full sm:w-auto" size="lg">
                   {isLoading ? (
                     <>
-                      <Loader2 size={18} className="mr-2 animate-spin" /> Generating Plan...
+                      <Loader2 size={18} className="mr-2 animate-spin" /> {t('generatingPlan')}
                     </>
                   ) : (
                     <>
-                      Generate Tasks <ArrowRight size={18} className="ml-2" />
+                      {t('generateTasks')} <ArrowRight size={18} className="ml-2" />
                     </>
                   )}
                 </Button>
@@ -125,12 +127,12 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-bold text-gray-800">Suggested Tasks ({suggestions.length})</h4>
+                <h4 className="font-bold text-gray-800">{t('suggestedTasks')} ({suggestions.length})</h4>
                 <button 
                   onClick={() => setSuggestions([])} 
                   className="text-sm text-brand-600 hover:underline"
                 >
-                  Start Over
+                  {t('startOver')}
                 </button>
               </div>
               
@@ -175,12 +177,12 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
         {suggestions.length > 0 && (
           <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center shrink-0">
             <div className="text-sm text-gray-500">
-              {selectedIndices.length} tasks selected
+              {selectedIndices.length} {t('tasksSelected')}
             </div>
             <div className="flex gap-3">
-              <Button variant="ghost" onClick={resetAndClose}>Cancel</Button>
+              <Button variant="ghost" onClick={resetAndClose}>{t('cancel')}</Button>
               <Button onClick={handleAddSelected} disabled={selectedIndices.length === 0}>
-                Add Selected Tasks
+                {t('addSelectedTasks')}
               </Button>
             </div>
           </div>

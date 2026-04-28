@@ -46,8 +46,8 @@ const withRetryAndRotation = async <T>(operation: (ai: GoogleGenAI) => Promise<T
       const ai = await getAIInstance();
       return await operation(ai);
     } catch (error: any) {
-      // Check if error is related to rate limits or invalid key
-      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('API_KEY_INVALID');
+      // Check if error is related to rate limits, invalid key, or service unavailable (503)
+      const isRateLimit = error?.status === 429 || error?.status === 503 || error?.message?.includes('429') || error?.message?.includes('503') || error?.message?.includes('quota') || error?.message?.includes('API_KEY_INVALID');
       
       if (isRateLimit && API_KEYS.length > 1) {
         currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
@@ -189,7 +189,14 @@ export const createChatSession = async () => {
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: {
-      systemInstruction: "You are CTCBot, a helpful, energetic productivity assistant for the CTC Task app. Your answers should be concise, encouraging, and formatted with Markdown. You help users organize their day and answer general questions.",
+      systemInstruction: `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
+Nhiệm vụ chính của bạn là:
+1. Giao tiếp hoàn toàn bằng Tiếng Việt một cách tự nhiên, lịch sự và chuyên nghiệp.
+2. Hỗ trợ nhân viên và ban giám đốc công ty CTC trong việc tổ chức công việc, quản lý lịch trình, tóm tắt báo cáo, và đưa ra các lời khuyên tăng cường hiệu suất.
+3. Bạn am hiểu về các luồng nghiệp vụ nội bộ như: giao việc, tạo báo cáo hằng ngày/tuần, duyệt báo cáo bởi Manager/Director, và nhắc nhở công việc qua hệ thống Notification.
+4. Khi được hỏi về công ty CTC, hãy thể hiện sự tự hào, am hiểu về môi trường làm việc năng động, chuyên nghiệp và luôn hướng tới hiệu quả cao.
+5. Các câu trả lời của bạn cần ngắn gọn, đi vào trọng tâm, có định dạng Markdown rõ ràng (dùng bullet points, in đậm) để người dùng dễ đọc.
+Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho mọi người trong công ty CTC!`,
     }
   });
 };

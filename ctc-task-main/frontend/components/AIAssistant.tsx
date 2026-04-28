@@ -178,7 +178,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
           <div className="bg-white/20 p-1.5 rounded-lg">
             <Bot size={18} />
           </div>
-          <span className="font-bold">OrangeBot AI</span>
+          <span className="font-bold">Bot CTC Tasks</span>
         </div>
         <div className="flex items-center gap-2 text-white/80">
           <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="hover:text-white">
@@ -246,7 +246,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask me anything..."
+                placeholder={t('askAiPlaceholder')}
                 className="w-full pl-4 pr-12 py-3 bg-gray-100 border-transparent focus:bg-white border focus:border-brand-300 rounded-xl text-sm outline-none transition-all"
               />
               <button

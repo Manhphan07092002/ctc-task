@@ -102,7 +102,7 @@ export default function TasksPage({
           </div>
           
           <Button variant="outline" className="text-brand-600 border-brand-200 hover:bg-brand-50" onClick={() => setIsSuggestionModalOpen(true)}>
-            <Wand2 size={18} className="mr-2" /> AI Plan
+            <Wand2 size={18} className="mr-2" /> {t('aiPlan')}
           </Button>
           <Button variant="secondary" onClick={() => aiAssistantRef.current?.summarizeTasks(rawTodaysTasks)}>
             <Sparkles size={18} className="mr-2" /> {t('aiSummary')}
