@@ -4,7 +4,7 @@ import { Task, Note, User, Report, Role, Department } from '../types';
 import { getTasks as fetchTasks, saveTask as apiSaveTask, deleteTask as apiDeleteTask } from '../services/taskService';
 import { getNotes as fetchNotes, saveNote as apiSaveNote, deleteNote as apiDeleteNote } from '../services/noteService';
 import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '../services/userService';
-import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport } from '../services/reportService';
+import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport, adminHardDeleteReport as apiAdminHardDeleteReport } from '../services/reportService';
 import { getRoles as fetchRoles } from '../services/roleService';
 import { getDepartments as fetchDepartments } from '../services/departmentService';
 
@@ -25,6 +25,7 @@ interface DataContextType {
   deleteUser: (id: string) => Promise<void>;
   saveReport: (r: Report) => Promise<void>;
   deleteReport: (id: string) => Promise<void>;
+  adminHardDeleteReport: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -89,6 +90,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
   });
 
+  const adminHardDeleteReportMutation = useMutation({
+    mutationFn: apiAdminHardDeleteReport,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
+  });
+
   return (
     <DataContext.Provider value={{
       tasks, notes, users, reports, roles, departments, isLoading, error,
@@ -100,6 +106,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       deleteUser: async (id) => { await deleteUserMutation.mutateAsync(id); },
       saveReport: async (r) => { await saveReportMutation.mutateAsync(r); },
       deleteReport: async (id) => { await deleteReportMutation.mutateAsync(id); },
+      adminHardDeleteReport: async (id) => { await adminHardDeleteReportMutation.mutateAsync(id); },
       refreshData
     }}>
       {children}

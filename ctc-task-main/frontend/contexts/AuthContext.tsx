@@ -7,6 +7,7 @@ const LOGIN_API_URL = '/api/auth/login';
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
+  quickLogin: (userId: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
   updateUserSession: (updatedUser: User) => void;
@@ -57,12 +58,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('orange_task_user_id');
   };
 
+  const quickLogin = async (userId: string): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/quick-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) return false;
+      const foundUser: User = await res.json();
+      setUser(foundUser);
+      localStorage.setItem('orange_task_user_id', foundUser.id);
+      return true;
+    } catch (e) {
+      console.error('Quick login failed:', e);
+    }
+    return false;
+  };
+
   const updateUserSession = (updatedUser: User) => {
     setUser(updatedUser);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, updateUserSession }}>
+    <AuthContext.Provider value={{ user, login, quickLogin, logout, isLoading, updateUserSession }}>
       {children}
     </AuthContext.Provider>
   );

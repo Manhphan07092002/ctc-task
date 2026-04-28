@@ -1,421 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X, Send, Save, CheckCircle, XCircle, Plus, Trash2,
-  CalendarDays, Building2, User, FileText, ChevronDown
-} from 'lucide-react';
-import { Button } from '../../components/UI';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Report, ReportStatus, Task, User as UserType, Department } from '../../types';
+const fs = require('fs');
+const path = 'd:/ctc-task/ctc-task-main/frontend/pages/Reports/ReportModal.tsx';
+let src = fs.readFileSync(path, 'utf8');
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface TaskRow {
-  id: string;
-  assignee?: string;
-  content: string;
-  result: 'done' | 'in_progress' | 'pending' | '';
-  nextAction: string;
-  note: string;
+const startStr = '  // ─── Render ────────────────────────────────────────────────────────────────\n  return (\n    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">';
+const endStr = '\n    </div>\n  );\n};';
+
+const si = src.indexOf(startStr);
+const ei = src.lastIndexOf(endStr);
+
+if (si === -1 || ei === -1) {
+  console.error("Could not find start or end block for ReportModal render");
+  process.exit(1);
 }
 
-interface StructuredContent {
-  tasks: TaskRow[];
-  nextWeekPlan: string;
-  weekStart: string;
-  weekEnd: string;
-}
-
-interface ReportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (r: Report) => void;
-  onDelete?: (id: string) => void;
-  onAdminHardDelete?: (id: string) => void;
-  initialReport: Report | null;
-  currentUser: UserType;
-  tasks: Task[];
-  departments: Department[];
-  users: UserType[];
-  allReports: Report[];
-  t: (key: string) => string;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function getWeekRange() {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const mon = new Date(now);
-  mon.setDate(now.getDate() + diffToMon);
-  const fri = new Date(mon);
-  fri.setDate(mon.getDate() + 4);
-  return {
-    start: mon.toISOString().split('T')[0],
-    end:   fri.toISOString().split('T')[0],
-  };
-}
-
-function fmtDate(iso: string) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-const DateInput = ({ value, onChange, disabled, className }: { value: string, onChange: (v: string) => void, disabled?: boolean, className?: string }) => {
-  const [type, setType] = useState<'text'|'date'>('text');
-  return (
-    <input
-      type={type}
-      value={type === 'text' ? fmtDate(value) : value}
-      onChange={e => onChange(e.target.value)}
-      onFocus={() => setType('date')}
-      onBlur={() => setType('text')}
-      disabled={disabled}
-      className={className || "border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-50 text-center"}
-      style={{ minWidth: '130px' }}
-    />
-  );
-};
-
-function parseContent(raw: string): StructuredContent | null {
-  try {
-    const obj = JSON.parse(raw);
-    if (obj && Array.isArray(obj.tasks)) return obj as StructuredContent;
-  } catch {}
-  return null;
-}
-
-const newRow = (): TaskRow => ({
-  id: Math.random().toString(36).slice(2),
-  assignee: '',
-  content: '',
-  result: '',
-  nextAction: '',
-  note: ''
-});
-
-const RESULT_OPTIONS: { value: TaskRow['result']; label: string; color: string }[] = [
-  { value: 'done',        label: 'Đã hoàn thành',   color: 'text-green-600'  },
-  { value: 'in_progress', label: 'Đang thực hiện',  color: 'text-blue-600'   },
-  { value: 'pending',     label: 'Chưa thực hiện',  color: 'text-gray-500'   },
-  { value: '',            label: '—',                color: 'text-gray-300'   },
-];
-
-// ─── Component ───────────────────────────────────────────────────────────────
-export const ReportModal: React.FC<ReportModalProps> = ({
-  isOpen, onClose, onSave, onDelete, onAdminHardDelete, initialReport, currentUser, tasks, departments, users, allReports,
-}) => {
-  const week = getWeekRange();
-
-  const [title, setTitle]         = useState('');
-  const [weekStart, setWeekStart] = useState(week.start);
-  const [weekEnd,   setWeekEnd]   = useState(week.end);
-  const [rows, setRows]           = useState<TaskRow[]>([newRow()]);
-  const [nextWeekPlan, setNextWeekPlan] = useState('');
-  const [directorFeedback, setDirectorFeedback] = useState('');
-  const [managerFeedback, setManagerFeedback] = useState('');
-  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [showConfirmHardDelete, setShowConfirmHardDelete] = useState(false);
-
-  const isAdmin = (currentUser.permissions || []).includes('admin_panel');
-
-  // ── Permissions ──
-  const perms = currentUser.permissions || [];
-  const canApprove   = perms.includes('approve_dept_reports');
-  const canViewAll   = perms.includes('view_all_reports');
-  const canDirectorF = perms.includes('director_feedback');
-
-  const isReadOnly = !!(
-    initialReport &&
-    initialReport.status !== 'Draft' &&
-    initialReport.authorId !== currentUser.id
-  );
-
-  // Manager reviewing a PENDING report from same dept (not own) — checked FIRST
-  const isPendingMgrReview = !!(
-    initialReport &&
-    initialReport.status === 'Pending' &&
-    canApprove &&
-    currentUser.department === initialReport.department &&
-    initialReport.authorId !== currentUser.id
-  );
-
-  // Director reviewing a PENDING — only if NOT also the dept manager for same report
-  const isPendingDirReview = !!(
-    initialReport &&
-    initialReport.status === 'Pending' &&
-    canViewAll &&
-    initialReport.authorId !== currentUser.id &&
-    !isPendingMgrReview
-  );
-
-  // Director viewing someone else's pending = read-only form + director approve button
-  const isFormReadOnly = isReadOnly || isPendingDirReview;
-  // Manager review: only manager approving EMPLOYEE/dept reports (same dept, not own)
-  const isManagerReview = isPendingMgrReview;
-  // Director review modes
-  const isDirectorPendingReview = isPendingDirReview;
-  const isDirectorFeedbackReview = !!(
-    initialReport &&
-    initialReport.status === 'Approved' &&
-    initialReport.authorId !== currentUser.id &&
-    canDirectorF &&
-    !canApprove
-  );
-  const isDirectorReview = isDirectorFeedbackReview || isDirectorPendingReview;
-
-  // ── Load initial data ──
-  useEffect(() => {
-    if (!isOpen) return;
-    if (initialReport) {
-      setTitle(initialReport.title);
-      setDirectorFeedback(initialReport.directorFeedback || '');
-      setManagerFeedback(initialReport.managerFeedback || '');
-      const parsed = parseContent(initialReport.content);
-      if (parsed) {
-        setRows(parsed.tasks.length ? parsed.tasks : [newRow()]);
-        setNextWeekPlan(parsed.nextWeekPlan || '');
-        setWeekStart(parsed.weekStart || week.start);
-        setWeekEnd(parsed.weekEnd   || week.end);
-      } else {
-        setRows([{ id: '1', content: initialReport.content || '', result: '', nextAction: '', note: '' }]);
-        setNextWeekPlan('');
-      }
-    } else {
-      const w = getWeekRange();
-      setWeekStart(w.start); setWeekEnd(w.end);
-      setTitle(`Báo cáo tuần ${fmtDate(w.start)} – ${fmtDate(w.end)} · ${currentUser.name}`);
-      setRows([newRow()]);
-      setNextWeekPlan('');
-      setDirectorFeedback('');
-    }
-  }, [isOpen, initialReport]);
-
-  if (!isOpen) return null;
-
-  // ── Row helpers ──
-  const updateRow = (id: string, field: keyof TaskRow, val: string) =>
-    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
-  const addRow    = () => setRows(prev => [...prev, newRow()]);
-  const removeRow = (id: string) => setRows(prev => prev.length > 1 ? prev.filter(r => r.id !== id) : prev);
-
-  // ── Import from task list ──
-  const importDoneTasks = () => {
-    const myTasks = tasks.filter(t => t.assignees.includes(currentUser.id));
-    const newRows: TaskRow[] = myTasks.map(t => ({
-      id: t.id,
-      assignee: currentUser.name,
-      content: t.title,
-      result: (t.status === 'Done' ? 'done' : t.status === 'In Progress' ? 'in_progress' : 'pending') as TaskRow['result'],
-      nextAction: '',
-      note: '',
-    }));
-    if (newRows.length) setRows(newRows);
-  };
-
-  // ── Aggregate Department Reports ──
-  const importDepartmentReports = () => {
-    if (!allReports) return;
-    const deptReports = allReports.filter(r =>
-      r.department === currentUser.department &&
-      r.authorId !== currentUser.id &&
-      r.status === 'Approved'
-    );
-    let newRows: TaskRow[] = [];
-    deptReports.forEach(r => {
-      const authorName = users.find(u => u.id === r.authorId)?.name || 'Nhân viên';
-      const parsed = parseContent(r.content);
-      if (parsed && parsed.weekStart === weekStart && parsed.weekEnd === weekEnd && parsed.tasks) {
-        parsed.tasks.filter(t => t.content.trim() !== '').forEach(t => {
-          newRows.push({
-            id: Math.random().toString(36).slice(2),
-            assignee: authorName,
-            content: t.content,
-            result: t.result,
-            nextAction: t.nextAction,
-            note: t.note,
-          });
-        });
-      }
-    });
-    if (newRows.length > 0) {
-      if (rows.length === 1 && rows[0].content.trim() === '') {
-        setRows(newRows);
-      } else {
-        setRows(prev => [...prev, ...newRows]);
-      }
-    } else {
-      alert('Không có báo cáo nào đã được duyệt trong tuần này của phòng để tổng hợp.');
-    }
-  };
-
-  // ── Save ──
-  const buildContent = () => {
-    const data = { tasks: rows, nextWeekPlan, weekStart, weekEnd };
-    return JSON.stringify(data);
-  };
-
-  const handleSave = (status: ReportStatus) => {
-    const report = {
-      id: initialReport?.id || Math.random().toString(36).slice(2, 9),
-      title,
-      content: buildContent(),
-      authorId: currentUser.id,
-      department: currentUser.department,
-      status,
-      createdAt: initialReport?.createdAt || new Date().toISOString(),
-      submittedAt: status === 'Pending' ? new Date().toISOString() : initialReport?.submittedAt,
-      approvedAt: status === 'Approved' ? new Date().toISOString() : undefined,
-      approvedBy: status === 'Approved' ? currentUser.id : undefined,
-      directorFeedback,
-      managerFeedback,
-    };
-    onSave({ ...report });
-    onClose();
-  };
-
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const logoUrl = `${window.location.origin}/logo.png`;
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>In Báo Cáo - ${title || 'Báo cáo công việc'}</title>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 30px; }
-          .header { display: flex; align-items: center; gap: 20px; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
-          .header-logo { width: 70px; height: 70px; object-fit: contain; flex-shrink: 0; }
-          .header-text { flex: 1; }
-          .company { font-weight: bold; text-transform: uppercase; color: #1e40af; font-size: 13px; margin-bottom: 3px; }
-          .dept { font-size: 15px; font-weight: bold; margin-bottom: 3px; color: #374151; }
-          .title { font-size: 20px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; color: #1e3a8a; }
-          .meta { display: flex; gap: 30px; font-size: 13px; color: #555; margin-bottom: 0; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px; }
-          th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
-          th { background-color: #f1f5f9; font-weight: bold; color: #1e40af; text-transform: uppercase; }
-          .section-title { font-size: 16px; font-weight: bold; color: #1e40af; margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
-          .plan-box, .feedback-box { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; white-space: pre-wrap; min-height: 50px; }
-          .footer { margin-top: 50px; display: flex; justify-content: space-around; text-align: center; page-break-inside: avoid; }
-          .sig-box { width: 200px; }
-          .sig-title { font-weight: bold; margin-bottom: 80px; }
-          @media print {
-            body { padding: 0; margin: 0; }
-            @page { margin: 1.5cm; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <img src="${logoUrl}" alt="Logo" class="header-logo" />
-          <div class="header-text">
-            <div class="company">CÔNG TY CỔ PHẦN XÂY LẮP BƯU ĐIỆN MIỀN TRUNG</div>
-            <div class="dept">${currentUser.department || 'Phòng ban'}</div>
-            <div class="title">BÁO CÁO CÔNG VIỆC THỰC HIỆN</div>
-            <div class="meta">
-              <span><strong>Tuần:</strong> ${fmtDate(weekStart)} - ${fmtDate(weekEnd)}</span>
-              <span><strong>Người báo cáo:</strong> ${initialReport ? (users.find(u => u.id === initialReport.authorId)?.name || currentUser.name) : currentUser.name}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-title">1. Nội dung công việc thực hiện</div>
-        <table>
-          <thead>
-            <tr>
-              <th width="5%" style="text-align: center">STT</th>
-              <th width="30%">Nội dung công việc</th>
-              <th width="15%">Kết quả</th>
-              <th width="20%">Công việc tiếp theo</th>
-              <th width="15%">Nhân viên</th>
-              <th width="15%">Ghi chú</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map((r, i) => `
-              <tr>
-                <td align="center">${i + 1}</td>
-                <td>${r.content || ''}</td>
-                <td>${RESULT_OPTIONS.find(o => o.value === r.result)?.label || ''}</td>
-                <td>${r.nextAction || ''}</td>
-                <td>${r.assignee || ''}</td>
-                <td>${r.note || ''}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <div class="section-title">2. Kế hoạch tuần tới</div>
-        <div class="plan-box">${nextWeekPlan || 'Không có'}</div>
-
-        ${managerFeedback || directorFeedback ? `
-          <div class="section-title">3. Ý kiến chỉ đạo / Nhận xét</div>
-          ${managerFeedback ? `<div class="feedback-box"><strong>Trưởng phòng:</strong><br/>${managerFeedback}</div>` : ''}
-          ${directorFeedback ? `<div class="feedback-box"><strong>Giám đốc:</strong><br/>${directorFeedback}</div>` : ''}
-        ` : ''}
-
-        <div class="footer">
-          <div class="sig-box">
-            <div class="sig-title">Người báo cáo</div>
-            <div>${initialReport ? (users.find(u => u.id === initialReport.authorId)?.name || currentUser.name) : currentUser.name}</div>
-          </div>
-          <div class="sig-box">
-            <div class="sig-title">Trưởng phòng</div>
-            <div></div>
-          </div>
-          <div class="sig-box">
-            <div class="sig-title">Giám đốc</div>
-            <div>${initialReport?.approvedBy ? users.find(u => u.id === initialReport.approvedBy)?.name : ''}</div>
-          </div>
-        </div>
-        
-        <script>
-          window.onload = function() { 
-            setTimeout(() => { window.print(); }, 500);
-          }
-        </script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
-  };
-
-  // isManagerAction=true → save managerFeedback; false → save directorFeedback
-  const handleAction = (status: ReportStatus, isManagerAction = false) => {
-    if (!initialReport) return;
-    onSave({
-      ...initialReport,
-      status,
-      approvedAt: status === 'Approved' ? new Date().toISOString() : undefined,
-      approvedBy: status === 'Approved' ? currentUser.id : undefined,
-      managerFeedback: isManagerAction ? managerFeedback : initialReport.managerFeedback,
-      directorFeedback: !isManagerAction ? directorFeedback : initialReport.directorFeedback,
-    });
-    onClose();
-  };
-
-  const handleDelete = () => {
-    setShowConfirmDelete(true);
-  };
-
-  const executeDelete = () => {
-    if (initialReport && onDelete) {
-      onDelete(initialReport.id);
-      setShowConfirmDelete(false);
-    }
-  };
-
-  const executeHardDelete = () => {
-    if (initialReport && onAdminHardDelete) {
-      onAdminHardDelete(initialReport.id);
-      setShowConfirmHardDelete(false);
-    }
-  };
-
-  // ─── Render ────────────────────────────────────────────────────────────────
+const newRender = `  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
       <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-5xl my-auto flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -425,8 +23,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
-                <img src="/logo.png" alt="CTC Logo" className="w-10 h-10 object-contain" />
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center font-bold text-xl backdrop-blur-sm shadow-inner">
+                IC
               </div>
               <div>
                 <p className="text-[11px] font-medium text-blue-200/80 uppercase tracking-widest mb-0.5">CÔNG TY CỔ PHẦN XÂY LẮP BƯU ĐIỆN MIỀN TRUNG</p>
@@ -518,7 +116,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                     </div>
                     <div className="px-2 py-3 flex items-start justify-center mt-1">
                       {isReadOnly ? (
-                        <span className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${row.result === 'done' ? 'bg-green-100 text-green-700' : row.result === 'in_progress' ? 'bg-blue-100 text-blue-700' : row.result === 'pending' ? 'bg-gray-100 text-gray-600' : 'text-gray-400'}`}>
+                        <span className={\`text-xs font-bold px-2.5 py-1.5 rounded-lg \${row.result === 'done' ? 'bg-green-100 text-green-700' : row.result === 'in_progress' ? 'bg-blue-100 text-blue-700' : row.result === 'pending' ? 'bg-gray-100 text-gray-600' : 'text-gray-400'}\`}>
                           {RESULT_OPTIONS.find(o => o.value === row.result)?.label || '—'}
                         </span>
                       ) : (
@@ -602,7 +200,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <span className="font-semibold">{initialReport.department}</span>
                 <span>•</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${initialReport.status === 'Approved' ? 'bg-green-100 text-green-700' : initialReport.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : initialReport.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600'}`}>
+                <span className={\`px-3 py-1 rounded-full text-xs font-bold \${initialReport.status === 'Approved' ? 'bg-green-100 text-green-700' : initialReport.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : initialReport.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600'}\`}>
                   {initialReport.status === 'Approved' ? '✓ Đã duyệt' : initialReport.status === 'Pending' ? '⏳ Chờ duyệt' : initialReport.status === 'Rejected' ? '✗ Từ chối' : 'Nháp'}
                 </span>
               </div>
@@ -610,9 +208,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={handlePrint} className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors shadow-sm flex items-center gap-2" title="In Báo Cáo">
-              <FileText size={16} /> In
-            </button>
             <button onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 rounded-xl transition-colors">
               Đóng
             </button>
@@ -644,7 +239,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             {/* Manager review actions */}
             {isManagerReview && (
               <>
-                <Button onClick={() => handleAction('Rejected', true)} className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
+                <Button onClick={() => handleAction('Rejected', true)} variant="danger" className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
                   <XCircle size={16} className="mr-2" /> Trả lại
                 </Button>
                 <Button onClick={() => handleAction('Approved', true)} className="!rounded-xl shadow-md bg-green-600 hover:bg-green-700">
@@ -657,7 +252,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             {isDirectorReview && (
               <>
                 {isDirectorPendingReview && (
-                  <Button onClick={() => handleAction('Rejected', false)} className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
+                  <Button onClick={() => handleAction('Rejected', false)} variant="danger" className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
                     <XCircle size={16} className="mr-2" /> Từ chối
                   </Button>
                 )}
@@ -676,12 +271,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
             {/* Admin actions */}
             {isAdmin && initialReport?.isDeleted === 1 && (
-              <Button onClick={executeHardDelete} className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
+              <Button onClick={executeHardDelete} variant="danger" className="!rounded-xl shadow-sm">
                 <Trash2 size={16} className="mr-2" /> Xóa vĩnh viễn
               </Button>
             )}
             {initialReport?.authorId === currentUser.id && initialReport.status === 'Draft' && (
-              <Button onClick={handleDelete} className="!rounded-xl shadow-sm bg-red-500 hover:bg-red-600 text-white">
+              <Button onClick={handleDelete} variant="danger" className="!rounded-xl shadow-sm">
                 <Trash2 size={16} className="mr-2" /> Xóa
               </Button>
             )}
@@ -705,4 +300,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       </div>
     </div>
   );
-};
+};`;
+
+const result = src.slice(0, si) + newRender + src.slice(ei + endStr.length);
+fs.writeFileSync(path, result, 'utf8');
+console.log('Successfully upgraded ReportModal UI. Total lines:', result.split('\\n').length);

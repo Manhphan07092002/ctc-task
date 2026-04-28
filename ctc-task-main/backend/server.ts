@@ -240,6 +240,17 @@ async function startServer() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      relatedId TEXT,
+      isRead INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   try {
@@ -256,6 +267,9 @@ async function startServer() {
   } catch(e) { /* ignores if column already exists */ }
   try {
     await db.exec('ALTER TABLE reports ADD COLUMN managerFeedback TEXT;');
+  } catch(e) { /* ignores if column already exists */ }
+  try {
+    await db.exec('ALTER TABLE reports ADD COLUMN deletedAt TEXT;');
   } catch(e) { /* ignores if column already exists */ }
 
   // Seed Roles
@@ -408,6 +422,28 @@ async function startServer() {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
+      const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
+      return res.json({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        avatar: user.avatar,
+        permissions: role?.permissions ? JSON.parse(role.permissions) : [],
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  // Quick-login: login bằng userId không cần password (chỉ dùng nội bộ / dev)
+  app.post('/api/auth/quick-login', async (req, res) => {
+    const { userId } = req.body;
+    try {
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+      const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+      if (!user) return res.status(404).json({ error: 'User not found' });
       const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
       return res.json({
         id: user.id,
@@ -1102,9 +1138,34 @@ async function startServer() {
   // --- Reports API ---
   app.get('/api/reports', async (req, res) => {
     try {
-      const reports = await prisma.reports.findMany();
+      // Exclude soft-deleted reports
+      const reports = await db.all('SELECT * FROM reports WHERE deletedAt IS NULL');
       res.json(reports);
     } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
+  });
+
+  // Admin: get all reports including soft-deleted
+  app.get('/api/admin/reports', async (req, res) => {
+    try {
+      const reports = await db.all('SELECT * FROM reports ORDER BY createdAt DESC');
+      res.json(reports);
+    } catch(e) { res.status(500).json({error: 'Failed to fetch reports'}); }
+  });
+
+  // Admin: hard delete a report permanently
+  app.delete('/api/admin/reports/:id', async (req, res) => {
+    try {
+      await prisma.reports.delete({ where: { id: req.params.id } });
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: 'Failed to hard-delete report' }); }
+  });
+
+  // Admin: restore a soft-deleted report
+  app.put('/api/admin/reports/:id/restore', async (req, res) => {
+    try {
+      await db.run('UPDATE reports SET deletedAt = NULL WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: 'Failed to restore report' }); }
   });
 
   app.post('/api/reports', async (req, res) => {
@@ -1113,6 +1174,54 @@ async function startServer() {
       await prisma.reports.create({
         data: { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
       });
+
+      // ── Notification khi tạo báo cáo mới với status Pending ──
+      if (status === 'Pending') {
+        const now = new Date().toISOString();
+        const nid = () => Math.random().toString(36).slice(2, 11);
+        const author = await db.get('SELECT name, role FROM users WHERE id = ?', [authorId]);
+        const shortTitle = (title || '').slice(0, 50);
+
+        // Kiểm tra tác giả có phải Trưởng phòng không
+        const isManager = author ? await db.get(
+          `SELECT 1 FROM roles r WHERE r.name = ? AND r.permissions LIKE '%approve_dept_reports%'`,
+          [author.role]
+        ) : null;
+
+        if (isManager) {
+          // Truong phong gui bao cao tong hop → thong bao Giam doc
+          const directors = await db.all(
+            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
+             WHERE r.permissions LIKE '%view_all_reports%'`
+          );
+          for (const dir of directors) {
+            await db.run(
+              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+              [nid(), dir.id, 'report_submitted',
+               'Bao cao tong hop phong cho phe duyet',
+               'Truong phong ' + (author?.name || '') + ' da gui bao cao tong hop chо phe duyet.',
+               id, now]
+            );
+          }
+        } else {
+          // Nhan vien gui bao cao → thong bao Truong phong cung phong
+          const managers = await db.all(
+            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
+             WHERE u.department = ? AND r.permissions LIKE '%approve_dept_reports%'`,
+            [department]
+          );
+          for (const mgr of managers) {
+            await db.run(
+              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+              [nid(), mgr.id, 'report_submitted',
+               'Co bao cao moi can duyet',
+               (author?.name || 'Nhan vien') + ' da gui bao cao cong viec cho ban duyet.',
+               id, now]
+            );
+          }
+        }
+      }
+
       res.status(201).json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed to create report' }); }
   });
@@ -1120,21 +1229,118 @@ async function startServer() {
   app.put('/api/reports/:id', async (req, res) => {
     const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
+      // Get old report to detect status change
+      const oldReport = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
+
       await prisma.reports.update({
         where: { id: req.params.id },
         data: { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback }
       });
+
+      // ── Auto-create notifications on status change ──
+      if (oldReport && status && status !== oldReport.status) {
+        const now = new Date().toISOString();
+        const nid = () => Math.random().toString(36).slice(2, 11);
+        const author = await db.get('SELECT name, role FROM users WHERE id = ?', [oldReport.authorId]);
+        const shortTitle = (title || oldReport.title || '').slice(0, 50);
+
+        if (status === 'Pending') {
+          const managers = await db.all(
+            `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
+             WHERE u.department = ? AND r.permissions LIKE '%approve_dept_reports%'`,
+            [oldReport.department]
+          );
+          const authorName = author?.name || 'Nhan vien';
+          for (const mgr of managers) {
+            await db.run(
+              'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+              [nid(), mgr.id, 'report_submitted', 'Co bao cao moi can duyet',
+               authorName + ' da gui bao cao cong viec cho ban duyet.',
+               req.params.id, now]
+            );
+          }
+          // Notify directors if author is manager
+          const isAuthorManager = await db.get(
+            `SELECT 1 FROM roles r WHERE r.name = ? AND r.permissions LIKE '%approve_dept_reports%'`,
+            [author?.role]
+          );
+          if (isAuthorManager) {
+            const directors = await db.all(
+              `SELECT u.id FROM users u INNER JOIN roles r ON r.name = u.role
+               WHERE r.permissions LIKE '%view_all_reports%'`
+            );
+            for (const dir of directors) {
+              await db.run(
+                'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+                [nid(), dir.id, 'report_submitted', 'Bao cao tong hop phong cho phe duyet',
+                 'Truong phong ' + authorName + ' da gui bao cao tong hop chо phe duyet.',
+                 req.params.id, now]
+              );
+            }
+          }
+        }
+
+        if (status === 'Approved') {
+          await db.run(
+            'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+            [nid(), oldReport.authorId, 'report_approved', 'Bao cao da duoc phe duyet',
+             'Bao cao cua ban da duoc phe duyet thanh cong.',
+             req.params.id, now]
+          );
+        }
+
+        if (status === 'Rejected') {
+          await db.run(
+            'INSERT INTO notifications (id, userId, type, title, message, relatedId, isRead, createdAt) VALUES (?,?,?,?,?,?,0,?)',
+            [nid(), oldReport.authorId, 'report_rejected', 'Bao cao bi tu choi',
+             'Bao cao cua ban da bi tu choi. Vui long xem nhan xet va chinh sua lai.',
+             req.params.id, now]
+          );
+        }
+      }
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
   });
 
   app.delete('/api/reports/:id', async (req, res) => {
     try {
-      await prisma.reports.delete({
-        where: { id: req.params.id }
-      });
+      // Soft delete: just mark deletedAt timestamp
+      await db.run('UPDATE reports SET deletedAt = ? WHERE id = ?', [new Date().toISOString(), req.params.id]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
+  });
+
+  // ── Notifications API ──────────────────────────────────────────────────────
+  app.get('/api/notifications/:userId', async (req, res) => {
+    try {
+      const notifs = await db.all(
+        'SELECT * FROM notifications WHERE userId = ? ORDER BY createdAt DESC',
+        [req.params.userId]
+      );
+      res.json(notifs);
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  app.patch('/api/notifications/:id/read', async (req, res) => {
+    try {
+      await db.run('UPDATE notifications SET isRead = 1 WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  app.patch('/api/notifications/read-all/:userId', async (req, res) => {
+    try {
+      await db.run('UPDATE notifications SET isRead = 1 WHERE userId = ?', [req.params.userId]);
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  app.delete('/api/notifications/:id', async (req, res) => {
+    try {
+      await db.run('DELETE FROM notifications WHERE id = ?', [req.params.id]);
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   const frontendPath = path.join(__dirname, '../frontend/dist');

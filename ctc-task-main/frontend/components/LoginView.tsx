@@ -7,13 +7,14 @@ import { Layout, ClipboardCheck, ArrowRight, AlertCircle, Sparkles, ShieldCheck,
 import { Button, Input } from './UI';
 
 export const LoginView: React.FC = () => {
-  const { login } = useAuth();
+  const { login, quickLogin } = useAuth();
   const { users } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [quickLoading, setQuickLoading] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +30,14 @@ export const LoginView: React.FC = () => {
     }, 800);
   };
 
-  const fillCredentials = (email: string) => {
-    setEmail(email);
-    setPassword('Ctcdn.vn@123');
+  const handleQuickAccess = async (u: User) => {
+    setQuickLoading(u.id);
+    setError('');
+    const success = await quickLogin(u.id);
+    if (!success) {
+      setError(`Không thể đăng nhập nhanh cho tài khoản này.`);
+    }
+    setQuickLoading(null);
   };
 
 
@@ -158,10 +164,15 @@ export const LoginView: React.FC = () => {
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => fillCredentials(u.email)}
-                    className="flex items-center gap-2.5 p-2.5 bg-white/40 hover:bg-white/80 border border-white/50 backdrop-blur-sm shadow-sm rounded-xl transition-all duration-200 text-left group hover:shadow-md hover:-translate-y-0.5"
+                    onClick={() => handleQuickAccess(u)}
+                    disabled={quickLoading === u.id}
+                    className="flex items-center gap-2.5 p-2.5 bg-white/40 hover:bg-white/80 border border-white/50 backdrop-blur-sm shadow-sm rounded-xl transition-all duration-200 text-left group hover:shadow-md hover:-translate-y-0.5 disabled:opacity-60"
                   >
-                    <img src={u.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0" />
+                    {quickLoading === u.id ? (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
+                    ) : (
+                      <img src={u.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-800 truncate">{u.name}</p>
                       <p className="text-[10px] font-medium text-gray-400 group-hover:text-brand-600 transition-colors truncate uppercase">{u.role}</p>

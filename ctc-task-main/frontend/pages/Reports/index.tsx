@@ -2,34 +2,38 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, CalendarDays, Building2, Trash2 } from 'lucide-react';
 import { ReportModal } from './ReportModal';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report } from '../../types';
 
 export default function ReportsPage() {
   const { t } = useLanguage();
-  const { reports, tasks, users, roles, departments, saveReport } = useData();
+  const { reports, tasks, users, roles, departments, saveReport, deleteReport, adminHardDeleteReport } = useData();
   const { user } = useAuth();
+  const { refresh: refreshNotifications } = useNotifications();
 
   // ── All hooks must be called before any conditional return ──
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [filterDept, setFilterDept] = useState<string>('all');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const perms      = user?.permissions || [];
   const canApprove = perms.includes('approve_dept_reports');
   const canViewAll = perms.includes('view_all_reports');
   const canCreate  = perms.includes('create_report');
 
-  // Initial tab: director starts on 'all', others on 'mine'
-  const [activeTab, setActiveTab] = useState<'mine' | 'pending' | 'all'>(
-    canViewAll ? 'all' : 'mine'
+  // Initial tab: director starts on 'pending', others on 'mine'
+  const [activeTab, setActiveTab] = useState<'mine' | 'pending' | 'all' | 'weekly_summary'>(
+    canViewAll ? 'pending' : 'mine'
   );
 
   // Sync tab if user permissions change at runtime
   useEffect(() => {
-    if (canViewAll && activeTab === 'mine') setActiveTab('all');
+    if (canViewAll && activeTab === 'mine') setActiveTab('pending');
   }, [canViewAll]);
 
   const myReports = useMemo(() => {
@@ -62,8 +66,11 @@ export default function ReportsPage() {
   );
 
   const pendingDirectorReports = useMemo(() => {
-    return []; // Directors no longer use the Pending tab
-  }, []);
+    if (!canViewAll) return [];
+    return reports
+      .filter(r => r.status === 'Pending' && managerIds.has(r.authorId))
+      .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
+  }, [reports, canViewAll, managerIds]);
 
   const directorReports = useMemo(() => {
     if (!canViewAll) return [];
@@ -80,6 +87,85 @@ export default function ReportsPage() {
   const handleOpenView   = (r: Report) => { setSelectedReport(r); setIsModalOpen(true); };
   const getUserDetails   = (id: string) => users.find(u => u.id === id);
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Auto-create/update consolidated dept report when manager approves an employee's report
+  // ──────────────────────────────────────────────────────────────────────────
+  const autoConsolidateForManager = async (approvedReport: Report) => {
+    if (!user || !canApprove) return;
+
+    let weekStart = '';
+    let weekEnd = '';
+    try {
+      const c = JSON.parse(approvedReport.content);
+      weekStart = c.weekStart || '';
+      weekEnd   = c.weekEnd   || '';
+    } catch {}
+    if (!weekStart || !weekEnd) return;
+
+    const fmtD = (iso: string) => {
+      if (!iso) return '';
+      const parts = iso.split('-');
+      return `${parts[2]}/${parts[1]}`;
+    };
+
+    // All approved employee reports for same dept + same week (include the newly approved one)
+    const weekDeptReports = [
+      ...reports.filter(r =>
+        r.id !== approvedReport.id &&
+        r.department === user.department &&
+        r.authorId !== user.id &&
+        r.status === 'Approved'
+      ),
+      approvedReport,
+    ].filter(r => {
+      try {
+        const c = JSON.parse(r.content);
+        return c.weekStart === weekStart && c.weekEnd === weekEnd;
+      } catch { return false; }
+    });
+
+    // Aggregate all task rows from each employee's report
+    const aggregatedTasks = weekDeptReports.flatMap(r => {
+      const authorName = users.find(u => u.id === r.authorId)?.name || 'Nhân viên';
+      try {
+        const c = JSON.parse(r.content);
+        return (Array.isArray(c.tasks) ? c.tasks : [])
+          .filter((t: any) => t.content?.trim())
+          .map((t: any) => ({ ...t, id: Math.random().toString(36).slice(2), assignee: authorName }));
+      } catch { return []; }
+    });
+
+    // Find existing consolidated report for this manager + week (to update instead of duplicate)
+    const existing = reports.find(r =>
+      r.authorId === user.id &&
+      r.department === user.department &&
+      (() => {
+        try { const c = JSON.parse(r.content); return c.weekStart === weekStart && c.weekEnd === weekEnd; }
+        catch { return false; }
+      })()
+    );
+
+    let prevNextWeekPlan = '';
+    if (existing) {
+      try { prevNextWeekPlan = JSON.parse(existing.content).nextWeekPlan || ''; } catch {}
+    }
+
+    const consolidated: Report = {
+      id: existing?.id || Math.random().toString(36).slice(2, 9),
+      title: `Báo cáo tổng hợp phòng ${user.department} · Tuần ${fmtD(weekStart)}–${fmtD(weekEnd)}`,
+      content: JSON.stringify({ tasks: aggregatedTasks, nextWeekPlan: prevNextWeekPlan, weekStart, weekEnd }),
+      authorId: user.id,
+      department: user.department,
+      status: 'Pending',
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      submittedAt: new Date().toISOString(),
+      directorFeedback: existing?.directorFeedback,
+      managerFeedback: existing?.managerFeedback,
+    };
+
+    await saveReport(consolidated);
+  };
+
   const exportCsv = () => {
     const header = ['Tiêu đề', 'Phòng ban', 'Trạng thái', 'Tác giả', 'Người duyệt', 'Ngày tạo'];
     const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -92,7 +178,7 @@ export default function ReportsPage() {
       r.approvedAt || r.submittedAt || r.createdAt,
     ]);
     const csv = [header, ...rows].map(row => row.map(escape).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -106,6 +192,7 @@ export default function ReportsPage() {
   let displayedReports: Report[] = [];
   if (activeTab === 'all'     && canViewAll)  displayedReports = directorReports;
   else if (activeTab === 'pending')            displayedReports = pendingList;
+  else if (activeTab === 'weekly_summary')     displayedReports = [];
   else                                         displayedReports = myReports;
 
   // Apply department filter for director
@@ -123,184 +210,224 @@ export default function ReportsPage() {
     }
   };
 
-  const tabClass = (tab: string) =>
-    `py-3 px-5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-      activeTab === tab
-        ? 'border-blue-500 text-blue-600'
-        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-    }`;
+  const myStats = {
+    total:    myReports.length,
+    pending:  myReports.filter(r => r.status === 'Pending').length,
+    approved: myReports.filter(r => r.status === 'Approved').length,
+    rejected: myReports.filter(r => r.status === 'Rejected').length,
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-end mb-6">
+    <div className="space-y-5">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Quản lý Báo cáo</h2>
-          <p className="text-gray-500 text-sm mt-1">Gửi, xem và xuất báo cáo công việc hàng tuần</p>
+          <h2 className="text-2xl font-bold text-gray-900">Quản lý Báo cáo</h2>
+          <p className="text-gray-500 text-sm mt-0.5">Gửi, theo dõi và xuất báo cáo công việc hàng tuần</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={exportCsv}>
-            <Download size={18} className="mr-2" /> Xuất CSV
-          </Button>
-          {canCreate && !canViewAll && (
-            <Button onClick={handleOpenCreate}>
-              <PlusCircle size={18} className="mr-2" /> Tạo báo cáo tuần này
-            </Button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+            <Download size={16}/> Xuất CSV
+          </button>
+          {(canCreate || canApprove) && !canViewAll && (
+            <button onClick={handleOpenCreate} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm">
+              <PlusCircle size={16}/>
+              {canApprove ? 'Tạo báo cáo tổng hợp phòng' : 'Tạo báo cáo tuần này'}
+            </button>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
-        {!canViewAll && (
-          <button className={tabClass('mine')} onClick={() => setActiveTab('mine')}>
-            Báo cáo của tôi
-          </button>
-        )}
-
-        {!canViewAll && canApprove && (
-          <button className={tabClass('pending')} onClick={() => setActiveTab('pending')}>
-            Cần duyệt
-            {pendingList.length > 0 && (
-              <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
-                {pendingList.length}
-              </span>
-            )}
-          </button>
-        )}
-
-        {canViewAll && (
-          <button className={tabClass('all')} onClick={() => setActiveTab('all')}>
-            Toàn cục (Đã duyệt)
-            {directorReports.length > 0 && (
-              <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full">
-                {directorReports.length}
-              </span>
-            )}
-          </button>
-        )}
-      </div>
-
-      {/* Director banner + Dept Filter */}
-      {activeTab === 'all' && canViewAll && (
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-xl border border-blue-100 mb-4">
-          <p className="font-bold text-base">Chế độ Xem Toàn Cục</p>
-          <p className="text-sm mt-0.5">Bạn đang xem tất cả báo cáo đã được Trưởng phòng phê duyệt trên toàn hệ thống.</p>
+      {/* STATS CARDS (non-director) */}
+      {!canViewAll && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Tổng báo cáo', value: myStats.total,    bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100',   icon: <FileText size={22}/> },
+            { label: 'Chờ duyệt',    value: myStats.pending,  bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', icon: <Clock size={22}/> },
+            { label: 'Đã duyệt',     value: myStats.approved, bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100',  icon: <CheckCircle size={22}/> },
+            { label: 'Từ chối',      value: myStats.rejected, bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-100',    icon: <XCircle size={22}/> },
+          ].map(s => (
+            <div key={s.label} className={`rounded-2xl border ${s.bg} ${s.border} p-4 flex items-center gap-3`}>
+              <div className={`${s.text} opacity-80`}>{s.icon}</div>
+              <div>
+                <p className={`text-2xl font-bold ${s.text}`}>{s.value}</p>
+                <p className="text-xs font-medium text-gray-500 mt-0.5">{s.label}</p>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {activeTab === 'all' && canViewAll && (
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <span className="text-sm text-gray-500 font-medium whitespace-nowrap">Lọc theo phòng:</span>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterDept('all')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                filterDept === 'all' ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'
-              }`}
-            >
-              Tất cả
+      {/* TABS */}
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        {!canViewAll && (
+          <button
+            className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='mine'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('mine')}
+          >
+            <FileText size={15}/> Báo cáo của tôi
+            <span className="bg-gray-100 text-gray-600 text-[11px] px-1.5 py-0.5 rounded-full">{myStats.total}</span>
+          </button>
+        )}
+        {!canViewAll && canApprove && (
+          <button
+            className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='pending'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('pending')}
+          >
+            <Clock size={15}/> Cần duyệt
+            {pendingList.length > 0 && <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingList.length}</span>}
+          </button>
+        )}
+        {canViewAll && (
+          <>
+            <button className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='pending'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={()=>setActiveTab('pending')}>
+              <Clock size={15}/> Chưa duyệt
+              {pendingDirectorReports.length>0&&<span className="bg-red-500 text-white text-[11px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingDirectorReports.length}</span>}
             </button>
-            {departments
-              .filter(d => !['GIÁM ĐỐC','ADMIN'].includes(d.name))
-              .map(dept => (
-                <button
-                  key={dept.id}
-                  onClick={() => setFilterDept(dept.name)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                    filterDept === dept.name ? 'bg-blue-500 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'
-                  }`}
-                >
-                  {dept.name}
-                </button>
-              ))}
+            <button className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='all'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={()=>setActiveTab('all')}>
+              <CheckCircle size={15}/> Đã duyệt
+              {directorReports.length>0&&<span className="bg-green-100 text-green-700 text-[11px] px-1.5 py-0.5 rounded-full">{directorReports.length}</span>}
+            </button>
+            <button className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='weekly_summary'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`} onClick={()=>setActiveTab('weekly_summary')}>
+              <CalendarDays size={15}/> Tổng hợp tuần
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* DEPT FILTER */}
+      {activeTab==='all'&&canViewAll&&(
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-gray-500 font-medium">Phòng:</span>
+          {['all',...departments.filter(d=>!['GIÁM ĐỐC','ADMIN'].includes(d.name)).map(d=>d.name)].map(n=>(
+            <button key={n} onClick={()=>setFilterDept(n)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filterDept===n?'bg-blue-600 text-white shadow-sm':'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+              {n==='all'?'Tất cả':n}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* WEEKLY SUMMARY */}
+      {activeTab==='weekly_summary'&&canViewAll?(
+        <div className="space-y-5">
+          {Object.entries(
+            [...directorReports,...pendingDirectorReports].reduce((acc,r)=>{
+              let k='Tuần không xác định';
+              try{const c=JSON.parse(r.content||'{}');if(c.weekStart&&c.weekEnd)k=`Tuần ${c.weekStart} – ${c.weekEnd}`;}catch{}
+              if(!acc[k])acc[k]=[];acc[k].push(r);return acc;
+            },{} as Record<string,Report[]>)
+          ).sort((a,b)=>b[0].localeCompare(a[0])).map(([week,rpts])=>(
+            <div key={week} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-3 border-b border-blue-100 flex items-center justify-between">
+                <h3 className="font-bold text-blue-800 flex items-center gap-2"><CalendarDays size={16}/>{week}</h3>
+                <span className="text-xs font-medium text-blue-600 bg-white px-2.5 py-1 rounded-full border border-blue-200">{rpts.length} phòng</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
+                {departments.filter(d=>!['GIÁM ĐỐC','ADMIN'].includes(d.name)).map(dept=>{
+                  const rpt=rpts.find(r=>r.department===dept.name);
+                  return(
+                    <div key={dept.id} onClick={()=>rpt&&handleOpenView(rpt)}
+                      className={`p-4 rounded-xl border-2 transition-all ${rpt?'border-green-200 bg-green-50/40 hover:bg-green-50 cursor-pointer shadow-sm hover:shadow':'border-dashed border-gray-200 bg-gray-50/50'}`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${rpt?'bg-green-100 text-green-600':'bg-gray-100 text-gray-400'}`}><Building2 size={18}/></div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className={`font-semibold text-sm ${rpt?'text-gray-800':'text-gray-400'}`}>{dept.name}</h4>
+                          {rpt&&<div className="mt-0.5">{renderStatusBadge(rpt.status)}</div>}
+                        </div>
+                      </div>
+                      {rpt?<p className="text-xs text-gray-500 line-clamp-2">{rpt.title}</p>:<p className="text-xs text-gray-400 flex items-center gap-1"><XCircle size={12}/>Chưa nộp</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {directorReports.length===0&&pendingDirectorReports.length===0&&(
+            <div className="py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-200">
+              <FileText size={40} className="mx-auto mb-3 opacity-20"/><p className="font-medium">Không có dữ liệu tổng hợp</p>
+            </div>
+          )}
+        </div>
+      ):(
+        /* REPORT LIST */
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 grid grid-cols-12 gap-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <div className="col-span-6 md:col-span-5">Báo cáo</div>
+            <div className="col-span-3 hidden md:block text-center">Người duyệt</div>
+            <div className="col-span-2 text-center">Trạng thái</div>
+            <div className="col-span-6 md:col-span-2 text-right">Ngày</div>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {displayedReports.length===0?(
+              <div className="py-16 text-center text-gray-400">
+                <FileText size={44} className="mx-auto mb-3 opacity-20"/>
+                <p className="font-medium text-gray-500">Không có báo cáo nào</p>
+                <p className="text-sm mt-1 text-gray-400">{activeTab==='pending'?'Tất cả báo cáo đã được xử lý ✓':'Nhấn nút tạo báo cáo để bắt đầu'}</p>
+              </div>
+            ):displayedReports.map(report=>{
+              const author=getUserDetails(report.authorId);
+              let approver=report.approvedBy?getUserDetails(report.approvedBy):null;
+              if(!approver&&report.status==='Pending'){const dept=departments.find(d=>d.name===report.department);if(dept?.managerId)approver=getUserDetails(dept.managerId);}
+              const lColor=report.status==='Approved'?'border-l-green-400':report.status==='Pending'?'border-l-yellow-400':report.status==='Rejected'?'border-l-red-400':'border-l-gray-200';
+              const iColor=report.status==='Approved'?'bg-green-100 text-green-600':report.status==='Pending'?'bg-yellow-100 text-yellow-600':report.status==='Rejected'?'bg-red-100 text-red-500':'bg-gray-100 text-gray-400';
+              const d=new Date(report.approvedAt||report.submittedAt||report.createdAt);
+              return(
+                <div key={report.id} onClick={()=>handleOpenView(report)}
+                  className={`px-5 py-4 grid grid-cols-12 gap-3 items-center hover:bg-blue-50/40 transition-colors cursor-pointer group border-l-4 ${lColor}`}>
+                  <div className="col-span-6 md:col-span-5 flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${iColor}`}><FileText size={18}/></div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 truncate text-sm group-hover:text-blue-600 transition-colors">{report.title}</p>
+                      {(canViewAll||canApprove)&&author&&(
+                        <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                          <Avatar src={author.avatar} alt={author.name} size={4}/>{author.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="col-span-3 hidden md:flex items-center justify-center">
+                    {approver?(<div className="flex items-center gap-2"><Avatar src={approver.avatar} alt={approver.name} size={6}/><span className="truncate max-w-[90px] text-xs text-gray-600">{approver.name}</span></div>):<span className="text-gray-300">—</span>}
+                  </div>
+                  <div className="col-span-2 flex justify-center">{renderStatusBadge(report.status)}</div>
+                  <div className="col-span-6 md:col-span-2 flex items-center justify-end gap-2">
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-gray-700">{d.toLocaleDateString('vi-VN')}</p>
+                      <p className="text-[11px] text-gray-400">{d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</p>
+                    </div>
+                    {report.authorId===user.id&&(
+                      <button onClick={e=>{e.stopPropagation();setDeleteConfirmId(report.id);}} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
+                        <Trash2 size={14}/>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Report table */}
-      <Card className="overflow-hidden">
-        <div className="bg-gray-50 px-6 py-3 border-b border-gray-100 grid grid-cols-12 gap-4 items-center text-xs font-bold text-gray-500 uppercase tracking-wider">
-          <div className="col-span-5 md:col-span-4">Tiêu đề</div>
-          <div className="col-span-3 hidden md:block text-center">Người duyệt</div>
-          <div className="col-span-2 text-center">Trạng thái</div>
-          <div className="col-span-5 md:col-span-3 text-right">Ngày cập nhật</div>
-        </div>
-
-        <div className="divide-y divide-gray-100">
-          {displayedReports.length === 0 ? (
-            <div className="p-10 text-center text-gray-400">
-              <FileText size={36} className="mx-auto mb-2 opacity-30" />
-              <p className="text-sm">Không có báo cáo nào.</p>
-            </div>
-          ) : displayedReports.map(report => {
-            const author   = getUserDetails(report.authorId);
-            let   approver = report.approvedBy ? getUserDetails(report.approvedBy) : null;
-            if (!approver && report.status === 'Pending') {
-              const dept = departments.find(d => d.name === report.department);
-              if (dept?.managerId) approver = getUserDetails(dept.managerId);
-            }
-
-            return (
-              <div
-                key={report.id}
-                onClick={() => handleOpenView(report)}
-                className="px-6 py-4 grid grid-cols-12 gap-4 items-center hover:bg-blue-50/40 transition-colors cursor-pointer group"
-              >
-                <div className="col-span-5 md:col-span-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex flex-shrink-0 items-center justify-center">
-                    <FileText size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">{report.title}</p>
-                    {(canViewAll || canApprove) && author && (
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                        <Avatar src={author.avatar} alt={author.name} size={4} /> {author.name}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="col-span-3 hidden md:flex items-center justify-center">
-                  {approver ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Avatar src={approver.avatar} alt={approver.name} size={6} />
-                      <span className="truncate max-w-[100px]">{approver.name}</span>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 text-sm">—</span>
-                  )}
-                </div>
-
-                <div className="col-span-2 flex justify-center">
-                  {renderStatusBadge(report.status)}
-                </div>
-
-                <div className="col-span-5 md:col-span-3 flex flex-col items-end justify-center text-sm">
-                  {(() => {
-                    const d = new Date(report.approvedAt || report.submittedAt || report.createdAt);
-                    const timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-                    const dateStr = d.toLocaleDateString('vi-VN');
-                    return (
-                      <>
-                        <span className="font-medium text-gray-700">{dateStr}</span>
-                        <span className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
-                          <Clock size={12} /> {timeStr}
-                        </span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <ReportModal
+            <ReportModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={(r) => saveReport(r)}
+        onSave={async (r) => {
+          await saveReport(r);
+          // If manager just approved an employee's report: auto-create/update consolidated dept report
+          if (
+            r.status === 'Approved' &&
+            canApprove &&
+            !canViewAll &&
+            r.authorId !== user?.id &&
+            r.department === user?.department
+          ) {
+            await autoConsolidateForManager(r);
+          }
+          // Refresh notifications so badge updates immediately
+          setTimeout(refreshNotifications, 800);
+        }}
+        onDelete={(id) => { deleteReport(id); setIsModalOpen(false); }}
+        onAdminHardDelete={(id) => { adminHardDeleteReport(id); setIsModalOpen(false); }}
         initialReport={selectedReport}
         currentUser={user}
         tasks={tasks}
@@ -308,6 +435,22 @@ export default function ReportsPage() {
         users={users}
         allReports={reports}
         t={t}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteConfirmId}
+        title="Xóa báo cáo"
+        message="Bạn có chắc chắn muốn xóa báo cáo này? Thao tác này không thể hoàn tác."
+        confirmText="Xóa"
+        cancelText="Hủy"
+        type="danger"
+        onConfirm={() => {
+          if (deleteConfirmId) {
+            deleteReport(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirmId(null)}
       />
     </div>
   );

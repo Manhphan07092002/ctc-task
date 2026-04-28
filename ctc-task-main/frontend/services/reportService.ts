@@ -20,9 +20,20 @@ export const saveReport = async (report: Report): Promise<void> => {
   if (!response.ok) throw new Error('Failed to save report');
 };
 
+// Soft delete — marks deletedAt, report hidden from all non-admin views
 export const deleteReport = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_URL}/${id}`, {
-    method: 'DELETE',
-  });
+  const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to delete report');
+};
+
+// Admin only: permanently remove a report from DB
+export const adminHardDeleteReport = async (id: string): Promise<void> => {
+  const response = await fetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to hard-delete report');
+};
+
+// Admin only: restore a soft-deleted report
+export const restoreReport = async (id: string): Promise<void> => {
+  const response = await fetch(`/api/admin/reports/${id}/restore`, { method: 'PUT' });
+  if (!response.ok) throw new Error('Failed to restore report');
 };

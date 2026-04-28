@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Menu, Globe, Search, X, Bell, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Menu, Globe, Search, X, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocation } from 'react-router-dom';
+import { useNotifications, AppNotification } from '../../contexts/NotificationContext';
 
 const getGreeting = (t: (key: string) => string) => {
   const hour = new Date().getHours();
@@ -34,6 +35,39 @@ const LiveClock = () => {
   );
 };
 
+const fmtRelative = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'vừa xong';
+  if (m < 60) return `${m} phút trước`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} giờ trước`;
+  return `${Math.floor(h / 24)} ngày trước`;
+};
+
+const NotificationItem: React.FC<{ n: AppNotification; onRead: () => void; onDelete: () => void }> = ({ n, onRead, onDelete }) => (
+  <div
+    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/60' : ''}`}
+    onClick={onRead}
+  >
+    <div className="text-2xl leading-none select-none">{n.title.slice(0, 2)}</div>
+    <div className="flex-1 min-w-0">
+      <p className={`text-sm leading-tight ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+        {n.title.slice(2).trim()}
+      </p>
+      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+      <p className="text-[10px] text-gray-400 mt-1">{fmtRelative(n.createdAt)}</p>
+    </div>
+    <button
+      onClick={e => { e.stopPropagation(); onDelete(); }}
+      className="p-1 rounded-full hover:bg-red-100 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
+      title="Xóa thông báo"
+    >
+      <X size={13} />
+    </button>
+  </div>
+);
+
 interface TopHeaderProps {
   setIsMobileMenuOpen: (o: boolean) => void;
   searchQuery: string;
@@ -43,20 +77,32 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
-  setIsMobileMenuOpen, searchQuery, setSearchQuery, notification, setNotification
+  setIsMobileMenuOpen, searchQuery, setSearchQuery,
 }) => {
   const { user } = useAuth();
   const { t, language, setLanguage } = useLanguage();
   const location = useLocation();
+  const { notifications, unreadCount, markRead, markAllRead, deleteNotification } = useNotifications();
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  const toggleLanguage = () => {
-    setLanguage(language === 'vi' ? 'en' : 'vi');
-  };
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggleLanguage = () => setLanguage(language === 'vi' ? 'en' : 'vi');
 
   const getPageTitle = () => {
     if (location.pathname === '/') return `${getGreeting(t)}, ${user?.name.split(' ')[0]}`;
     const name = location.pathname.split('/')[1];
-    return t(name); // relies on correct translation keys
+    return t(name);
   };
 
   return (
@@ -99,31 +145,77 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           )}
         </div>
 
-        <div className="relative">
+        {/* ── Notification Bell ── */}
+        <div className="relative" ref={panelRef}>
           <button
-            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors relative"
-            onClick={() => setNotification({ ...notification, visible: false })}
+            className="relative p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
+            onClick={() => setOpen(v => !v)}
+            aria-label="Thông báo"
           >
             <Bell size={20} />
-            {notification?.visible && (
-              <span className="absolute top-1.5 right-2 w-2.5 h-2.5 bg-brand-500 border-2 border-white rounded-full animate-pulse"></span>
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse border-2 border-white leading-none">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             )}
           </button>
 
-          {notification?.visible && (
-            <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-xl border border-gray-100 p-4 z-50 animate-in slide-in-from-top-2">
-              <div className="flex gap-3">
-                <div className={`mt-1 p-1 rounded-full h-fit ${notification.type === 'warning' ? 'bg-brand-100' : 'bg-blue-100'}`}>
-                  <AlertCircle size={16} className={notification.type === 'warning' ? 'text-brand-600' : 'text-blue-600'} />
+          {open && (
+            <div className="absolute right-0 top-14 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 animate-in slide-in-from-top-2 overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+                <div className="flex items-center gap-2">
+                  <Bell size={16} className="text-gray-600" />
+                  <span className="font-semibold text-gray-800 text-sm">Thông báo</span>
+                  {unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{notification.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">{notification.message}</p>
-                  <div className="mt-2 flex gap-2">
-                    <button onClick={() => setNotification((prev: any) => ({ ...prev, visible: false }))} className="text-xs text-gray-400 hover:text-gray-600">Dismiss</button>
-                  </div>
-                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllRead}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  >
+                    Đọc tất cả
+                  </button>
+                )}
               </div>
+
+              {/* Notification list */}
+              <div className="max-h-[420px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                    <Bell size={36} strokeWidth={1.2} className="mb-3 opacity-40" />
+                    <p className="text-sm font-medium">Không có thông báo nào</p>
+                    <p className="text-xs mt-1">Các thông báo sẽ xuất hiện ở đây</p>
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <NotificationItem
+                      key={n.id}
+                      n={n}
+                      onRead={() => { if (!n.isRead) markRead(n.id); }}
+                      onDelete={() => deleteNotification(n.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              {notifications.length > 0 && (
+                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 text-center">
+                  <button
+                    onClick={() => {
+                      notifications.forEach(n => deleteNotification(n.id));
+                    }}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    Xóa tất cả thông báo
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -8,6 +8,7 @@ import './index.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { DataProvider } from './contexts/DataContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,10 +26,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <LanguageProvider>
           <AuthProvider>
             <DataProvider>
-              <Routes>
-                <Route path="/admin/*" element={<AdminApp />} />
-                <Route path="/*" element={<App />} />
-              </Routes>
+              <NotificationProvider>
+                <Routes>
+                  <Route path="/admin/*" element={<AdminApp />} />
+                  <Route path="/*" element={<App />} />
+                </Routes>
+              </NotificationProvider>
             </DataProvider>
           </AuthProvider>
         </LanguageProvider>
