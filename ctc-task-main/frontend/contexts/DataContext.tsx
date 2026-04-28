@@ -7,6 +7,7 @@ import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDelet
 import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport, adminHardDeleteReport as apiAdminHardDeleteReport } from '../services/reportService';
 import { getRoles as fetchRoles } from '../services/roleService';
 import { getDepartments as fetchDepartments } from '../services/departmentService';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
   tasks: Task[];
@@ -33,9 +34,11 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const userId = user?.id || '';
 
   const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks });
-  const { data: notes = [], isLoading: notesLoading, error: notesError } = useQuery({ queryKey: ['notes'], queryFn: fetchNotes });
+  const { data: notes = [], isLoading: notesLoading, error: notesError } = useQuery({ queryKey: ['notes', userId], queryFn: () => fetchNotes(userId), enabled: !!userId });
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
   const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useQuery({ queryKey: ['roles'], queryFn: fetchRoles });
@@ -62,12 +65,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const saveNoteMutation = useMutation({
     mutationFn: apiSaveNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes', userId] }),
   });
 
   const deleteNoteMutation = useMutation({
     mutationFn: apiDeleteNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes', userId] }),
   });
 
   const saveUserMutation = useMutation({

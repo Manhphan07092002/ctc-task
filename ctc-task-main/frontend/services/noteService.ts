@@ -2,16 +2,17 @@ import { Note } from '../types';
 
 const API_URL = '/api/notes';
 
-export const getNotes = async (): Promise<Note[]> => {
-  const response = await fetch(API_URL);
+export const getNotes = async (userId: string): Promise<Note[]> => {
+  const response = await fetch(`${API_URL}?userId=${encodeURIComponent(userId)}`);
   if (!response.ok) throw new Error('Failed to fetch notes');
   return response.json();
 };
 
 export const saveNote = async (note: Note): Promise<void> => {
-  const allNotes = await getNotes();
+  // Fetch only user's own notes to check existence
+  const allNotes = await getNotes(note.userId || '');
   const exists = allNotes.some(n => n.id === note.id);
-  
+
   if (exists) {
     const res = await fetch(`${API_URL}/${note.id}`, {
       method: 'PUT',

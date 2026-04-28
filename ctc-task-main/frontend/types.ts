@@ -56,6 +56,7 @@ export interface Note {
   color: string;
   createdAt: string;
   reminderAt?: string; // ISO datetime string, optional
+  userId?: string;     // owner – private notes
 }
 
 // Core roles are the 4 built-in system roles.

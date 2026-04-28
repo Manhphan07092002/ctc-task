@@ -155,11 +155,16 @@ export const LoginView: React.FC = () => {
               </div>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-gray-200/50 relative">
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/70 backdrop-blur-xl px-4 text-xs font-bold text-gray-400 uppercase tracking-widest rounded-full border border-gray-100">
-                Quick Access
+            <div className="mt-8 relative">
+              <div className="relative flex items-center justify-center mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200/50"></div>
+                </div>
+                <div className="relative bg-white/70 backdrop-blur-xl px-4 py-1 text-xs font-bold text-gray-400 uppercase tracking-widest rounded-full border border-gray-100">
+                  Quick Access
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 scrollbar-thin">
+              <div className="grid grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 pb-2 scrollbar-thin">
                 {users?.map((u: User) => (
                   <button
                     key={u.id}

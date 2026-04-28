@@ -222,7 +222,7 @@ export default function CTCTaskApp() {
   const openEditModal = (task: Task) => { setEditingTask(task); setIsModalOpen(true); };
   const toggleTagFilter = (tag: string) => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
 
-  const handleSaveNote = async (note: Note) => await saveNote(note);
+  const handleSaveNote = async (note: Note) => await saveNote({ ...note, userId: user!.id });
   const handleDeleteNote = async (noteId: string) => await deleteNote(noteId);
   const openCreateNoteModal = () => { setEditingNote(null); setIsNoteModalOpen(true); };
   const openEditNoteModal = (note: Note) => { setEditingNote(note); setIsNoteModalOpen(true); };

@@ -310,7 +310,7 @@ export default function DashboardPage({
                         dataKey="value"
                       >
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-\${index}`} fill={entry.color} />
+                          <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <RechartsTooltip />

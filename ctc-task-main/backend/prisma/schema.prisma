@@ -64,6 +64,7 @@ model notes {
   color      String?
   createdAt  String?
   reminderAt String?
+  userId     String?
 }
 
 model reports {

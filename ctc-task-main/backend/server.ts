@@ -595,7 +595,16 @@ async function startServer() {
     try {
       const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
       if (user) {
-        return res.json({ success: true, user });
+        const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
+        return res.json({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+          avatar: user.avatar,
+          permissions: role?.permissions ? JSON.parse(role.permissions) : [],
+        });
       }
       return res.status(401).json({ error: 'Invalid user id' });
     } catch (e) {
@@ -796,29 +805,31 @@ async function startServer() {
     }
   });
 
-  // --- Notes API ---
+  // --- Notes API (private per user) ---
   app.get('/api/notes', async (req, res) => {
     try {
-      const notes = await db.all('SELECT * FROM notes');
+      const userId = req.query.userId as string | undefined;
+      if (!userId) return res.json([]);
+      const notes = await db.all('SELECT * FROM notes WHERE userId = ?', [userId]);
       res.json(notes);
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.post('/api/notes', async (req, res) => {
-    const { id, title, content, color, createdAt, reminderAt } = req.body;
+    const { id, title, content, color, createdAt, reminderAt, userId } = req.body;
     try {
       await db.run(
-        'INSERT INTO notes (id, title, content, color, createdAt, reminderAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, title, content, color, createdAt, reminderAt]
+        'INSERT INTO notes (id, title, content, color, createdAt, reminderAt, userId) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [id, title, content, color, createdAt, reminderAt, userId]
       );
       res.json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
   app.put('/api/notes/:id', async (req, res) => {
-    const { title, content, color, reminderAt } = req.body;
+    const { title, content, color, reminderAt, userId } = req.body;
     try {
       await db.run(
-        'UPDATE notes SET title = ?, content = ?, color = ?, reminderAt = ? WHERE id = ?',
-        [title, content, color, reminderAt, req.params.id]
+        'UPDATE notes SET title = ?, content = ?, color = ?, reminderAt = ? WHERE id = ? AND userId = ?',
+        [title, content, color, reminderAt, req.params.id, userId]
       );
       // Delete old notifications for this note so the scheduler can fire again if time was changed
       await db.run(
