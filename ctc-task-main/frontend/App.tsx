@@ -79,9 +79,6 @@ export default function CTCTaskApp() {
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
-    const perms = currentUser.permissions || [];
-    if (perms.includes('admin_panel') || perms.includes('manage_users')) return true;
-    
     if (action === 'edit') {
       return task.createdBy === currentUser.id || task.assignees.includes(currentUser.id);
     }
