@@ -79,14 +79,22 @@ export default function CTCTaskApp() {
   const aiAssistantRef = useRef<AIAssistantHandle>(null);
 
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
+    const perms = currentUser.permissions || [];
+    const isAdmin = perms.includes('admin_panel') || perms.includes('manage_users');
+    const isCreator = task.createdBy === currentUser.id;
+    const isAssignee = task.assignees.includes(currentUser.id);
+
     if (action === 'edit') {
-      return task.createdBy === currentUser.id || task.assignees.includes(currentUser.id);
+      // Chỉ người tạo hoặc người được phân công mới được chỉnh sửa
+      // Trưởng phòng, Giám đốc, Admin KHÔNG được edit task của người khác
+      return isCreator || isAssignee;
     }
-    
+
     if (action === 'delete') {
-      return task.createdBy === currentUser.id;
+      // Chỉ người tạo hoặc Admin mới được xóa
+      return isCreator || isAdmin;
     }
-    
+
     return false;
   };
 
