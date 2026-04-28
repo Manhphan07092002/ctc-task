@@ -4,13 +4,14 @@ import {
   XCircle, FileEdit, Trash2, ChevronDown, Filter, Eye,
   ThumbsUp, ThumbsDown, MessageSquare, Building2, X, Save
 } from 'lucide-react';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report, User } from '../../types';
 
 const STATUS_META: Record<string, { cls: string; label: string; icon: React.ReactNode }> = {
-  Draft:    { cls: 'bg-gray-100 text-gray-600 border-gray-200',     label: 'Nháp',       icon: <FileEdit size={11} /> },
-  Pending:  { cls: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Chờ duyệt', icon: <Clock size={11} /> },
+  Draft: { cls: 'bg-gray-100 text-gray-600 border-gray-200', label: 'Nháp', icon: <FileEdit size={11} /> },
+  Pending: { cls: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Chờ duyệt', icon: <Clock size={11} /> },
   Approved: { cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Đã duyệt', icon: <CheckCircle size={11} /> },
-  Rejected: { cls: 'bg-red-100 text-red-600 border-red-200',        label: 'Từ chối',    icon: <XCircle size={11} /> },
+  Rejected: { cls: 'bg-red-100 text-red-600 border-red-200', label: 'Từ chối', icon: <XCircle size={11} /> },
 };
 
 const RejectModal: React.FC<{

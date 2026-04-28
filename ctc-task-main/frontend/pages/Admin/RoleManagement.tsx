@@ -38,6 +38,44 @@ const PRESET_COLORS = [
   '#84cc16', '#f59e0b', '#6366f1', '#14b8a6',
 ];
 
+const ROLE_PRESETS = [
+  {
+    label: 'Admin',
+    name: 'Admin',
+    color: '#ef4444',
+    desc: 'Toàn quyền hệ thống: quản trị, cấu hình, và xem mọi dữ liệu.',
+    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings']
+  },
+  {
+    label: 'Giám đốc',
+    name: 'Giám đốc',
+    color: '#8b5cf6',
+    desc: 'Xem toàn bộ báo cáo, cung cấp phản hồi Giám đốc. Xem tiến độ công việc.',
+    perms: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings']
+  },
+  {
+    label: 'Phó giám đốc',
+    name: 'Phó giám đốc',
+    color: '#3b82f6',
+    desc: 'Hỗ trợ giám đốc điều phối các dự án và phòng ban.',
+    perms: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'join_meetings']
+  },
+  {
+    label: 'Trưởng phòng',
+    name: 'Trưởng phòng',
+    color: '#f59e0b',
+    desc: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.',
+    perms: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'create_report', 'view_own_tasks', 'join_meetings']
+  },
+  {
+    label: 'Nhân viên',
+    name: 'Nhân viên',
+    color: '#10b981',
+    desc: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần của bản thân.',
+    perms: ['view_own_tasks', 'create_report', 'join_meetings']
+  }
+];
+
 const RoleFormModal: React.FC<{
   role: Role | null;
   onClose: () => void;
@@ -90,6 +128,31 @@ const RoleFormModal: React.FC<{
             {isSystem && (
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
                 <Lock size={14} />Vai trò hệ thống: chỉ có thể chỉnh sửa màu sắc và mô tả.
+              </div>
+            )}
+
+            {/* Presets */}
+            {!isSystem && (
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Gợi ý phân quyền nhanh</label>
+                <div className="flex flex-wrap gap-2">
+                  {ROLE_PRESETS.map(preset => (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => {
+                        if (!name) setName(preset.name);
+                        setColor(preset.color);
+                        setDesc(preset.desc);
+                        setPerms(preset.perms);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all hover:bg-gray-50 flex items-center gap-1.5"
+                      style={{ borderColor: preset.color + '40', color: preset.color, backgroundColor: preset.color + '10' }}
+                    >
+                      <Shield size={12} /> {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
