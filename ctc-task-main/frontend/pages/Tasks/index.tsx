@@ -33,7 +33,7 @@ export default function TasksPage({
   checkPermission, user, users, aiAssistantRef, setIsSuggestionModalOpen, handleSaveTask
 }: TasksPageProps) {
   
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('board');
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -114,10 +114,10 @@ export default function TasksPage({
       </div>
 
       {/* Filter Tags */}
-      {allTags.length > 0 && (
+      {((allTags && allTags.some(t => t.trim())) || selectedTags.length > 0) && (
         <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
           <span className="text-sm text-gray-500 font-medium px-2">Lọc theo Tags:</span>
-          {allTags.map(tag => (
+          {allTags.filter(tag => tag && tag.trim()).map(tag => (
             <button
               key={tag}
               onClick={() => toggleTagFilter(tag)}
@@ -127,7 +127,7 @@ export default function TasksPage({
             </button>
           ))}
           {selectedTags.length > 0 && (
-            <button onClick={() => setSelectedTags([])} className="text-xs text-red-500 hover:text-red-700 px-2 underline">
+            <button onClick={() => setSelectedTags([])} className="text-xs text-red-500 hover:text-red-700 px-2 underline whitespace-nowrap">
               Xóa lọc
             </button>
           )}

@@ -81,8 +81,16 @@ export default function CTCTaskApp() {
   const checkPermission = (action: 'edit' | 'delete', task: Task, currentUser: User) => {
     const perms = currentUser.permissions || [];
     if (perms.includes('admin_panel') || perms.includes('manage_users')) return true;
-    if (perms.includes('manage_dept_tasks')) return task.department === currentUser.department;
-    return task.createdBy === currentUser.id;
+    
+    if (action === 'edit') {
+      return task.createdBy === currentUser.id || task.assignees.includes(currentUser.id);
+    }
+    
+    if (action === 'delete') {
+      return task.createdBy === currentUser.id;
+    }
+    
+    return false;
   };
 
   const roleBasedTasks = useMemo(() => {
@@ -141,7 +149,9 @@ export default function CTCTaskApp() {
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    roleBasedTasks.forEach(task => task.tags?.forEach(tag => tags.add(tag)));
+    roleBasedTasks.forEach(task => task.tags?.forEach(tag => {
+      if (tag && tag.trim()) tags.add(tag.trim());
+    }));
     return Array.from(tags).sort();
   }, [roleBasedTasks]);
 
