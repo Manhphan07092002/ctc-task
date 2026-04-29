@@ -115,10 +115,10 @@ export async function initDb() {
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
     const INITIAL_USERS = [
-      { id: 'u1', name: 'Alice Wilson', email: 'alice@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
-      { id: 'u2', name: 'Bob Smith', email: 'bob@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
-      { id: 'u3', name: 'Charlie Davis', email: 'charlie@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
-      { id: 'u4', name: 'Thái Hưng (Giám đốc)', email: 'director@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=director' },
+      { id: 'u1', name: 'Admin', email: 'admin@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
+      { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u2' },
+      { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
+      { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u4' },
     ];
     for (const u of INITIAL_USERS) {
       await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar]);
