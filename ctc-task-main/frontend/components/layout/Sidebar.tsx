@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
               
               if (item.id === 'tasks' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
               if (item.id === 'calendar' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
-              if (item.id === 'meetings' && !hasPerm('join_meetings') && !hasPerm('manage_meetings')) return null;
+              // meetings: tất cả mọi người đều có thể xem cuộc họp → không filter, tiếp tục render NavLink
               if (item.id === 'reports' && !hasPerm('view_all_reports') && !hasPerm('approve_dept_reports') && !hasPerm('create_report') && !hasPerm('director_feedback')) return null;
               if (item.id === 'team' && !hasPerm('view_dept_users') && !hasPerm('manage_users')) return null;
               if (item.id === 'admin' && !hasPerm('admin_panel')) return null;

@@ -80,30 +80,35 @@ export async function initDb() {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }
   }
 
-  // Ensure Director and Manager never have meeting access
-  // (strip join_meetings / manage_meetings from their permissions on every startup)
-  const meetingRoleFixes = ['Director', 'Manager'];
-  for (const roleName of meetingRoleFixes) {
-    try {
-      const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [roleName]);
-      if (role && role.permissions) {
-        const perms: string[] = JSON.parse(role.permissions);
-        const cleaned = perms.filter(p => p !== 'join_meetings' && p !== 'manage_meetings');
-        if (cleaned.length !== perms.length) {
-          await db.run('UPDATE roles SET permissions = ? WHERE name = ?', [JSON.stringify(cleaned), roleName]);
-          console.log(`[DB] Removed meeting permissions from role: ${roleName}`);
-        }
+  // Patch existing system roles to ensure meetings permissions are included
+  const rolePatches: { name: string; permissions: string[] }[] = [
+    { name: 'Admin',    permissions: ['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'join_meetings', 'admin_panel'] },
+    { name: 'Director', permissions: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings'] },
+    { name: 'Manager',  permissions: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'manage_meetings', 'join_meetings', 'create_report'] },
+    { name: 'Employee', permissions: ['view_own_tasks', 'create_report', 'join_meetings'] },
+  ];
+  for (const patch of rolePatches) {
+    const existing = await db.get('SELECT permissions FROM roles WHERE name = ? AND isSystem = 1', [patch.name]);
+    if (existing) {
+      let perms: string[] = [];
+      try { perms = JSON.parse(existing.permissions); } catch { perms = []; }
+      let changed = false;
+      for (const p of patch.permissions) {
+        if (!perms.includes(p)) { perms.push(p); changed = true; }
       }
-    } catch (_) { /* role may not exist yet */ }
+      if (changed) {
+        await db.run('UPDATE roles SET permissions = ? WHERE name = ? AND isSystem = 1', [JSON.stringify(perms), patch.name]);
+      }
+    }
   }
 
   // Seed Roles
   const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
   if (roleCount.count === 0) {
     const INITIAL_ROLES = [
-      { id: 'role-admin', name: 'Admin', description: 'Toàn quyền hệ thống.', color: '#ef4444', permissions: JSON.stringify(['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'admin_panel']), isSystem: 1 },
-      { id: 'role-director', name: 'Director', description: 'Xem toàn bộ báo cáo, cung cấp phản hồi Giám đốc.', color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports', 'director_feedback', 'view_all_tasks']), isSystem: 1 },
-      { id: 'role-manager', name: 'Manager', description: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.', color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users']), isSystem: 1 },
+      { id: 'role-admin', name: 'Admin', description: 'Toàn quyền hệ thống.', color: '#ef4444', permissions: JSON.stringify(['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'join_meetings', 'admin_panel']), isSystem: 1 },
+      { id: 'role-director', name: 'Director', description: 'Xem toàn bộ báo cáo, cung cấp phản hồi Giám đốc.', color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings']), isSystem: 1 },
+      { id: 'role-manager', name: 'Manager', description: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.', color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'manage_meetings', 'join_meetings', 'create_report']), isSystem: 1 },
       { id: 'role-employee', name: 'Employee', description: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần.', color: '#10b981', permissions: JSON.stringify(['view_own_tasks', 'create_report', 'join_meetings']), isSystem: 1 },
     ];
     for (const r of INITIAL_ROLES) {
