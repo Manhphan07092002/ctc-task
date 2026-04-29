@@ -85,6 +85,14 @@ export async function initDb() {
       metadata TEXT,
       createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS db_history (
+      id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      filename TEXT,
+      performedBy TEXT,
+      note TEXT,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   // Migrations (safe to run multiple times)

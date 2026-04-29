@@ -63,24 +63,82 @@ export function adminRoutes(db: any, mailer: any) {
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
-  router.get('/database/export', async (_req, res) => {
+  // Helper: read/write db_history JSON file
+  const HISTORY_FILE = path.join(__dirname, '../db_history.json');
+  const readHistory = (): any[] => {
+    try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch { return []; }
+  };
+  const appendHistory = (entry: object) => {
+    const list = readHistory();
+    list.unshift(entry);
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(list.slice(0, 200), null, 2));
+  };
+
+  router.get('/database/export', async (req: any, res) => {
     try {
       const file = process.env.DB_PATH || path.join(__dirname, '../database.sqlite');
       if (!fs.existsSync(file)) return res.status(404).json({ error: 'Database file not found' });
+
+      // Log export to JSON file (safe across DB replacements)
+      appendHistory({
+        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+        action: 'export',
+        filename: 'database.sqlite',
+        performedBy: req.user?.id || 'admin',
+        note: 'Xuất toàn bộ database',
+        createdAt: new Date().toISOString(),
+      });
+
       res.setHeader('Content-Type', 'application/x-sqlite3');
       res.setHeader('Content-Disposition', 'attachment; filename="database.sqlite"');
       fs.createReadStream(file).pipe(res);
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
-  router.post('/database/import', upload.single('file'), async (req, res) => {
+  router.post('/database/import', upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Thiếu file import' });
       const targetPath = process.env.DB_PATH || path.join(__dirname, '../database.sqlite');
+      const originalName = (req.file as any).originalname || 'unknown.sqlite';
+
+      // Log to JSON file BEFORE replacing the database (survives DB replacement)
+      appendHistory({
+        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+        action: 'import',
+        filename: originalName,
+        performedBy: req.user?.id || 'admin',
+        note: 'Nhập database từ file ' + originalName,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Close database connection to release file lock on Windows
+      if (db && typeof db.close === 'function') {
+        await db.close();
+      }
+
       await fs.promises.copyFile(req.file.path, targetPath);
       await fs.promises.unlink(req.file.path).catch(() => { });
-      res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: 'Import thất bại' }); }
+
+      res.json({ success: true, message: 'Import thành công. Hệ thống đang khởi động lại, trang sẽ tự làm mới sau 10 giây...' });
+
+      // Force restart: touch server.ts for tsx/nodemon, and exit process for PM2
+      setTimeout(() => {
+        try {
+          const now = new Date();
+          fs.utimesSync(path.join(__dirname, '../server.ts'), now, now);
+        } catch(e) {}
+        setTimeout(() => { process.exit(0); }, 500);
+      }, 1000);
+    } catch (e: any) {
+      res.status(500).json({ error: 'Import thất bại: ' + e.message });
+    }
+  });
+
+  // --- DB History (stored in JSON file, survives database replacement) ---
+  router.get('/database/history', async (_req, res) => {
+    try {
+      res.json(readHistory());
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   // --- SMTP Config ---

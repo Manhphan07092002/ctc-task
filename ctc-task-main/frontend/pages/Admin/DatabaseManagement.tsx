@@ -1,6 +1,6 @@
 import { apiFetch } from '../../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Database, Download, FileUp, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, Database, Download, FileUp, RefreshCw, Search, Trash2, CheckCircle2, History, Upload, ArrowDownToLine } from 'lucide-react';
 
 type DbTable = { name: string; count?: number | null };
 
@@ -18,6 +18,9 @@ export default function AdminDatabaseManagement() {
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
   const [importConfirmText, setImportConfirmText] = useState('');
+  const [importSuccessMsg, setImportSuccessMsg] = useState('');
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchTables = async () => {
     setLoading(true);
@@ -51,7 +54,17 @@ export default function AdminDatabaseManagement() {
     }
   };
 
-  useEffect(() => { fetchTables(); }, []);
+  useEffect(() => { fetchTables(); fetchHistory(); }, []);
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await apiFetch('/api/admin/database/history');
+      if (res.ok) setHistory(await res.json());
+    } catch {}
+    setHistoryLoading(false);
+  };
+
   useEffect(() => { if (selectedTable) fetchRows(selectedTable); }, [selectedTable]);
 
   const filtered = useMemo(() => {
@@ -122,17 +135,51 @@ export default function AdminDatabaseManagement() {
       if (!res.ok) throw new Error(data.error || 'Import thất bại');
       setImportFile(null);
       setImportStep(1);
-      await fetchTables();
-      if (selectedTable) await fetchRows(selectedTable);
+      setImportConfirmText('');
+      setImportSuccessMsg('✅ Import thành công! Đang chờ server khởi động lại...');
+
+      // Poll until backend is back up, then reload
+      const waitForBackend = async () => {
+        await new Promise(r => setTimeout(r, 3000)); // give backend time to exit
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          try {
+            const ping = await fetch('/api/admin/database/tables');
+            if (ping.ok) {
+              setImportSuccessMsg('✅ Server đã sẵn sàng! Đang tải lại trang...');
+              await new Promise(r => setTimeout(r, 1500));
+              window.location.reload();
+              return;
+            }
+          } catch {}
+        }
+        window.location.reload(); // fallback
+      };
+      waitForBackend();
     } catch (e: any) {
       setImportError(e.message || 'Import thất bại');
-    } finally {
       setImportBusy(false);
     }
   };
 
   return (
     <div className="space-y-6 pb-8">
+      {importSuccessMsg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm mx-4 text-center border border-green-100 transform transition-all animate-in fade-in zoom-in duration-300">
+            <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-5 shadow-inner">
+              <CheckCircle2 size={32} strokeWidth={2.5} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Thành công!</h3>
+            <p className="text-gray-500 text-sm leading-relaxed mb-6">{importSuccessMsg}</p>
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full animate-[progress_10s_ease-in-out_forwards]" />
+            </div>
+            <style>{'\n@keyframes progress { from { width: 0%; } to { width: 100%; } }\n'}</style>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-gradient-to-br from-slate-800 to-slate-600 rounded-2xl shadow-lg shadow-slate-200">
@@ -194,7 +241,13 @@ export default function AdminDatabaseManagement() {
 
           <div className="flex items-center gap-2">
             {importStep === 1 ? (
-              <button onClick={() => setImportStep(2)} className="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700">Tiếp tục</button>
+              <button 
+                onClick={() => setImportStep(2)} 
+                disabled={importConfirmText !== 'IMPORT'}
+                className="px-4 py-2 rounded-xl bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Tiếp tục
+              </button>
             ) : (
               <button
                 onClick={confirmImport}
@@ -288,6 +341,59 @@ export default function AdminDatabaseManagement() {
           </div>
         </div>
       )}
+
+      {/* DB History */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <History size={18} className="text-indigo-500" />
+            <h2 className="font-bold text-gray-800">Lịch sử cập nhật Database</h2>
+          </div>
+          <button onClick={fetchHistory} className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all" title="Làm mới">
+            <RefreshCw size={14} className={historyLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+        {historyLoading ? (
+          <div className="p-6 text-center text-gray-400 text-sm">Đang tải lịch sử...</div>
+        ) : history.length === 0 ? (
+          <div className="p-8 text-center text-gray-400 text-sm">
+            <History size={32} className="mx-auto mb-2 opacity-30" />
+            <p>Chưa có lịch sử cập nhật.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {history.map((item, idx) => (
+              <div key={item.id || idx} className="flex items-start gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
+                <div className={`mt-1 w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  item.action === 'import'
+                    ? 'bg-blue-50 text-blue-500'
+                    : 'bg-emerald-50 text-emerald-500'
+                }`}>
+                  {item.action === 'import'
+                    ? <Upload size={16} />
+                    : <ArrowDownToLine size={16} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      item.action === 'import'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {item.action === 'import' ? '⬆ IMPORT' : '⬇ EXPORT'}
+                    </span>
+                    <span className="text-sm font-medium text-gray-700 truncate">{item.filename}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{item.note}</p>
+                </div>
+                <div className="text-xs text-gray-400 flex-shrink-0 text-right">
+                  {new Date(item.createdAt).toLocaleString('vi-VN')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

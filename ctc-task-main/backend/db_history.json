@@ -1,0 +1,10 @@
+[
+  {
+    "id": "ysqjta5rifgmok1wiwz",
+    "action": "import",
+    "filename": "ctc-database-2026-04-29.sqlite",
+    "performedBy": "admin",
+    "note": "Nhập database từ file ctc-database-2026-04-29.sqlite",
+    "createdAt": "2026-04-29T12:48:26.819Z"
+  }
+]
