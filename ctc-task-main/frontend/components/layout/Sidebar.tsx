@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote, Users, Settings, Video, FileText, Bell, Shield } from 'lucide-react';
+import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote, Users, Settings, Video, FileText, Bell, Shield, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button, Avatar } from '../UI';
@@ -30,6 +30,7 @@ const NAV_GROUPS = [
   {
     label: 'Giao tiếp',
     items: [
+      { id: 'mail',          icon: Mail,   path: '/mail',          permission: null },
       { id: 'meetings',      icon: Video,  path: '/meetings',      permission: null },
       { id: 'notes',         icon: StickyNote, path: '/notes',     permission: null },
       { id: 'notifications', icon: Bell,   path: '/notifications', permission: null },
@@ -49,6 +50,7 @@ const NAV_LABELS: Record<string, string> = {
   tasks:         'Công việc',
   calendar:      'Lịch',
   reports:       'Báo cáo',
+  mail:          'Hộp thư',
   meetings:      'Cuộc họp',
   notes:         'Ghi chú',
   notifications: 'Thông báo',

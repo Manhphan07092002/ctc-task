@@ -22,6 +22,7 @@ import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { eventRoutes } from './routes/events.js';
 import { activityRoutes } from './routes/activity.js';
+import { mailRoutes } from './routes/mail.js';
 
 import { initSocket } from './socket.js';
 
@@ -87,6 +88,7 @@ async function startServer() {
   app.use('/api/admin', adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
   app.use('/api/activity', activityRoutes(prisma));
+  app.use('/api/mail', mailRoutes(db));
 
   // ===== SCHEDULERS =====
   scheduleFridayReminder(db);

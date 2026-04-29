@@ -22,7 +22,8 @@ export async function initDb() {
     );
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL,
-      password TEXT, role TEXT NOT NULL, department TEXT NOT NULL, avatar TEXT NOT NULL
+      password TEXT, role TEXT NOT NULL, department TEXT NOT NULL, avatar TEXT NOT NULL,
+      mailPassword TEXT
     );
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
@@ -89,6 +90,7 @@ export async function initDb() {
   // Migrations (safe to run multiple times)
   const migrations = [
     'ALTER TABLE users ADD COLUMN password TEXT;',
+    'ALTER TABLE users ADD COLUMN mailPassword TEXT;',
     "ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';",
     'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;',
     'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',

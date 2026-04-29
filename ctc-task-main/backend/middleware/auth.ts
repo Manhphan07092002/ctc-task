@@ -22,6 +22,7 @@ declare global {
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error(`[Auth] Missing token for ${req.method} ${req.url}`);
     return res.status(401).json({ error: 'Unauthorized: missing token' });
   }
 
@@ -32,7 +33,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     const payload = jwt.verify(token, secret) as JwtPayload;
     req.user = payload;
     next();
-  } catch (e) {
+  } catch (e: any) {
+    console.error(`[Auth] Invalid token for ${req.method} ${req.url}:`, e.message);
     return res.status(401).json({ error: 'Unauthorized: invalid or expired token' });
   }
 }

@@ -9,11 +9,14 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
   const response = await fetch(url, { ...options, headers });
   
   if (response.status === 401) {
-    // Nếu token hết hạn hoặc không hợp lệ, xóa token và có thể reload để đẩy về trang login
-    localStorage.removeItem('ctc_token');
-    localStorage.removeItem('ctc_user');
-    localStorage.removeItem('orange_task_user_id');
-    // window.location.href = '/'; 
+    // Only clear token for actual auth failures (not mail IMAP auth failures)
+    // Mail endpoints return 401 when IMAP credentials are wrong - that's different from JWT expiry
+    const isMailEndpoint = url.includes('/api/mail/');
+    if (!isMailEndpoint) {
+      localStorage.removeItem('ctc_token');
+      localStorage.removeItem('ctc_user');
+      localStorage.removeItem('orange_task_user_id');
+    }
   }
   
   return response;

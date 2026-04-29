@@ -176,7 +176,7 @@ export const LoginView: React.FC = () => {
                     {quickLoading === u.id ? (
                       <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
                     ) : (
-                      <img src={u.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0" />
+                      <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} alt="" className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-gray-800 truncate">{u.name}</p>

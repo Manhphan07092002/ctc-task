@@ -24,6 +24,7 @@ import { NoteModal } from './components/NoteModal';
 import { UserModal } from './components/UserModal';
 import { InviteModal } from './components/InviteModal';
 import { TaskSuggestionModal } from './components/TaskSuggestionModal';
+import MailPage from './pages/Mail';
 const MeetingModal = React.lazy(() => import('./components/MeetingModal').then(module => ({ default: module.MeetingModal })));
 const MeetingRoom = React.lazy(() => import('./components/MeetingRoom').then(module => ({ default: module.MeetingRoom })));
 import { AIAssistant, AIAssistantHandle } from './components/AIAssistant';
@@ -339,6 +340,12 @@ export default function CTCTaskApp() {
               <Route path="/calendar" element={
                 <div className="h-[calc(100vh-8rem)]">
                   <CalendarPage tasks={roleBasedTasks} onDateClick={(date) => openCreateModal(date)} onTaskClick={(task) => openEditModal(task)} />
+                </div>
+              } />
+
+              <Route path="/mail" element={
+                <div className="h-[calc(100vh-8rem)]">
+                  <MailPage />
                 </div>
               } />
 
