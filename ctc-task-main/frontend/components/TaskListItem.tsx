@@ -66,7 +66,7 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
                 return (
                   <img
                     key={id}
-                    src={assignee.avatar}
+                    src={assignee.avatar && assignee.avatar.trim() ? assignee.avatar : `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(assignee.name)}&backgroundColor=6366f1&textColor=ffffff`}
                     alt={assignee.name}
                     className="w-5 h-5 rounded-full border border-white"
                     title={assignee.name}

@@ -46,9 +46,10 @@ export const Card: React.FC<{ children: React.ReactNode; className?: string }> =
 
 export const Avatar: React.FC<{ src?: string; alt?: string; size?: number | string; className?: string }> = ({ src, alt = '', size = 8, className = '' }) => {
   const numericSize = typeof size === 'string' ? (size === 'xl' ? 24 : size === 'lg' ? 16 : size === 'sm' ? 6 : 8) : size;
+  const safeSrc = src && src.trim() ? src : `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(alt || 'U')}&backgroundColor=6366f1&textColor=ffffff`;
   return (
     <img 
-      src={src || 'https://api.dicebear.com/8.x/avataaars/svg?seed=fallback'} 
+      src={safeSrc}
       alt={alt} 
       className={`rounded-full object-cover ring-4 ring-white/80 shadow-md shadow-gray-200 bg-gray-100 transition-transform hover:scale-105 ${className}`}
       style={{ width: `${numericSize * 4}px`, height: `${numericSize * 4}px` }}

@@ -17,20 +17,22 @@ const loadApiKeys = async () => {
       }
     }
   } catch (e) {
-    console.error("Failed to load AI keys from backend", e);
+    // silently ignore if backend not available or no keys set
   }
-  
+
   // Fallback to env key if empty
   if (API_KEYS.length === 0 && import.meta.env.VITE_GEMINI_API_KEY) {
     API_KEYS = [import.meta.env.VITE_GEMINI_API_KEY];
   }
-  
+
   keysLoaded = true;
 };
 
 const getAIInstance = async () => {
   await loadApiKeys();
-  if (API_KEYS.length === 0) throw new Error("No Gemini API keys configured");
+  if (API_KEYS.length === 0) {
+    throw new Error("No Gemini API keys configured");
+  }
   return new GoogleGenAI({ apiKey: API_KEYS[currentKeyIndex] });
 };
 
@@ -38,7 +40,7 @@ const getAIInstance = async () => {
 const withRetryAndRotation = async <T>(operation: (ai: GoogleGenAI) => Promise<T>): Promise<T> => {
   await loadApiKeys();
   if (API_KEYS.length === 0) throw new Error("No Gemini API keys configured");
-  
+
   const maxRetries = API_KEYS.length;
   let attempts = 0;
 
@@ -47,22 +49,21 @@ const withRetryAndRotation = async <T>(operation: (ai: GoogleGenAI) => Promise<T
       const ai = await getAIInstance();
       return await operation(ai);
     } catch (error: any) {
-      // Check if error is related to rate limits, invalid key, or service unavailable (503)
-      const isRateLimit = error?.status === 429 || error?.status === 503 || error?.message?.includes('429') || error?.message?.includes('503') || error?.message?.includes('quota') || error?.message?.includes('API_KEY_INVALID');
-      
+      const isRateLimit = error?.status === 429 || error?.status === 503
+        || error?.message?.includes('429') || error?.message?.includes('503')
+        || error?.message?.includes('quota') || error?.message?.includes('API_KEY_INVALID');
+
       if (isRateLimit && API_KEYS.length > 1) {
         currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
-        console.warn(`[AI Service] API Key limit reached or invalid. Rotating to key index ${currentKeyIndex}...`);
+        console.warn(`[AI Service] API Key limit reached. Rotating to key index ${currentKeyIndex}...`);
         attempts++;
       } else {
-        // Not a rate limit error, throw it
         throw error;
       }
     }
   }
   throw new Error("All AI API keys exhausted or rate limited.");
 };
-
 
 // Helper to strip markdown code blocks if present
 const parseJSON = (text: string) => {
@@ -77,11 +78,11 @@ const parseJSON = (text: string) => {
 
 export const generateSubtasksFromTitle = async (taskTitle: string): Promise<string[]> => {
   if (!taskTitle) return [];
-  
+
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: `Generate a list of 3 to 5 concise, actionable subtasks (checklist items) for a task titled: "${taskTitle}". Return ONLY the list of strings in a JSON array.`,
         config: {
           responseMimeType: "application/json",
@@ -111,7 +112,7 @@ export const generateTaskDetails = async (taskTitle: string): Promise<{ descript
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: `For a task titled "${taskTitle}", generate a concise 1-sentence description and a list of 3-5 actionable subtasks.`,
         config: {
           responseMimeType: "application/json",
@@ -131,7 +132,7 @@ export const generateTaskDetails = async (taskTitle: string): Promise<{ descript
 
       const text = response.text;
       if (text) {
-         return parseJSON(text);
+        return parseJSON(text);
       }
       return null;
     });
@@ -153,9 +154,8 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `I have a goal: "${goal}". Break this down into 3 to 6 distinct, actionable tasks. 
-        For each task, provide a title, a short description, and a priority level (High, Medium, or Low).`,
+        model: 'gemini-2.0-flash',
+        contents: `I have a goal: "${goal}". Break this down into 3 to 6 distinct, actionable tasks. For each task, provide a title, a short description, and a priority level (High, Medium, or Low).`,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -186,9 +186,9 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
 };
 
 export const createChatSession = async () => {
-  const ai = await getAIInstance(); // Note: persistent chat session instances don't auto-rotate mid-stream
+  const ai = await getAIInstance();
   return ai.chats.create({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     config: {
       systemInstruction: `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
 Nhiệm vụ chính của bạn là:

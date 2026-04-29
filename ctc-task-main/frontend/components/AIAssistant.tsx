@@ -53,7 +53,11 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   useEffect(() => {
     const initChat = async () => {
       if (isOpen && !chatSessionRef.current) {
-        chatSessionRef.current = await createChatSession();
+        try {
+          chatSessionRef.current = await createChatSession();
+        } catch (e) {
+          // AI not configured, silently skip
+        }
       }
     };
     initChat();
@@ -102,9 +106,16 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
         }
       }
 
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: "Sorry, I'm having trouble analyzing your tasks right now." }]);
+    } catch (error: any) {
+      const isNoKey = error?.message?.includes('No Gemini API keys');
+      const is429 = error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED');
+      if (!isNoKey && !is429) console.error("Chat error:", error);
+      const errText = isNoKey
+        ? '⚠️ Tính năng AI chưa được cấu hình. Vui lòng thêm Gemini API Key trong phần Cài đặt Admin.'
+        : is429
+        ? '⏳ API Key đã vượt giới hạn miễn phí. Vui lòng thử lại sau ít phút hoặc nâng cấp quota tại ai.google.dev.'
+        : 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại.';
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: errText }]);
     } finally {
       setIsLoading(false);
     }
@@ -141,9 +152,16 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
         }
       }
 
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: "Sorry, I'm having trouble connecting right now. Please try again." }]);
+    } catch (error: any) {
+      const isNoKey = error?.message?.includes('No Gemini API keys');
+      const is429 = error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED');
+      if (!isNoKey && !is429) console.error("Chat error:", error);
+      const errText = isNoKey
+        ? '⚠️ Tính năng AI chưa được cấu hình. Vui lòng thêm Gemini API Key trong phần Cài đặt Admin.'
+        : is429
+        ? '⏳ API Key đã vượt giới hạn miễn phí. Vui lòng thử lại sau ít phút hoặc nâng cấp quota tại ai.google.dev.'
+        : 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại.';
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: errText }]);
     } finally {
       setIsLoading(false);
     }
