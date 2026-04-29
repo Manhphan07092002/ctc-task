@@ -80,6 +80,23 @@ export async function initDb() {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }
   }
 
+  // Ensure Director and Manager never have meeting access
+  // (strip join_meetings / manage_meetings from their permissions on every startup)
+  const meetingRoleFixes = ['Director', 'Manager'];
+  for (const roleName of meetingRoleFixes) {
+    try {
+      const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [roleName]);
+      if (role && role.permissions) {
+        const perms: string[] = JSON.parse(role.permissions);
+        const cleaned = perms.filter(p => p !== 'join_meetings' && p !== 'manage_meetings');
+        if (cleaned.length !== perms.length) {
+          await db.run('UPDATE roles SET permissions = ? WHERE name = ?', [JSON.stringify(cleaned), roleName]);
+          console.log(`[DB] Removed meeting permissions from role: ${roleName}`);
+        }
+      }
+    } catch (_) { /* role may not exist yet */ }
+  }
+
   // Seed Roles
   const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
   if (roleCount.count === 0) {
