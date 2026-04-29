@@ -1,0 +1,145 @@
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+import bcrypt from 'bcryptjs';
+
+export async function initDb() {
+  const db = await open({
+    filename: process.env.DB_PATH || './database.sqlite',
+    driver: sqlite3.Database,
+  });
+
+  // Create tables
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS meetings (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
+      hostId TEXT NOT NULL, startTime TEXT NOT NULL, endTime TEXT NOT NULL,
+      meetingLink TEXT NOT NULL, status TEXT NOT NULL, participants TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS signals (
+      id TEXT PRIMARY KEY, meetingId TEXT NOT NULL,
+      \`from\` TEXT NOT NULL, \`to\` TEXT NOT NULL,
+      type TEXT NOT NULL, data TEXT NOT NULL, timestamp INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL,
+      password TEXT, role TEXT NOT NULL, department TEXT NOT NULL, avatar TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
+      startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
+      assignees TEXT, tags TEXT, createdBy TEXT, department TEXT,
+      recurrence TEXT, subtasks TEXT, comments TEXT
+    );
+    CREATE TABLE IF NOT EXISTS notes (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT,
+      color TEXT, createdAt TEXT, reminderAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT,
+      authorId TEXT NOT NULL, department TEXT NOT NULL, status TEXT NOT NULL,
+      createdAt TEXT NOT NULL, submittedAt TEXT, approvedAt TEXT, approvedBy TEXT
+    );
+    CREATE TABLE IF NOT EXISTS roles (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT,
+      color TEXT NOT NULL DEFAULT '#6366f1', permissions TEXT NOT NULL DEFAULT '[]',
+      isSystem INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS departments (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT,
+      color TEXT NOT NULL DEFAULT '#6366f1', managerId TEXT
+    );
+    CREATE TABLE IF NOT EXISTS password_reset_requests (
+      id TEXT PRIMARY KEY, userId TEXT NOT NULL, email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', emailStatus TEXT NOT NULL DEFAULT 'unknown',
+      emailSentAt TEXT, createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id TEXT PRIMARY KEY, userId TEXT NOT NULL, email TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE, expiresAt TEXT NOT NULL, usedAt TEXT
+    );
+    CREATE TABLE IF NOT EXISTS system_config (
+      key TEXT PRIMARY KEY, value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY, userId TEXT NOT NULL, type TEXT NOT NULL,
+      title TEXT NOT NULL, message TEXT NOT NULL, relatedId TEXT,
+      isRead INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL
+    );
+  `);
+
+  // Migrations (safe to run multiple times)
+  const migrations = [
+    'ALTER TABLE users ADD COLUMN password TEXT;',
+    "ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';",
+    'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;',
+    'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',
+    'ALTER TABLE reports ADD COLUMN managerFeedback TEXT;',
+    'ALTER TABLE notes ADD COLUMN userId TEXT;',
+  ];
+  for (const sql of migrations) {
+    try { await db.exec(sql); } catch (_) { /* column already exists */ }
+  }
+
+  // Seed Roles
+  const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
+  if (roleCount.count === 0) {
+    const INITIAL_ROLES = [
+      { id: 'role-admin', name: 'Admin', description: 'Toàn quyền hệ thống.', color: '#ef4444', permissions: JSON.stringify(['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'admin_panel']), isSystem: 1 },
+      { id: 'role-director', name: 'Director', description: 'Xem toàn bộ báo cáo, cung cấp phản hồi Giám đốc.', color: '#8b5cf6', permissions: JSON.stringify(['view_all_reports', 'director_feedback', 'view_all_tasks']), isSystem: 1 },
+      { id: 'role-manager', name: 'Manager', description: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.', color: '#3b82f6', permissions: JSON.stringify(['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users']), isSystem: 1 },
+      { id: 'role-employee', name: 'Employee', description: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần.', color: '#10b981', permissions: JSON.stringify(['view_own_tasks', 'create_report', 'join_meetings']), isSystem: 1 },
+    ];
+    for (const r of INITIAL_ROLES) {
+      await db.run('INSERT INTO roles (id, name, description, color, permissions, isSystem) VALUES (?, ?, ?, ?, ?, ?)', [r.id, r.name, r.description, r.color, r.permissions, r.isSystem]);
+    }
+  }
+
+  // Seed Departments
+  const deptCount = await db.get('SELECT COUNT(*) as count FROM departments');
+  if (deptCount.count === 0) {
+    const INITIAL_DEPTS = [
+      { id: 'dept-board', name: 'Board', description: 'Hội đồng quản trị và ban lãnh đạo công ty.', color: '#ef4444' },
+      { id: 'dept-product', name: 'Product', description: 'Phát triển và quản lý sản phẩm.', color: '#3b82f6' },
+      { id: 'dept-marketing', name: 'Marketing', description: 'Tiếp thị và truyền thông thương hiệu.', color: '#f59e0b' },
+      { id: 'dept-sales', name: 'Sales', description: 'Kiến tạo doanh thu và phát triển thị trường.', color: '#10b981' },
+      { id: 'dept-it', name: 'IT', description: 'Hạ tầng công nghệ và hệ thống nội bộ.', color: '#8b5cf6' },
+      { id: 'dept-hr', name: 'HR', description: 'Nhân sự, tuyển dụng và phát triển văn hoá doanh nghiệp.', color: '#ec4899' },
+      { id: 'dept-finance', name: 'Finance', description: 'Kế toán, tài chính và kiểm soát ngân sách.', color: '#14b8a6' },
+    ];
+    for (const d of INITIAL_DEPTS) {
+      await db.run('INSERT INTO departments (id, name, description, color) VALUES (?, ?, ?, ?)', [d.id, d.name, d.description, d.color]);
+    }
+  }
+
+  // Seed Users
+  const userCount = await db.get('SELECT COUNT(*) as count FROM users');
+  if (userCount.count === 0) {
+    const INITIAL_USERS = [
+      { id: 'u1', name: 'Alice Wilson', email: 'alice@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
+      { id: 'u2', name: 'Bob Smith', email: 'bob@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
+      { id: 'u3', name: 'Charlie Davis', email: 'charlie@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
+      { id: 'u4', name: 'Thái Hưng (Giám đốc)', email: 'director@ctc.com', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=director' },
+    ];
+    for (const u of INITIAL_USERS) {
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar]);
+    }
+  }
+
+  // Seed Tasks
+  const taskCount = await db.get('SELECT COUNT(*) as count FROM tasks');
+  if (taskCount.count === 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    await db.run(
+      'INSERT INTO tasks (id, title, description, startDate, estimatedEndAt, priority, status, assignees, tags, createdBy, department, recurrence, subtasks, comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['t1', 'Design System Review', 'Review the new color palette and component library compatibility.', todayStr, null, 'High', 'In Progress', '["u1","u2"]', '["Design","UI/UX"]', 'u1', 'Board', 'None', '[{"id":"st1","title":"Check color contrast ratios","isCompleted":true}]', '[]']
+    );
+  }
+
+  // Seed Notes
+  const noteCount = await db.get('SELECT COUNT(*) as count FROM notes');
+  if (noteCount.count === 0) {
+    await db.run('INSERT INTO notes (id, title, content, color, createdAt) VALUES (?, ?, ?, ?, ?)', ['n1', 'Brainstorming Ideas', '- New UI looks great\n- Need to check contrast ratio', 'bg-yellow-100', new Date().toISOString()]);
+  }
+
+  return db;
+}
