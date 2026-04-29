@@ -65,6 +65,16 @@ export async function initDb() {
       title TEXT NOT NULL, message TEXT NOT NULL, relatedId TEXT,
       isRead INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      date TEXT NOT NULL,
+      endDate TEXT,
+      type TEXT NOT NULL DEFAULT 'holiday',
+      color TEXT NOT NULL DEFAULT '#ef4444',
+      description TEXT,
+      isRecurringYearly INTEGER NOT NULL DEFAULT 1
+    );
   `);
 
   // Migrations (safe to run multiple times)
@@ -161,6 +171,26 @@ export async function initDb() {
   const noteCount = await db.get('SELECT COUNT(*) as count FROM notes');
   if (noteCount.count === 0) {
     await db.run('INSERT INTO notes (id, title, content, color, createdAt) VALUES (?, ?, ?, ?, ?)', ['n1', 'Brainstorming Ideas', '- New UI looks great\n- Need to check contrast ratio', 'bg-yellow-100', new Date().toISOString()]);
+  }
+
+  // Seed Events (Vietnamese National Holidays)
+  const eventCount = await db.get('SELECT COUNT(*) as count FROM events');
+  if (eventCount.count === 0) {
+    const year = new Date().getFullYear();
+    const holidays = [
+      { id: 'evt-01', title: 'Tết Dương Lịch', date: `${year}-01-01`, type: 'holiday', color: '#ef4444', description: 'Ngày đầu năm mới dương lịch', isRecurringYearly: 1 },
+      { id: 'evt-02', title: 'Tết Nguyên Đán', date: `${year}-01-28`, endDate: `${year}-02-02`, type: 'holiday', color: '#f97316', description: 'Tết Nguyên Đán – nghỉ 7 ngày', isRecurringYearly: 0 },
+      { id: 'evt-03', title: 'Giỗ Tổ Hùng Vương', date: `${year}-04-07`, type: 'holiday', color: '#8b5cf6', description: 'Ngày Giỗ Tổ Hùng Vương (10/3 âm lịch)', isRecurringYearly: 0 },
+      { id: 'evt-04', title: 'Ngày Giải phóng Miền Nam', date: `${year}-04-30`, type: 'holiday', color: '#ef4444', description: 'Ngày Giải phóng Miền Nam – thống nhất đất nước', isRecurringYearly: 1 },
+      { id: 'evt-05', title: 'Ngày Quốc tế Lao động', date: `${year}-05-01`, type: 'holiday', color: '#ef4444', description: 'Ngày Quốc tế Lao động 1/5', isRecurringYearly: 1 },
+      { id: 'evt-06', title: 'Ngày Quốc khánh', date: `${year}-09-02`, endDate: `${year}-09-03`, type: 'holiday', color: '#ef4444', description: 'Quốc khánh nước CHXHCN Việt Nam', isRecurringYearly: 1 },
+    ];
+    for (const h of holidays) {
+      await db.run(
+        'INSERT INTO events (id, title, date, endDate, type, color, description, isRecurringYearly) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [h.id, h.title, h.date, h.endDate || null, h.type, h.color, h.description, h.isRecurringYearly]
+      );
+    }
   }
 
   return db;

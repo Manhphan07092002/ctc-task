@@ -11,10 +11,11 @@ import AdminMeetingManagement from './MeetingManagement';
 import AdminRoleManagement from './RoleManagement';
 import AdminDepartmentManagement from './DepartmentManagement';
 import AdminDatabaseManagement from './DatabaseManagement';
+import AdminEventManagement from './EventManagement';
 import {
   Shield, LayoutDashboard, Users, Settings, LogOut,
   Bell, ChevronRight, Activity, Menu, X,
-  CheckSquare, FileText, Video, ShieldCheck, Building2, Database
+  CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays
 } from 'lucide-react';
 
 const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -27,8 +28,9 @@ const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
     { id: 'departments', label: 'Quản lý Phòng ban',  icon: Building2,    path: '/admin/departments' },
     { id: 'tasks',       label: 'Quản lý Công việc',  icon: CheckSquare,  path: '/admin/tasks' },
     { id: 'reports',     label: 'Quản lý Báo cáo',   icon: FileText,     path: '/admin/reports' },
-    { id: 'meetings',    label: 'Quản lý Cuộc họp',  icon: Video,        path: '/admin/meetings' },
-    { id: 'database',    label: 'Quản lý Database',  icon: Database,     path: '/admin/database' },
+    { id: 'meetings',    label: 'Quản lý Cuộc họp',   icon: Video,        path: '/admin/meetings' },
+    { id: 'events',      label: 'Sự kiện & Ngày lễ',   icon: CalendarDays, path: '/admin/events' },
+    { id: 'database',    label: 'Quản lý Database',    icon: Database,     path: '/admin/database' },
     { id: 'settings',    label: 'Cấu hình Hệ thống', icon: Settings,     path: '/admin/settings' },
   ];
 
@@ -230,6 +232,7 @@ export default function AdminApp() {
             <Route path="/tasks" element={<AdminTaskManagement />} />
             <Route path="/reports" element={<AdminReportManagement />} />
             <Route path="/meetings" element={<AdminMeetingManagement />} />
+            <Route path="/events" element={<AdminEventManagement />} />
             <Route path="/settings" element={<AdminSystemConfig />} />
             <Route path="/database" element={<AdminDatabaseManagement />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />

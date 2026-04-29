@@ -106,9 +106,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [calEvents, setCalEvents] = useState<any[]>([]);
   const popupRef = useRef<HTMLDivElement>(null);
   const { language } = useLanguage();
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
+
+  useEffect(() => {
+    fetch('/api/events').then(r => r.json()).then(setCalEvents).catch(() => {});
+  }, []);
 
   const getLocalDateString = (date: Date): string => {
     const y = date.getFullYear();
@@ -163,6 +168,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
   [tasks, filterPriority]);
 
   const getTasksForDate = (dateStr: string) => filteredTasks.filter(t => t.startDate === dateStr);
+
+  // Check if a date falls within an event range (including multi-day events and yearly recurring)
+  const getEventsForDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return calEvents.filter(evt => {
+      let startDate = evt.date;
+      let endDate = evt.endDate || evt.date;
+      // Handle yearly recurring: replace year
+      if (evt.isRecurringYearly) {
+        startDate = `${y}-${startDate.slice(5)}`;
+        endDate = `${y}-${endDate.slice(5)}`;
+      }
+      return dateStr >= startDate && dateStr <= endDate;
+    });
+  };
 
   // Monthly stats
   const monthStats = useMemo(() => {
@@ -297,17 +317,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
             );
 
             const dayTasks = getTasksForDate(day.dateStr);
+            const dayEvents = getEventsForDate(day.dateStr);
             const isToday = day.dateStr === today;
             const isSelected = day.dateStr === selectedDate;
             const hasHighPriority = dayTasks.some(t => t.priority === 'High');
-            const isFriday = day.date.getDay() === 5; // 5 = Friday
+            const isFriday = day.date.getDay() === 5;
+            const isHoliday = dayEvents.some(e => e.type === 'holiday');
 
             return (
               <div
                 key={day.dateStr}
                 onClick={(e) => handleDayClick(day.dateStr, e)}
                 className={`min-h-[90px] p-1.5 transition-all cursor-pointer flex flex-col gap-0.5 relative group
-                  ${isToday ? 'bg-brand-50 border-t-[3px] border-t-brand-500' : 'bg-white'}
+                  ${isHoliday ? 'bg-red-50/60' : isToday ? 'bg-brand-50' : 'bg-white'}
+                  ${isToday ? 'border-t-[3px] border-t-brand-500' : ''}
                   ${isSelected ? 'ring-2 ring-inset ring-brand-400' : 'hover:bg-brand-50/20'}
                 `}
               >
@@ -353,6 +376,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
 
                 {/* Task bars */}
                 <div className="flex flex-col gap-0.5 overflow-hidden flex-grow">
+                  {/* Holiday / Event banners */}
+                  {dayEvents.map(evt => (
+                    <div
+                      key={evt.id}
+                      title={evt.description || evt.title}
+                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-bold truncate"
+                      style={{ background: evt.color + '18', color: evt.color, borderLeftColor: evt.color }}
+                    >
+                      <span>{evt.type === 'holiday' ? '🎌' : evt.type === 'company' ? '🏢' : '📌'}</span>
+                      <span className="truncate">{evt.title}</span>
+                    </div>
+                  ))}
                   {/* Friday recurring reminder */}
                   {isFriday && (
                     <div className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-semibold bg-violet-50 text-violet-700 border-l-violet-500 truncate">

@@ -18,6 +18,7 @@ import { roleRoutes } from './routes/roles.js';
 import { departmentRoutes } from './routes/departments.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
+import { eventRoutes } from './routes/events.js';
 
 import { scheduleFridayReminder } from './schedulers/fridayReminder.js';
 import { scheduleNoteReminders } from './schedulers/noteReminder.js';
@@ -53,6 +54,7 @@ async function startServer() {
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
   app.use('/api/admin', adminRoutes(db, mailer));
+  app.use('/api/events', eventRoutes(db));
 
   // ===== SCHEDULERS =====
   scheduleFridayReminder(db);
