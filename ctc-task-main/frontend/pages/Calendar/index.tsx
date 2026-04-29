@@ -10,6 +10,78 @@ import { useLanguage } from '../../contexts/LanguageContext';
 // Recurring Friday reminder
 const FRIDAY_REMINDER = { title: 'Nộp báo cáo công việc', time: '16:00', icon: <FileText size={10}/> };
 
+// ===== VIETNAMESE LUNAR CALENDAR =====
+const TZ = 7; // UTC+7
+function jdFromDate(d: number, m: number, y: number): number {
+  const a = Math.floor((14 - m) / 12);
+  const yr = y + 4800 - a;
+  const mo = m + 12 * a - 3;
+  let jd = d + Math.floor((153 * mo + 2) / 5) + 365 * yr + Math.floor(yr / 4) - Math.floor(yr / 100) + Math.floor(yr / 400) - 32045;
+  if (jd < 2299161) jd = d + Math.floor((153 * mo + 2) / 5) + 365 * yr + Math.floor(yr / 4) - 32083;
+  return jd;
+}
+function getNewMoonDay(k: number, tz: number): number {
+  const dr = Math.PI / 180;
+  const T = k / 1236.85, T2 = T * T, T3 = T2 * T;
+  let Jd1 = 2415020.75933 + 29.53058868 * k + 0.0001178 * T2 - 0.000000155 * T3;
+  Jd1 += 0.00033 * Math.sin((166.56 + 132.87 * T - 0.009173 * T2) * dr);
+  const M = 359.2242 + 29.10535608 * k - 0.0000333 * T2 - 0.00000347 * T3;
+  const Mpr = 306.0253 + 385.81691806 * k + 0.0107306 * T2 + 0.00001236 * T3;
+  const F = 21.2964 + 390.67050646 * k - 0.0016528 * T2 - 0.00000239 * T3;
+  let C1 = (0.1734 - 0.000393 * T) * Math.sin(M * dr) + 0.0021 * Math.sin(2 * dr * M);
+  C1 -= 0.4068 * Math.sin(Mpr * dr) + 0.0161 * Math.sin(dr * 2 * Mpr) + 0.0004 * Math.sin(dr * 3 * Mpr);
+  C1 += 0.0104 * Math.sin(dr * 2 * F) - 0.0051 * Math.sin(dr * (M + Mpr)) - 0.0074 * Math.sin(dr * (M - Mpr));
+  C1 += 0.0004 * Math.sin(dr * (2 * F + M)) - 0.0004 * Math.sin(dr * (2 * F - M)) - 0.0006 * Math.sin(dr * (2 * F + Mpr));
+  C1 += 0.001 * Math.sin(dr * (2 * F - Mpr)) + 0.0005 * Math.sin(dr * (M + 2 * Mpr));
+  const deltat = T < -11 ? 0.001 + 0.000839 * T + 0.0002261 * T2 - 0.00000845 * T3 : -0.000278 + 0.000265 * T + 0.000262 * T2;
+  return Math.floor(Jd1 + C1 - deltat + 0.5 + tz / 24);
+}
+function getSunLong(jdn: number, tz: number): number {
+  const dr = Math.PI / 180;
+  const T = (jdn - 2451545.5 - tz / 24) / 36525, T2 = T * T;
+  const M = 357.5291 + 35999.0503 * T - 0.0001559 * T2;
+  const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T2;
+  let DL = (1.9146 - 0.004817 * T - 0.000014 * T2) * Math.sin(dr * M)
+          + (0.019993 - 0.000101 * T) * Math.sin(dr * 2 * M)
+          + 0.00029 * Math.sin(dr * 3 * M);
+  let L = (L0 + DL) * dr;
+  L -= Math.PI * 2 * Math.floor(L / (Math.PI * 2));
+  return Math.floor(L / Math.PI * 6);
+}
+function getLunarMonth11(y: number, tz: number): number {
+  const k = Math.floor((jdFromDate(31, 12, y) - 2415021) / 29.530588853);
+  let nm = getNewMoonDay(k, tz);
+  if (getSunLong(nm, tz) >= 9) nm = getNewMoonDay(k - 1, tz);
+  return nm;
+}
+function getLeapOff(a11: number, tz: number): number {
+  const k = Math.floor((a11 - 2415021.076998695) / 29.530588853 + 0.5);
+  let i = 1, last = 0, arc = getSunLong(getNewMoonDay(k + i, tz), tz);
+  do { last = arc; i++; arc = getSunLong(getNewMoonDay(k + i, tz), tz); } while (arc !== last && i < 14);
+  return i - 1;
+}
+function getLunarDate(date: Date): { day: number; month: number; year: number; isLeap: boolean } {
+  const dd = date.getDate(), mm = date.getMonth() + 1, yy = date.getFullYear();
+  const dayNumber = jdFromDate(dd, mm, yy);
+  const k = Math.floor((dayNumber - 2415021.076998695) / 29.530588853);
+  let monthStart = getNewMoonDay(k + 1, TZ);
+  if (monthStart > dayNumber) monthStart = getNewMoonDay(k, TZ);
+  let a11 = getLunarMonth11(yy, TZ), b11 = a11;
+  let lunarYear = yy;
+  if (a11 >= monthStart) { lunarYear = yy; a11 = getLunarMonth11(yy - 1, TZ); }
+  else { lunarYear = yy + 1; b11 = getLunarMonth11(yy + 1, TZ); }
+  const lunarDay = dayNumber - monthStart + 1;
+  const diff = Math.floor((monthStart - a11) / 29);
+  let lunarLeap = false, lunarMonth = diff + 11;
+  if (b11 - a11 > 365) {
+    const leapOff = getLeapOff(a11, TZ);
+    if (diff >= leapOff) { lunarMonth = diff + 10; if (diff === leapOff) lunarLeap = true; }
+  }
+  if (lunarMonth > 12) lunarMonth -= 12;
+  if (lunarMonth >= 11 && diff < 4) lunarYear -= 1;
+  return { day: lunarDay, month: lunarMonth, year: lunarYear, isLeap: lunarLeap };
+}
+
 interface CalendarViewProps {
   tasks: Task[];
   onDateClick: (date: string) => void;
@@ -240,31 +312,44 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                 `}
               >
                 {/* Date number row */}
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors flex-shrink-0 text-[13px]
-                    ${isToday ? 'bg-brand-500 text-white shadow-md shadow-brand-200'
-                      : isSelected ? 'bg-brand-100 text-brand-700'
-                      : 'text-gray-700 group-hover:bg-gray-100'}`}
-                  >
-                    {day.date.getDate()}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {/* Task count badge */}
-                    {dayTasks.length > 0 && (
-                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${hasHighPriority ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
-                        {dayTasks.length}
-                      </span>
-                    )}
-                    {/* Add button */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDateClick(day.dateStr); }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-brand-100 rounded text-brand-500 transition-all"
-                      title="Thêm công việc"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
+                {(() => {
+                  const lunar = getLunarDate(day.date);
+                  const isLunarFirst = lunar.day === 1;
+                  return (
+                    <div className="flex items-start justify-between mb-0.5">
+                      <div className="flex flex-col items-center">
+                        <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors flex-shrink-0 text-[13px]
+                          ${isToday ? 'bg-brand-500 text-white shadow-md shadow-brand-200'
+                            : isSelected ? 'bg-brand-100 text-brand-700'
+                            : 'text-gray-700 group-hover:bg-gray-100'}`}
+                        >
+                          {day.date.getDate()}
+                        </span>
+                        <span className={`text-[9px] leading-tight mt-0.5 font-medium
+                          ${isLunarFirst ? 'text-red-500 font-bold' : 'text-gray-400'}`}
+                        >
+                          {isLunarFirst ? `1/${lunar.month}` : `${lunar.day}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {/* Task count badge */}
+                        {dayTasks.length > 0 && (
+                          <span className={`text-[9px] font-bold px-1 py-0.5 rounded-full ${hasHighPriority ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                            {dayTasks.length}
+                          </span>
+                        )}
+                        {/* Add button */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onDateClick(day.dateStr); }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-brand-100 rounded text-brand-500 transition-all"
+                          title="Thêm công việc"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Task bars */}
                 <div className="flex flex-col gap-0.5 overflow-hidden flex-grow">
