@@ -2,7 +2,7 @@ import { apiFetch } from '../services/api';
 import { io } from 'socket.io-client';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { Bell, X, FileText, StickyNote } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, X, FileText, StickyNote } from 'lucide-react';
 import { Note } from '../types';
 
 export interface AppNotification {
@@ -16,6 +16,13 @@ export interface AppNotification {
   createdAt: string;
 }
 
+export interface ToastOptions {
+  type?: 'success' | 'error' | 'info';
+  title: string;
+  message?: string;
+  duration?: number; // ms, default 4000
+}
+
 interface NotificationContextType {
   notifications: AppNotification[];
   unreadCount: number;
@@ -23,7 +30,9 @@ interface NotificationContextType {
   markAllRead: () => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
-  setNotes: (notes: Note[]) => void; // feed notes from App for reminder checking
+  setNotes: (notes: Note[]) => void;
+  showToast: (opts: ToastOptions) => void;
+  pushLocalNotification: (notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -32,6 +41,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [toasts, setToasts] = useState<AppNotification[]>([]);
+  const [simpleToasts, setSimpleToasts] = useState<(ToastOptions & { id: string })[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const isFirstLoad = useRef(true);
   const prevIds = useRef<Set<string>>(new Set());
@@ -68,6 +78,26 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const dismissToast = (id: string) => setToasts(curr => curr.filter(t => t.id !== id));
+  const dismissSimpleToast = (id: string) => setSimpleToasts(curr => curr.filter(t => t.id !== id));
+
+  const showToast = (opts: ToastOptions) => {
+    const id = Math.random().toString(36).slice(2);
+    setSimpleToasts(prev => [...prev, { ...opts, id }]);
+    setTimeout(() => dismissSimpleToast(id), opts.duration ?? 4000);
+  };
+
+  const pushLocalNotification = (notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>) => {
+    const n: AppNotification = {
+      ...notif,
+      id: 'local-' + Math.random().toString(36).slice(2),
+      isRead: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setNotifications(prev => [n, ...prev]);
+    setToasts(prev => [...prev, n]);
+    playSound();
+    setTimeout(() => dismissToast(n.id), 5000);
+  };
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -161,7 +191,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh, setNotes }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh, setNotes, showToast, pushLocalNotification }}>
       {children}
       
       {/* Toast Portal */}
@@ -202,6 +232,43 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
                 className={`p-1.5 rounded-lg transition-colors flex-shrink-0 ${isReportReminder ? 'hover:bg-white/20 text-violet-200' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
               >
                 <X size={16}/>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Simple Toast Portal (success / error / info) */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-3 items-center pointer-events-none">
+        {simpleToasts.map(t => {
+          const isSuccess = t.type === 'success';
+          const isError = t.type === 'error';
+          return (
+            <div
+              key={t.id}
+              className={`pointer-events-auto flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-bottom-4 fade-in duration-300 min-w-[280px] max-w-[420px]
+                ${
+                  isSuccess ? 'bg-emerald-600 border-emerald-500/50 text-white'
+                  : isError ? 'bg-red-600 border-red-500/50 text-white'
+                  : 'bg-gray-900 border-gray-700 text-white'
+                }`}
+            >
+              <div className={`p-2 rounded-xl flex-shrink-0 ${
+                isSuccess ? 'bg-white/20' : isError ? 'bg-white/20' : 'bg-white/10'
+              }`}>
+                {isSuccess ? <CheckCircle size={20} className="text-white" /> :
+                 isError ? <AlertCircle size={20} className="text-white" /> :
+                 <Bell size={20} className="text-white" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm">{t.title}</p>
+                {t.message && <p className="text-xs opacity-80 mt-0.5 leading-relaxed">{t.message}</p>}
+              </div>
+              <button
+                onClick={() => dismissSimpleToast(t.id)}
+                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0"
+              >
+                <X size={15} />
               </button>
             </div>
           );

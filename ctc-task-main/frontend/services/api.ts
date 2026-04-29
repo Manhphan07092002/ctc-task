@@ -1,14 +1,11 @@
 export async function apiFetch(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('ctc_token');
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: any = {
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
-
-  // Only default to application/json if we are not sending FormData
-  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
 
   const response = await fetch(url, { ...options, headers });
   
