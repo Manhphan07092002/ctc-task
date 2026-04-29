@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useCallback, useEffect, useState } from 'react';
 import { KeyRound, RefreshCw, AlertCircle, Clock, CheckCircle2, X } from 'lucide-react';
 
@@ -107,7 +108,7 @@ export default function AdminPasswordResetRequests() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/password-reset-requests');
+      const res = await apiFetch('/api/admin/password-reset-requests');
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       setItems(await res.json());
     } catch (e: any) {
@@ -129,7 +130,7 @@ export default function AdminPasswordResetRequests() {
   };
 
   const handleResetPassword = async (request: PasswordResetRequest, newPassword: string) => {
-    const res = await fetch(`/api/users/${request.userId}/reset-password`, {
+    const res = await apiFetch(`/api/users/${request.userId}/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword }),

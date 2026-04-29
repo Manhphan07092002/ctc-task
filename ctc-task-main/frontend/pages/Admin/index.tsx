@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, CheckSquare, FileText, Video, Shield, TrendingUp,
@@ -110,8 +111,8 @@ export default function AdminDashboard() {
     setError(null);
     try {
       const [statsRes, resetRes] = await Promise.all([
-        fetch('/api/admin/stats'),
-        fetch('/api/admin/password-reset-requests')
+        apiFetch('/api/admin/stats'),
+        apiFetch('/api/admin/password-reset-requests')
       ]);
       if (!statsRes.ok) throw new Error(`Server error: ${statsRes.status}`);
       const data: AdminStats = await statsRes.json();

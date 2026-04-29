@@ -1,10 +1,29 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { z } from 'zod';
+import { validate } from '../middleware/validate.js';
+
+const LoginSchema = z.object({
+  email: z.string().email('Email không hợp lệ'),
+  password: z.string().min(6, 'Mật khẩu phải ít nhất 6 ký tự'),
+});
+
+const ChangePasswordSchema = z.object({
+  userId: z.string(),
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(6, 'Mật khẩu mới phải ít nhất 6 ký tự'),
+});
 
 export function authRoutes(db: any) {
   const router = Router();
+  const getSecret = () => process.env.JWT_SECRET || 'ctc_default_secret_change_me';
 
-  router.post('/login', async (req, res) => {
+  const generateToken = (userPayload: any) => {
+    return jwt.sign(userPayload, getSecret(), { expiresIn: '7d' });
+  };
+
+  router.post('/login', validate(LoginSchema), async (req, res) => {
     const { email, password } = req.body;
     try {
       const user = await db.get('SELECT * FROM users WHERE lower(email) = lower(?)', [email]);
@@ -12,11 +31,19 @@ export function authRoutes(db: any) {
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
       const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
-      return res.json({ id: user.id, name: user.name, email: user.email, role: user.role, department: user.department, avatar: user.avatar, permissions: role?.permissions ? JSON.parse(role.permissions) : [] });
+      
+      const userClientData = {
+        id: user.id, name: user.name, email: user.email, role: user.role, 
+        department: user.department, avatar: user.avatar, 
+        permissions: role?.permissions ? JSON.parse(role.permissions) : []
+      };
+      const jwtPayload = { id: user.id, role: user.role };
+      const token = generateToken(jwtPayload);
+      return res.json({ token, user: userClientData });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
-  router.post('/change-password', async (req, res) => {
+  router.post('/change-password', validate(ChangePasswordSchema), async (req, res) => {
     const { userId, currentPassword, newPassword } = req.body;
     try {
       const user = await db.get('SELECT id, password FROM users WHERE id = ?', [userId]);
@@ -35,7 +62,14 @@ export function authRoutes(db: any) {
       const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
       if (user) {
         const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
-        return res.json({ id: user.id, name: user.name, email: user.email, role: user.role, department: user.department, avatar: user.avatar, permissions: role?.permissions ? JSON.parse(role.permissions) : [] });
+        const userClientData = {
+          id: user.id, name: user.name, email: user.email, role: user.role, 
+          department: user.department, avatar: user.avatar, 
+          permissions: role?.permissions ? JSON.parse(role.permissions) : []
+        };
+        const jwtPayload = { id: user.id, role: user.role };
+        const token = generateToken(jwtPayload);
+        return res.json({ token, user: userClientData });
       }
       return res.status(401).json({ error: 'Invalid user id' });
     } catch (e) { res.status(500).json({ error: 'Server error' }); }

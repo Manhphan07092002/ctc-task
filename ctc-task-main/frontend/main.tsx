@@ -11,6 +11,13 @@ import { DataProvider } from './contexts/DataContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import 'flatpickr/dist/flatpickr.min.css';
 
+// Suppress Recharts ResponsiveContainer "width/height = -1" warning
+const _warn = console.warn.bind(console);
+console.warn = (...args: any[]) => {
+  if (typeof args[0] === 'string' && args[0].includes('width(-1) and height(-1)')) return;
+  _warn(...args);
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

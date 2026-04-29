@@ -1,9 +1,10 @@
+import { apiFetch } from './api';
 import { Task } from '../types';
 
 const API_URL = '/api/tasks';
 
 export const getTasks = async (): Promise<Task[]> => {
-  const response = await fetch(API_URL);
+  const response = await apiFetch(API_URL);
   if (!response.ok) throw new Error('Failed to fetch tasks');
   return response.json();
 };
@@ -21,14 +22,14 @@ export const saveTask = async (task: Task): Promise<void> => {
   const exists = allTasks.some(t => t.id === task.id);
   
   if (exists) {
-    const res = await fetch(`${API_URL}/${task.id}`, {
+    const res = await apiFetch(`${API_URL}/${task.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(task)
     });
     if (!res.ok) throw new Error('Update failed');
   } else {
-    const res = await fetch(API_URL, {
+    const res = await apiFetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(task)
@@ -38,7 +39,7 @@ export const saveTask = async (task: Task): Promise<void> => {
 };
 
 export const deleteTask = async (taskId: string): Promise<void> => {
-  const res = await fetch(`${API_URL}/${taskId}`, {
+  const res = await apiFetch(`${API_URL}/${taskId}`, {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Delete failed');

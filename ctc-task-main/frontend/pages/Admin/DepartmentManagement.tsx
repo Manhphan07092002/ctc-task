@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2, PlusCircle, Edit2, Trash2, RefreshCw, AlertCircle,
@@ -155,7 +156,7 @@ export default function AdminDepartmentManagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [dr, ur] = await Promise.all([fetch('/api/departments'), fetch('/api/users')]);
+      const [dr, ur] = await Promise.all([apiFetch('/api/departments'), apiFetch('/api/users')]);
       if (!dr.ok) throw new Error('Không thể tải phòng ban');
       setDepts(await dr.json());
       if (ur.ok) setUsers(await ur.json());
@@ -167,7 +168,7 @@ export default function AdminDepartmentManagement() {
 
   const handleSave = async (data: Partial<Department>) => {
     const isNew = !data.id || !depts.find(d => d.id === data.id);
-    const res = await fetch(isNew ? '/api/departments' : `/api/departments/${data.id}`, {
+    const res = await apiFetch(isNew ? '/api/departments' : `/api/departments/${data.id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -182,7 +183,7 @@ export default function AdminDepartmentManagement() {
     if (!confirm(`Xóa phòng ban "${dept.name}"?`)) return;
     setDeletingId(dept.id);
     try {
-      const res = await fetch(`/api/departments/${dept.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/departments/${dept.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       showToast(`Đã xóa phòng ban "${dept.name}"`);

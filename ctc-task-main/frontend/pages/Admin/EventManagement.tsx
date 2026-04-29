@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, CalendarDays, X, Save, PartyPopper, Building2 } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function AdminEventManagement() {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/events');
+      const res = await apiFetch('/api/events');
       setEvents(await res.json());
     } finally { setLoading(false); }
   };
@@ -59,9 +60,9 @@ export default function AdminEventManagement() {
     try {
       const payload = { ...form, id: editingId || `evt-${Date.now()}` };
       if (editingId) {
-        await fetch(`/api/events/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await apiFetch(`/api/events/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       } else {
-        await fetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await apiFetch('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       }
       setShowModal(false);
       fetchEvents();
@@ -70,7 +71,7 @@ export default function AdminEventManagement() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Bạn có chắc muốn xóa sự kiện này?')) return;
-    await fetch(`/api/events/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/events/${id}`, { method: 'DELETE' });
     fetchEvents();
   };
 

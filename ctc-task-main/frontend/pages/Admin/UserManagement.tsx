@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, PlusCircle, Edit2, Trash2, Shield, Briefcase,
@@ -421,7 +422,7 @@ export default function AdminUserManagement() {
     setLoading(true); setError(null);
     try {
       const [ur, rr, dr, pr] = await Promise.all([
-        fetch('/api/users'), fetch('/api/roles'), fetch('/api/departments'), fetch('/api/admin/password-reset-requests')
+        apiFetch('/api/users'), apiFetch('/api/roles'), apiFetch('/api/departments'), apiFetch('/api/admin/password-reset-requests')
       ]);
       if (!ur.ok) throw new Error('Không thể tải người dùng');
       setUsers(await ur.json());
@@ -435,7 +436,7 @@ export default function AdminUserManagement() {
         const enriched = await Promise.all(
           requests.map(async (request: PasswordResetRequest) => {
             try {
-              const res = await fetch('/api/auth/forgot-password', {
+              const res = await apiFetch('/api/auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: request.email }),
@@ -461,7 +462,7 @@ export default function AdminUserManagement() {
 
   const handleSave = async (u: User) => {
     const isNew = !users.find(x => x.id === u.id);
-    const res = await fetch(isNew ? '/api/users' : `/api/users/${u.id}`, {
+    const res = await apiFetch(isNew ? '/api/users' : `/api/users/${u.id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(u),
@@ -472,7 +473,7 @@ export default function AdminUserManagement() {
   };
 
   const handleDelete = async (u: User) => {
-    const res = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/users/${u.id}`, { method: 'DELETE' });
     if (!res.ok) { showToast('Xóa thất bại', 'error'); return; }
     showToast(`Đã xóa ${u.name}`);
     setDeletingUser(null);
@@ -480,7 +481,7 @@ export default function AdminUserManagement() {
   };
 
   const handleResetPassword = async (u: User, newPassword: string) => {
-    const res = await fetch(`/api/users/${u.id}/reset-password`, {
+    const res = await apiFetch(`/api/users/${u.id}/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ newPassword }),
@@ -589,7 +590,7 @@ export default function AdminUserManagement() {
                       </button>
                       <button
                         onClick={async () => {
-                          const res = await fetch(`/api/admin/password-reset-requests/${request.id}`, { method: 'DELETE' });
+                          const res = await apiFetch(`/api/admin/password-reset-requests/${request.id}`, { method: 'DELETE' });
                           if (!res.ok) { showToast('Xóa request thất bại', 'error'); return; }
                           showToast('Đã xóa request quên mật khẩu');
                           await fetchUsers();

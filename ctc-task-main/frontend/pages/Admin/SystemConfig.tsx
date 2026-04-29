@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Database, Server, Activity, CheckCircle,
@@ -75,9 +76,9 @@ export default function AdminSystemConfig() {
     setAiKeysLoading(true);
     try {
       const [statsRes, smtpRes, aiKeysRes] = await Promise.all([
-        fetch('/api/admin/stats'),
-        fetch('/api/admin/system-config/smtp'),
-        fetch('/api/admin/system-config/ai-keys')
+        apiFetch('/api/admin/stats'),
+        apiFetch('/api/admin/system-config/smtp'),
+        apiFetch('/api/admin/system-config/ai-keys')
       ]);
       if (statsRes.ok) {
         const data = await statsRes.json();
@@ -114,7 +115,7 @@ export default function AdminSystemConfig() {
     setSmtpSaving(true);
     setSmtpMessage(null);
     try {
-      const res = await fetch('/api/admin/system-config/smtp', {
+      const res = await apiFetch('/api/admin/system-config/smtp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(smtpConfig),
@@ -134,7 +135,7 @@ export default function AdminSystemConfig() {
     setSmtpTesting(true);
     setSmtpMessage(null);
     try {
-      const res = await fetch('/api/admin/system-config/smtp/test', {
+      const res = await apiFetch('/api/admin/system-config/smtp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ testEmail }),
@@ -162,7 +163,7 @@ export default function AdminSystemConfig() {
     setAiMessage(null);
     try {
       const filteredKeys = aiKeys.map(k => k.trim()).filter(k => k.length > 0);
-      const res = await fetch('/api/admin/system-config/ai-keys', {
+      const res = await apiFetch('/api/admin/system-config/ai-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keys: filteredKeys }),

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User } from '../types';
 
-const API_URL = '/api/users';
 const LOGIN_API_URL = '/api/auth/login';
 
 interface AuthContextType {
@@ -15,24 +14,46 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to decode JWT without a library
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUserId = localStorage.getItem('orange_task_user_id');
-    if (storedUserId) {
-      fetch(API_URL)
-        .then(r => r.json())
-        .then((users: User[]) => {
-          const foundUser = users.find(u => u.id === storedUserId);
-          if (foundUser) setUser(foundUser);
-        })
-        .catch(console.error)
-        .finally(() => setIsLoading(false));
+    const token = localStorage.getItem('ctc_token');
+    const storedUser = localStorage.getItem('ctc_user');
+    
+    if (token && storedUser) {
+      const payload = parseJwt(token);
+      if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          localStorage.removeItem('ctc_user');
+          localStorage.removeItem('ctc_token');
+        }
+      } else {
+        localStorage.removeItem('ctc_token');
+        localStorage.removeItem('ctc_user');
+      }
     } else {
-      setIsLoading(false);
+      localStorage.removeItem('ctc_token');
+      localStorage.removeItem('ctc_user');
     }
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -43,9 +64,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) return false;
-      const foundUser: User = await res.json();
-      setUser(foundUser);
-      localStorage.setItem('orange_task_user_id', foundUser.id);
+      const data = await res.json();
+      setUser(data.user);
+      localStorage.setItem('ctc_token', data.token);
+      localStorage.setItem('ctc_user', JSON.stringify(data.user));
       return true;
     } catch (e) {
       console.error('Login failed:', e);
@@ -55,7 +77,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('orange_task_user_id');
+    localStorage.removeItem('ctc_token');
+    localStorage.removeItem('ctc_user');
   };
 
   const quickLogin = async (userId: string): Promise<boolean> => {
@@ -66,9 +89,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ userId }),
       });
       if (!res.ok) return false;
-      const foundUser: User = await res.json();
-      setUser(foundUser);
-      localStorage.setItem('orange_task_user_id', foundUser.id);
+      const data = await res.json();
+      setUser(data.user);
+      localStorage.setItem('ctc_token', data.token);
+      localStorage.setItem('ctc_user', JSON.stringify(data.user));
       return true;
     } catch (e) {
       console.error('Quick login failed:', e);
@@ -78,6 +102,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateUserSession = (updatedUser: User) => {
     setUser(updatedUser);
+    localStorage.setItem('ctc_user', JSON.stringify(updatedUser));
   };
 
   return (

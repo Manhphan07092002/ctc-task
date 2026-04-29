@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Task } from '../../types';
 import {
@@ -112,7 +113,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
 
   useEffect(() => {
-    fetch('/api/events').then(r => r.json()).then(setCalEvents).catch(() => {});
+    apiFetch('/api/events').then(r => r.json()).then(setCalEvents).catch(() => {});
   }, []);
 
   const getLocalDateString = (date: Date): string => {

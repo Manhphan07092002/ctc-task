@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Database, Download, FileUp, RefreshCw, Search, Trash2 } from 'lucide-react';
 
@@ -22,7 +23,7 @@ export default function AdminDatabaseManagement() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/database/tables');
+      const res = await apiFetch('/api/admin/database/tables');
       const data = await res.json().catch(() => ([]));
       if (!res.ok) throw new Error(data.error || 'Không thể tải danh sách bảng');
       setTables(data);
@@ -39,7 +40,7 @@ export default function AdminDatabaseManagement() {
     setRowLoading(true);
     setRowError('');
     try {
-      const res = await fetch(`/api/admin/database/table/${table}?limit=50&offset=0`);
+      const res = await apiFetch(`/api/admin/database/table/${table}?limit=50&offset=0`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Không thể tải dữ liệu bảng');
       setRows(data.rows || []);
@@ -61,7 +62,7 @@ export default function AdminDatabaseManagement() {
 
   const deleteRow = async (table: string, id: string) => {
     if (!confirm(`Xóa record ${id} khỏi bảng ${table}?`)) return;
-    await fetch(`/api/admin/database/table/${table}/row/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/admin/database/table/${table}/row/${id}`, { method: 'DELETE' });
     await fetchRows(table);
     await fetchTables();
   };
@@ -84,7 +85,7 @@ export default function AdminDatabaseManagement() {
     try {
       const formData = new FormData();
       formData.append('file', importFile);
-      const res = await fetch('/api/admin/database/import', { method: 'POST', body: formData });
+      const res = await apiFetch('/api/admin/database/import', { method: 'POST', body: formData });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Import thất bại');
       setImportFile(null);

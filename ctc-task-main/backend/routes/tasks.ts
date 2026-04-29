@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 export function taskRoutes(prisma: PrismaClient) {
   const router = Router();
@@ -32,6 +33,11 @@ export function taskRoutes(prisma: PrismaClient) {
           comments: JSON.stringify(t.comments || [])
         }
       });
+      if (t.createdBy) {
+        await prisma.activity_logs.create({
+          data: { id: randomUUID(), userId: t.createdBy, action: 'task.created', entityId: t.id, entityType: 'task', createdAt: new Date().toISOString() }
+        });
+      }
       res.json({ id: t.id });
     } catch (e) { res.status(500).json({ error: 'Failed task create' }); }
   });
@@ -52,6 +58,11 @@ export function taskRoutes(prisma: PrismaClient) {
           comments: JSON.stringify(t.comments || [])
         }
       });
+      if (t.updatedBy || t.createdBy) {
+        await prisma.activity_logs.create({
+          data: { id: randomUUID(), userId: t.updatedBy || t.createdBy || 'system', action: 'task.updated', entityId: req.params.id, entityType: 'task', createdAt: new Date().toISOString() }
+        });
+      }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed task update' }); }
   });

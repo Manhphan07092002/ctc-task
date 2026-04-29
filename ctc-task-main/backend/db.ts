@@ -75,6 +75,15 @@ export async function initDb() {
       description TEXT,
       isRecurringYearly INTEGER NOT NULL DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS activity_logs (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entityId TEXT,
+      entityType TEXT,
+      metadata TEXT,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   // Migrations (safe to run multiple times)

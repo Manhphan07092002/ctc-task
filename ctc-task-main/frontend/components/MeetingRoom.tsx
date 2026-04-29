@@ -1,3 +1,4 @@
+import { apiFetch } from '../services/api';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -195,12 +196,12 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
   useEffect(() => {
     if (!user || !hasJoined) return;
     // Use existing PUT endpoint: fetch current state first then update atomically
-    fetch(`/api/meetings/${meeting.id}`)
+    apiFetch(`/api/meetings/${meeting.id}`)
       .then(r => r.json())
       .then(data => {
         const parts: string[] = data.participants || [];
         if (!parts.includes(user.id)) {
-          fetch(`/api/meetings/${meeting.id}`, {
+          apiFetch(`/api/meetings/${meeting.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...data, participants: [...parts, user.id] }),
@@ -243,7 +244,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
 
       if (user && hasJoinedRef.current) {
         // Run in background without awaiting, best effort to notify others we left
-        fetch(`/api/meetings/${meeting.id}/signals`, {
+        apiFetch(`/api/meetings/${meeting.id}/signals`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -257,11 +258,11 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({ meeting, onLeave, allU
         }).catch(e => {});
 
         // Safely remove self from DB participants array via existing PUT endpoint
-        fetch(`/api/meetings/${meeting.id}`, { keepalive: true })
+        apiFetch(`/api/meetings/${meeting.id}`, { keepalive: true })
           .then(r => r.json())
           .then(data => {
             const parts: string[] = (data.participants || []).filter((p: string) => p !== user.id);
-            fetch(`/api/meetings/${meeting.id}`, {
+            apiFetch(`/api/meetings/${meeting.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...data, participants: parts }),

@@ -133,3 +133,14 @@ model notifications {
   isRead    Int     @default(0)
   createdAt String
 }
+
+model activity_logs {
+  id         String  @id
+  userId     String
+  action     String
+  entityId   String?
+  entityType String?
+  metadata   String?
+  createdAt  String
+}
+

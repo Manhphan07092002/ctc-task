@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Shield, PlusCircle, Edit2, Trash2, RefreshCw, AlertCircle,
@@ -271,7 +272,7 @@ export default function AdminRoleManagement() {
   const fetchRoles = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch('/api/roles');
+      const res = await apiFetch('/api/roles');
       if (!res.ok) throw new Error('Lỗi tải dữ liệu');
       setRoles(await res.json());
     } catch (e: any) { setError(e.message); }
@@ -282,7 +283,7 @@ export default function AdminRoleManagement() {
 
   const handleSave = async (data: Partial<Role> & { id?: string }) => {
     const isNew = !data.id || !roles.find(r => r.id === data.id);
-    const res = await fetch(isNew ? '/api/roles' : `/api/roles/${data.id}`, {
+    const res = await apiFetch(isNew ? '/api/roles' : `/api/roles/${data.id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -297,7 +298,7 @@ export default function AdminRoleManagement() {
     if (!confirm(`Xóa vai trò "${role.name}"?`)) return;
     setDeletingId(role.id);
     try {
-      const res = await fetch(`/api/roles/${role.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/roles/${role.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       showToast(`Đã xóa vai trò "${role.name}"`);

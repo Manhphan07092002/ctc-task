@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 
 import { initDb } from './db.js';
 import { createMailer } from './mailer.js';
@@ -19,6 +20,7 @@ import { departmentRoutes } from './routes/departments.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { eventRoutes } from './routes/events.js';
+import { activityRoutes } from './routes/activity.js';
 
 import { scheduleFridayReminder } from './schedulers/fridayReminder.js';
 import { scheduleNoteReminders } from './schedulers/noteReminder.js';
@@ -33,8 +35,26 @@ async function startServer() {
   const prisma = new PrismaClient();
 
   // Middleware
-  app.use(cors());
+  app.use(cors({
+    origin: process.env.ALLOWED_ORIGIN || '*',
+    credentials: true
+  }));
   app.use(express.json());
+
+  // Rate Limiting
+  const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    message: { error: 'Too many requests from this IP' }
+  });
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { error: 'Too many login attempts from this IP' }
+  });
+
+  app.use('/api', globalLimiter);
+  app.use('/api/auth/login', loginLimiter);
 
   // Database
   const db = await initDb();
@@ -43,6 +63,10 @@ async function startServer() {
   const mailer = createMailer(db);
 
   // ===== ROUTES =====
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date() });
+  });
+
   app.use('/api/auth', authRoutes(db));
   app.use('/api/auth', forgotPasswordRoutes(db, mailer));
   app.use('/api/users', userRoutes(db, mailer));
@@ -55,6 +79,7 @@ async function startServer() {
   app.use('/api/notifications', notificationRoutes(db));
   app.use('/api/admin', adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
+  app.use('/api/activity', activityRoutes(prisma));
 
   // ===== SCHEDULERS =====
   scheduleFridayReminder(db);

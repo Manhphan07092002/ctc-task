@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckSquare, Search, RefreshCw, AlertCircle, Filter, PlusCircle,
@@ -175,7 +176,7 @@ export default function AdminTaskManagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [tr, ur] = await Promise.all([fetch('/api/tasks'), fetch('/api/users')]);
+      const [tr, ur] = await Promise.all([apiFetch('/api/tasks'), apiFetch('/api/users')]);
       setTasks(await tr.json()); setUsers(await ur.json());
     } catch { setError('Không thể tải dữ liệu'); }
     finally { setLoading(false); }
@@ -185,7 +186,7 @@ export default function AdminTaskManagement() {
 
   const handleSave = async (t: Task) => {
     const isNew = !tasks.find(x => x.id === t.id);
-    const res = await fetch(isNew ? '/api/tasks' : `/api/tasks/${t.id}`, {
+    const res = await apiFetch(isNew ? '/api/tasks' : `/api/tasks/${t.id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(t),
@@ -199,7 +200,7 @@ export default function AdminTaskManagement() {
     if (!confirm(`Xóa công việc "${title}"?`)) return;
     setDeletingId(id);
     try {
-      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
       showToast(`Đã xóa: ${title}`);
       await fetchAll();
     } catch { showToast('Xóa thất bại', 'error'); }

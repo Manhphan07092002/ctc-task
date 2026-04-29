@@ -1,3 +1,4 @@
+import { apiFetch } from '../services/api';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Bell, X, FileText, StickyNote } from 'lucide-react';
@@ -70,7 +71,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/notifications/${user.id}`);
+      const res = await apiFetch(`/api/notifications/${user.id}`);
       if (res.ok) {
         const data: AppNotification[] = await res.json();
         
@@ -105,18 +106,18 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [refresh]);
 
   const markRead = async (id: string) => {
-    await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+    await apiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: 1 } : n));
   };
 
   const markAllRead = async () => {
     if (!user) return;
-    await fetch(`/api/notifications/read-all/${user.id}`, { method: 'PATCH' });
+    await apiFetch(`/api/notifications/read-all/${user.id}`, { method: 'PATCH' });
     setNotifications(prev => prev.map(n => ({ ...n, isRead: 1 })));
   };
 
   const deleteNotification = async (id: string) => {
-    await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/notifications/${id}`, { method: 'DELETE' });
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 

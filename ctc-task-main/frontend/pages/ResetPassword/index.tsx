@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, KeyRound } from 'lucide-react';
@@ -25,7 +26,7 @@ export default function ResetPasswordPage() {
         return;
       }
       try {
-        const res = await fetch(`/api/auth/reset-password/${encodeURIComponent(token)}`);
+        const res = await apiFetch(`/api/auth/reset-password/${encodeURIComponent(token)}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           setError(data.error || 'Link đặt lại mật khẩu không hợp lệ.');
@@ -69,7 +70,7 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/auth/reset-password', {
+      const res = await apiFetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),

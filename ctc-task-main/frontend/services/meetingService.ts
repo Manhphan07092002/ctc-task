@@ -1,10 +1,11 @@
+import { apiFetch } from './api';
 import { Meeting } from '../types';
 
 const API_BASE = '/api';
 
 export const getMeetings = async (): Promise<Meeting[]> => {
   try {
-    const response = await fetch(`${API_BASE}/meetings`);
+    const response = await apiFetch(`${API_BASE}/meetings`);
     if (!response.ok) throw new Error('Failed to fetch meetings');
     return await response.json();
   } catch (error) {
@@ -32,14 +33,14 @@ export const subscribeToMeetings = (callback: (meetings: Meeting[]) => void) => 
 
 export const saveMeeting = async (meeting: Meeting): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/meetings`, {
+    const response = await apiFetch(`${API_BASE}/meetings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(meeting),
     });
     if (!response.ok) {
       // Try update if create fails (id already exists)
-      const updateResponse = await fetch(`${API_BASE}/meetings/${meeting.id}`, {
+      const updateResponse = await apiFetch(`${API_BASE}/meetings/${meeting.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(meeting),
@@ -53,7 +54,7 @@ export const saveMeeting = async (meeting: Meeting): Promise<void> => {
 
 export const getMeetingById = async (meetingId: string): Promise<Meeting | null> => {
   try {
-    const response = await fetch(`${API_BASE}/meetings/${meetingId}`);
+    const response = await apiFetch(`${API_BASE}/meetings/${meetingId}`);
     if (!response.ok) return null;
     return await response.json();
   } catch (error) {
@@ -64,7 +65,7 @@ export const getMeetingById = async (meetingId: string): Promise<Meeting | null>
 
 export const deleteMeeting = async (meetingId: string): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/meetings/${meetingId}`, {
+    const response = await apiFetch(`${API_BASE}/meetings/${meetingId}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to delete meeting');
@@ -76,7 +77,7 @@ export const deleteMeeting = async (meetingId: string): Promise<void> => {
 // Signals for WebRTC
 export const sendSignal = async (meetingId: string, signal: any): Promise<void> => {
   try {
-    const response = await fetch(`${API_BASE}/meetings/${meetingId}/signals`, {
+    const response = await apiFetch(`${API_BASE}/meetings/${meetingId}/signals`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(signal),
@@ -95,7 +96,7 @@ export const subscribeToSignals = (meetingId: string, callback: (signals: any[])
   const poll = async () => {
     if (!isSubscribed) return;
     try {
-      const response = await fetch(`${API_BASE}/meetings/${meetingId}/signals?since=${lastTimestamp}`);
+      const response = await apiFetch(`${API_BASE}/meetings/${meetingId}/signals?since=${lastTimestamp}`);
       if (response.ok) {
         const signals = await response.json();
         

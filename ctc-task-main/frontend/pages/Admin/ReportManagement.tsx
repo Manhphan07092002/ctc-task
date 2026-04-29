@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Search, RefreshCw, AlertCircle, CheckCircle, Clock,
@@ -69,7 +70,7 @@ export default function AdminReportManagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [rr, ur] = await Promise.all([fetch('/api/reports'), fetch('/api/users')]);
+      const [rr, ur] = await Promise.all([apiFetch('/api/reports'), apiFetch('/api/users')]);
       const list: Report[] = await rr.json();
       setReports(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setUsers(await ur.json());
@@ -81,7 +82,7 @@ export default function AdminReportManagement() {
 
   const patchReport = async (r: Report, patch: Partial<Report>) => {
     const updated = { ...r, ...patch };
-    const res = await fetch(`/api/reports/${r.id}`, {
+    const res = await apiFetch(`/api/reports/${r.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated),
     });
     if (!res.ok) throw new Error('Lỗi cập nhật');
@@ -120,7 +121,7 @@ export default function AdminReportManagement() {
     if (!confirm(`Xóa báo cáo "${r.title}"?`)) return;
     setDeletingId(r.id);
     try {
-      await fetch(`/api/reports/${r.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/reports/${r.id}`, { method: 'DELETE' });
       showToast(`Đã xóa: ${r.title}`);
       if (detailReport?.id === r.id) setDetailReport(null);
       await fetchAll();

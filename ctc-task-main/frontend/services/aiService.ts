@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 import { GoogleGenAI, Type } from "@google/genai";
 
 // API Key Rotation Setup
@@ -8,7 +9,7 @@ let keysLoaded = false;
 const loadApiKeys = async () => {
   if (keysLoaded) return;
   try {
-    const res = await fetch('/api/admin/system-config/ai-keys');
+    const res = await apiFetch('/api/admin/system-config/ai-keys');
     if (res.ok) {
       const data = await res.json();
       if (data.keys && data.keys.length > 0) {

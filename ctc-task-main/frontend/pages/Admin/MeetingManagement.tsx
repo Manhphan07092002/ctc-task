@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Video, RefreshCw, AlertCircle, Search, CheckCircle, PlusCircle,
@@ -179,7 +180,7 @@ export default function AdminMeetingManagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [mr, ur] = await Promise.all([fetch('/api/meetings'), fetch('/api/users')]);
+      const [mr, ur] = await Promise.all([apiFetch('/api/meetings'), apiFetch('/api/users')]);
       const list: Meeting[] = await mr.json();
       setMeetings(list.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
       setUsers(await ur.json());
@@ -191,7 +192,7 @@ export default function AdminMeetingManagement() {
 
   const handleSave = async (m: Meeting) => {
     const isNew = !meetings.find(x => x.id === m.id);
-    const res = await fetch(isNew ? '/api/meetings' : `/api/meetings/${m.id}`, {
+    const res = await apiFetch(isNew ? '/api/meetings' : `/api/meetings/${m.id}`, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(m),
@@ -205,7 +206,7 @@ export default function AdminMeetingManagement() {
     if (!confirm(`Xóa cuộc họp "${m.title}"?`)) return;
     setDeletingId(m.id);
     try {
-      await fetch(`/api/meetings/${m.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/meetings/${m.id}`, { method: 'DELETE' });
       showToast(`Đã xóa: ${m.title}`);
       await fetchAll();
     } catch { showToast('Xóa thất bại', 'error'); }
@@ -213,7 +214,7 @@ export default function AdminMeetingManagement() {
   };
 
   const handleChangeStatus = async (m: Meeting, status: Meeting['status']) => {
-    const res = await fetch(`/api/meetings/${m.id}`, {
+    const res = await apiFetch(`/api/meetings/${m.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...m, status }),
     });

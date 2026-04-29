@@ -293,14 +293,14 @@ export default function DashboardPage({
           {/* Weekly Progress */}
           <Card className="p-6">
             <h3 className="text-base font-bold text-gray-800 mb-4">{t('weeklyProgress')}</h3>
-            <div className="h-48 w-full relative">
+            <div className="relative" style={{ height: 192 }}>
               {stats.total === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
                   Chưa có công việc nào
                 </div>
               ) : (
                 <>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <ResponsiveContainer width="100%" height={192} minWidth={0}>
                     <PieChart>
                       <Pie
                         data={chartData}
@@ -324,6 +324,7 @@ export default function DashboardPage({
               )}
             </div>
           </Card>
+
 
           {/* Team Widget */}
           <Card className="p-6">

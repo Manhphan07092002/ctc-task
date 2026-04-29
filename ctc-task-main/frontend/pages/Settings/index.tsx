@@ -1,3 +1,4 @@
+import { apiFetch } from '../../services/api';
 
 import React, { useState, useEffect } from 'react';
 import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, Eye, EyeOff, AlertTriangle } from 'lucide-react';
@@ -78,7 +79,7 @@ export const SettingsView: React.FC = () => {
     if (newPassword !== confirmPassword) { setPwError('Mật khẩu xác nhận không khớp.'); return; }
 
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await apiFetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
