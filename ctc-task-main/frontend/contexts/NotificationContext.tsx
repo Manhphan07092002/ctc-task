@@ -1,4 +1,5 @@
 import { apiFetch } from '../services/api';
+import { io } from 'socket.io-client';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Bell, X, FileText, StickyNote } from 'lucide-react';
@@ -98,12 +99,48 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   }, [user]);
 
-  // Poll every 30s for new notifications
+  // Replace polling with Socket.io
   useEffect(() => {
-    refresh();
-    const interval = setInterval(refresh, 30_000);
-    return () => clearInterval(interval);
-  }, [refresh]);
+    refresh(); // initial fetch
+
+    if (!user) return;
+
+    // Connect to socket
+    const socket = io(window.location.origin, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket connected, joining room:', user.id);
+      socket.emit('join', user.id);
+    });
+
+    socket.on('new_notification', (data: AppNotification) => {
+      console.log('Received real-time notification:', data);
+      
+      setNotifications(prev => {
+        // Prevent duplicate if already exists
+        if (prev.some(n => n.id === data.id)) return prev;
+        return [data, ...prev];
+      });
+
+      setToasts(prev => [...prev, data]);
+      playSound();
+
+      setTimeout(() => {
+        dismissToast(data.id);
+      }, 5000);
+    });
+
+    // Fallback slow poll just in case of disconnects
+    const interval = setInterval(refresh, 5 * 60 * 1000);
+
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
+  }, [user, refresh]);
 
   const markRead = async (id: string) => {
     await apiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
@@ -179,3 +216,4 @@ export const useNotifications = () => {
   if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
   return ctx;
 };
+

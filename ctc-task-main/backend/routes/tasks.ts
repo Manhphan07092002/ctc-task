@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { sendNotification } from '../utils/notify.js';
 
-export function taskRoutes(prisma: PrismaClient) {
+export function taskRoutes(prisma: PrismaClient, db: any) {
   const router = Router();
 
   router.get('/', async (_req, res) => {
@@ -38,6 +39,17 @@ export function taskRoutes(prisma: PrismaClient) {
           data: { id: randomUUID(), userId: t.createdBy, action: 'task.created', entityId: t.id, entityType: 'task', createdAt: new Date().toISOString() }
         });
       }
+
+      // Notify all assignees
+      if (t.assignees && Array.isArray(t.assignees)) {
+        for (const assigneeId of t.assignees) {
+          // Don't notify the creator if they assign themselves
+          if (assigneeId !== t.createdBy) {
+            await sendNotification(db, assigneeId, 'task_assigned', 'Công việc mới', `Bạn vừa được giao một công việc mới: ${t.title}`, t.id);
+          }
+        }
+      }
+
       res.json({ id: t.id });
     } catch (e) { res.status(500).json({ error: 'Failed task create' }); }
   });

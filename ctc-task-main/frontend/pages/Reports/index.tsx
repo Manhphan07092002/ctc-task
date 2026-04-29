@@ -9,6 +9,7 @@ import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTo
 import { ReportModal } from './ReportModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report } from '../../types';
+import * as XLSX from 'xlsx';
 
 export default function ReportsPage() {
   const { t } = useLanguage();
@@ -171,25 +172,21 @@ export default function ReportsPage() {
     await saveReport(consolidated);
   };
 
-  const exportCsv = () => {
-    const header = ['Tiêu đề', 'Phòng ban', 'Trạng thái', 'Tác giả', 'Người duyệt', 'Ngày tạo'];
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const rows = displayedReports.map(r => [
-      r.title,
-      r.department,
-      r.status,
-      getUserDetails(r.authorId)?.name || r.authorId,
-      (r.approvedBy && getUserDetails(r.approvedBy)?.name) || '',
-      r.approvedAt || r.submittedAt || r.createdAt,
-    ]);
-    const csv = [header, ...rows].map(row => row.map(escape).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bao-cao-${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportExcel = () => {
+    const data = displayedReports.map(r => ({
+      'Tiêu đề': r.title,
+      'Phòng ban': r.department,
+      'Trạng thái': r.status === 'Approved' ? 'Đã duyệt' : r.status === 'Pending' ? 'Chờ duyệt' : r.status === 'Rejected' ? 'Từ chối' : 'Nháp',
+      'Tác giả': getUserDetails(r.authorId)?.name || r.authorId,
+      'Người duyệt': r.approvedBy ? getUserDetails(r.approvedBy)?.name : '',
+      'Ngày tạo': new Date(r.createdAt).toLocaleDateString('vi-VN'),
+      'Ngày cập nhật': new Date(r.approvedAt || r.submittedAt || r.createdAt).toLocaleDateString('vi-VN')
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reports");
+    XLSX.writeFile(wb, `CTC_Reports_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const pendingList = canViewAll ? pendingDirectorReports : pendingManagerReports;
@@ -287,8 +284,8 @@ export default function ReportsPage() {
           <button onClick={() => setShowAnalytics(!showAnalytics)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors shadow-sm border ${showAnalytics ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
             <PieChart size={16}/> Thống kê
           </button>
-          <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-            <Download size={16}/> Xuất CSV
+          <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-200 rounded-xl hover:bg-green-50 transition-colors shadow-sm">
+            <Download size={16}/> Xuất Excel
           </button>
           {(canCreate || canApprove) && !canViewAll && (
             <button onClick={handleOpenCreate} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm">

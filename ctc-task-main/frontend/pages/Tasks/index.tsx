@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
-import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Flame, Trash2 } from 'lucide-react';
+import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Flame, Trash2, Download } from 'lucide-react';
 import { Task, User, TaskStatus, TaskPriority } from '../../types';
 import { AIAssistantHandle } from '../../components/AIAssistant';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import * as XLSX from 'xlsx';
 
 interface TasksPageProps {
   t: (key: string) => string;
@@ -65,6 +66,25 @@ export default function TasksPage({
     };
   }, [filteredTasks]);
 
+  const exportToExcel = () => {
+    const data = filteredTasks.map(t => ({
+      'Tiêu đề': t.title,
+      'Mô tả': t.description || '',
+      'Trạng thái': t.status === TaskStatus.DONE ? 'Hoàn thành' : t.status === TaskStatus.IN_PROGRESS ? 'Đang làm' : 'Cần làm',
+      'Độ ưu tiên': t.priority === TaskPriority.HIGH ? 'Cao' : t.priority === TaskPriority.MEDIUM ? 'Trung bình' : 'Thấp',
+      'Ngày bắt đầu': t.startDate,
+      'Hạn chót': t.dueDate || '',
+      'Phòng ban': t.department || '',
+      'Người được giao': t.assignees.map(id => users.find(u => u.id === id)?.name || id).join(', '),
+      'Tags': t.tags?.join(', ') || ''
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tasks");
+    XLSX.writeFile(wb, "CTC_Tasks_Export.xlsx");
+  };
+
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
       case TaskPriority.HIGH: return 'text-red-500 bg-red-50';
@@ -101,6 +121,9 @@ export default function TasksPage({
             </button>
           </div>
           
+          <Button variant="outline" className="text-green-600 border-green-200 hover:bg-green-50" onClick={exportToExcel}>
+            <Download size={18} className="mr-2" /> Xuất Excel
+          </Button>
           <Button variant="outline" className="text-brand-600 border-brand-200 hover:bg-brand-50" onClick={() => setIsSuggestionModalOpen(true)}>
             <Wand2 size={18} className="mr-2" /> {t('aiPlan')}
           </Button>

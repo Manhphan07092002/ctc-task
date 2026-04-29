@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
@@ -22,6 +23,8 @@ import { adminRoutes } from './routes/admin.js';
 import { eventRoutes } from './routes/events.js';
 import { activityRoutes } from './routes/activity.js';
 
+import { initSocket } from './socket.js';
+
 import { scheduleFridayReminder } from './schedulers/fridayReminder.js';
 import { scheduleNoteReminders } from './schedulers/noteReminder.js';
 import { scheduleDailyTaskReminder } from './schedulers/dailyTaskReminder.js';
@@ -31,8 +34,12 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  const httpServer = http.createServer(app);
   const PORT = process.env.PORT || 3000;
   const prisma = new PrismaClient();
+
+  // Khởi tạo Socket.io
+  initSocket(httpServer);
 
   // Middleware
   app.use(cors({
@@ -70,10 +77,10 @@ async function startServer() {
   app.use('/api/auth', authRoutes(db));
   app.use('/api/auth', forgotPasswordRoutes(db, mailer));
   app.use('/api/users', userRoutes(db, mailer));
-  app.use('/api/tasks', taskRoutes(prisma));
+  app.use('/api/tasks', taskRoutes(prisma, db));
   app.use('/api/notes', noteRoutes(db));
   app.use('/api/meetings', meetingRoutes(prisma, db));
-  app.use('/api/reports', reportRoutes(prisma));
+  app.use('/api/reports', reportRoutes(prisma, db));
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
@@ -98,7 +105,7 @@ async function startServer() {
     }
   });
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  httpServer.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
