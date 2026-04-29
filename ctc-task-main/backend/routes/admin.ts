@@ -65,7 +65,7 @@ export function adminRoutes(db: any, mailer: any) {
 
   router.get('/database/export', async (_req, res) => {
     try {
-      const file = process.env.DB_PATH || path.join(__dirname, '../../database.sqlite');
+      const file = process.env.DB_PATH || path.join(__dirname, '../database.sqlite');
       if (!fs.existsSync(file)) return res.status(404).json({ error: 'Database file not found' });
       res.setHeader('Content-Type', 'application/x-sqlite3');
       res.setHeader('Content-Disposition', 'attachment; filename="database.sqlite"');
@@ -76,7 +76,7 @@ export function adminRoutes(db: any, mailer: any) {
   router.post('/database/import', upload.single('file'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'Thiếu file import' });
-      const targetPath = process.env.DB_PATH || './database.sqlite';
+      const targetPath = process.env.DB_PATH || path.join(__dirname, '../database.sqlite');
       await fs.promises.copyFile(req.file.path, targetPath);
       await fs.promises.unlink(req.file.path).catch(() => { });
       res.json({ success: true });
