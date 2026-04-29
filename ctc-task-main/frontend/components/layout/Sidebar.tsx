@@ -1,9 +1,8 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { PlusCircle, LogOut } from 'lucide-react';
+import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote, Users, Settings, Video, FileText, Bell, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { NAV_ITEMS } from '../../constants';
 import { Button, Avatar } from '../UI';
 
 interface SidebarProps {
@@ -12,15 +11,68 @@ interface SidebarProps {
   openCreateModal: () => void;
 }
 
+// Grouped nav structure
+const NAV_GROUPS = [
+  {
+    label: 'Tổng quan',
+    items: [
+      { id: 'dashboard', icon: LayoutDashboard, path: '/', permission: null },
+    ],
+  },
+  {
+    label: 'Công việc',
+    items: [
+      { id: 'tasks',    icon: CheckSquare, path: '/tasks',    permission: ['view_all_tasks', 'manage_dept_tasks', 'view_own_tasks'] },
+      { id: 'calendar', icon: Calendar,    path: '/calendar', permission: ['view_all_tasks', 'manage_dept_tasks', 'view_own_tasks'] },
+      { id: 'reports',  icon: FileText,    path: '/reports',  permission: ['view_all_reports', 'approve_dept_reports', 'create_report', 'director_feedback'] },
+    ],
+  },
+  {
+    label: 'Giao tiếp',
+    items: [
+      { id: 'meetings',      icon: Video,  path: '/meetings',      permission: null },
+      { id: 'notes',         icon: StickyNote, path: '/notes',     permission: null },
+      { id: 'notifications', icon: Bell,   path: '/notifications', permission: null },
+    ],
+  },
+  {
+    label: 'Hệ thống',
+    items: [
+      { id: 'team',     icon: Users,    path: '/team',     permission: ['view_dept_users', 'manage_users'] },
+      { id: 'settings', icon: Settings, path: '/settings', permission: null },
+    ],
+  },
+];
+
+const NAV_LABELS: Record<string, string> = {
+  dashboard:     'Tổng quan',
+  tasks:         'Công việc',
+  calendar:      'Lịch',
+  reports:       'Báo cáo',
+  meetings:      'Cuộc họp',
+  notes:         'Ghi chú',
+  notifications: 'Thông báo',
+  team:          'Đội ngũ',
+  settings:      'Cài đặt',
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen, openCreateModal }) => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
 
   if (!user) return null;
 
+  const perms = user?.permissions || [];
+  const hasPerm = (p: string) => perms.includes(p);
+
+  const canSeeItem = (permission: string[] | null) => {
+    if (!permission) return true;
+    return permission.some(p => hasPerm(p));
+  };
+
   return (
     <>
-      {/* Mobile Sidebar Backdrop */}
+      {/* Mobile Backdrop */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/20 z-20 lg:hidden backdrop-blur-sm"
@@ -28,93 +80,99 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
         />
       )}
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <aside className={`
-        fixed inset-y-4 left-4 z-40 w-72 bg-white/70 backdrop-blur-3xl border border-white/60 shadow-2xl shadow-brand-500/10 rounded-[2rem] flex flex-col overflow-hidden transform transition-all duration-500 ease-out
+        fixed inset-y-4 left-4 z-40 w-64 bg-white/80 backdrop-blur-3xl border border-white/60 shadow-2xl shadow-brand-500/10 rounded-[2rem] flex flex-col overflow-hidden transform transition-all duration-500 ease-out
         ${isMobileMenuOpen ? 'translate-x-0 opacity-100' : '-translate-x-[120%] lg:translate-x-0 lg:opacity-100'}
       `}>
         <div className="h-full flex flex-col">
+
           {/* Logo */}
-          <div className="h-20 flex items-center px-8 border-b border-white/40">
-            <img src="/logo.png" alt="CTC Logo" className="h-10 w-auto object-contain mr-3 drop-shadow-sm mix-blend-multiply" />
-            <span className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 tracking-tight">
-              CTC Task
-            </span>
+          <div className="h-20 flex items-center px-6 border-b border-gray-100/80 flex-shrink-0">
+            <img src="/logo.png" alt="CTC Logo" className="h-9 w-auto object-contain mr-3 drop-shadow-sm mix-blend-multiply" />
+            <div>
+              <span className="text-base font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 tracking-tight block leading-tight">
+                CTC Tasks
+              </span>
+              <span className="text-[10px] text-gray-400 font-medium leading-tight block">Hệ thống quản lý</span>
+            </div>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            <div className="mb-6">
-              <Button onClick={() => openCreateModal()} className="w-full justify-center gap-2 shadow-brand-200 shadow-lg whitespace-nowrap" size="lg">
-                <PlusCircle size={20} /> {t('newTask')}
-              </Button>
-            </div>
+          {/* New Task Button */}
+          <div className="px-4 pt-4 pb-2 flex-shrink-0">
+            <Button onClick={() => openCreateModal()} className="w-full justify-center gap-2 shadow-brand-200/60 shadow-md" size="sm">
+              <PlusCircle size={16} /> Tạo công việc
+            </Button>
+          </div>
 
-            <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Menu</p>
-            {NAV_ITEMS.map(item => {
-              const perms = user?.permissions || [];
-              const hasPerm = (p: string) => perms.includes(p);
-              
-              if (item.id === 'tasks' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
-              if (item.id === 'calendar' && !hasPerm('view_all_tasks') && !hasPerm('manage_dept_tasks') && !hasPerm('view_own_tasks')) return null;
-              // meetings: tất cả mọi người đều có thể xem cuộc họp → không filter, tiếp tục render NavLink
-              if (item.id === 'reports' && !hasPerm('view_all_reports') && !hasPerm('approve_dept_reports') && !hasPerm('create_report') && !hasPerm('director_feedback')) return null;
-              if (item.id === 'team' && !hasPerm('view_dept_users') && !hasPerm('manage_users')) return null;
-              if (item.id === 'admin' && !hasPerm('admin_panel')) return null;
-
-              // Admin link navigates OUTSIDE the SPA to the standalone admin layout
-              if (item.id === 'admin') {
-                return (
-                  <a
-                    key={item.id}
-                    href="/admin"
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all text-gray-600 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-100"
-                  >
-                    <item.icon size={18} />
-                    {t(item.id)}
-                  </a>
-                );
-              }
-              
-              // Map legacy item.id to Router Paths
-              const path = item.id === 'dashboard' ? '/' : `/${item.id}`;
-
+          {/* Nav Groups */}
+          <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-4">
+            {NAV_GROUPS.map(group => {
+              const visibleItems = group.items.filter(item => canSeeItem(item.permission));
+              if (visibleItems.length === 0) return null;
               return (
-                <NavLink
-                  key={item.id}
-                  to={path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={({ isActive }) => `
-                    w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all
-                    ${isActive
-                      ? 'bg-brand-50 text-brand-600 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}
-                  `}
-                >
-                  <item.icon size={18} />
-                  {t(item.id)}
-                </NavLink>
+                <div key={group.label}>
+                  <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    {group.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {visibleItems.map(item => (
+                      <NavLink
+                        key={item.id}
+                        to={item.path}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={({ isActive }) => `
+                          w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all
+                          ${isActive
+                            ? 'bg-brand-50 text-brand-700 shadow-sm border border-brand-100'
+                            : 'text-gray-600 hover:bg-gray-100/80 hover:text-gray-900'
+                          }
+                        `}
+                      >
+                        <item.icon size={17} className="flex-shrink-0" />
+                        {NAV_LABELS[item.id] || t(item.id)}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
               );
             })}
           </nav>
 
-          {/* User Profile */}
-          <div className="p-4 border-t border-gray-100">
+          {/* Bottom Section: Admin + User */}
+          <div className="flex-shrink-0 border-t border-gray-100 pt-2 pb-3 px-3 space-y-1">
+            {/* Admin link */}
+            {hasPerm('admin_panel') && (
+              <a
+                href="/admin"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100"
+              >
+                <Shield size={17} className="flex-shrink-0" />
+                Quản trị viên
+              </a>
+            )}
+
+            {/* User profile / logout */}
             <div
-              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+              className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100/80 cursor-pointer transition-colors group"
               onClick={logout}
-              title="Click to Logout"
+              title="Đăng xuất"
             >
-              <Avatar src={user.avatar} alt={user.name} />
+              <Avatar src={user.avatar} alt={user.name} size={8} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                <p className="text-xs text-gray-500 truncate">{user.role}</p>
+                <p className="text-sm font-semibold text-gray-900 truncate leading-tight">{user.name}</p>
+                <p className="text-[11px] text-gray-400 truncate leading-tight">{user.role}</p>
               </div>
-              <LogOut size={16} className="text-gray-400 group-hover:text-red-500 transition-colors" />
+              <LogOut size={15} className="text-gray-300 group-hover:text-red-500 transition-colors flex-shrink-0" />
             </div>
           </div>
+
         </div>
       </aside>
     </>
   );
 };
+
+
+
+

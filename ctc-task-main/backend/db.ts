@@ -84,7 +84,9 @@ export async function initDb() {
     'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;',
     'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',
     'ALTER TABLE reports ADD COLUMN managerFeedback TEXT;',
+    'ALTER TABLE reports ADD COLUMN deletedAt TEXT;',
     'ALTER TABLE notes ADD COLUMN userId TEXT;',
+    'ALTER TABLE notes ADD COLUMN reminderAt TEXT;',
   ];
   for (const sql of migrations) {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }
