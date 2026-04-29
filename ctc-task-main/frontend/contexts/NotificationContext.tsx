@@ -1,5 +1,6 @@
 import { apiFetch } from '../services/api';
 import { io } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Bell, CheckCircle, AlertCircle, X, FileText, StickyNote } from 'lucide-react';
@@ -43,6 +44,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [toasts, setToasts] = useState<AppNotification[]>([]);
   const [simpleToasts, setSimpleToasts] = useState<(ToastOptions & { id: string })[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const navigate = useNavigate();
   const isFirstLoad = useRef(true);
   const prevIds = useRef<Set<string>>(new Set());
   const firedReminders = useRef<Set<string>>(new Set()); // note ids already reminded
@@ -129,6 +131,39 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   }, [user]);
 
+  // Global mail polling
+  useEffect(() => {
+    if (!user) return;
+    const checkNewMail = async () => {
+      try {
+        const res = await apiFetch('/api/mail/check-new');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.uid && !data.isRead) {
+          const lastSeenUid = localStorage.getItem(`last_mail_uid_${user.id}`);
+          if (!lastSeenUid || parseInt(lastSeenUid, 10) < data.uid) {
+            localStorage.setItem(`last_mail_uid_${user.id}`, data.uid.toString());
+            pushLocalNotification({
+              userId: user.id,
+              type: 'new_mail',
+              title: `📩 Email từ ${data.fromName || data.from || 'Ai đó'}`,
+              message: data.subject || '(Không có tiêu đề)'
+            });
+            playSound();
+          }
+        }
+      } catch (e) { }
+    };
+    
+    // Check shortly after login, then every 60s
+    const timeout = setTimeout(checkNewMail, 5000);
+    const interval = setInterval(checkNewMail, 60000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [user]);
+
   // Replace polling with Socket.io
   useEffect(() => {
     refresh(); // initial fetch
@@ -203,7 +238,19 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto w-[340px] backdrop-blur-xl border shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300
+              onClick={() => {
+                if (t.type === 'new_mail') {
+                  navigate(t.relatedId ? `/mail?mailId=${t.relatedId}` : '/mail');
+                } else if (isNoteReminder) {
+                  navigate('/notes');
+                } else if (isReportReminder) {
+                  navigate('/reports');
+                } else if (isDailyTaskReminder) {
+                  navigate('/tasks');
+                }
+                dismissToast(t.id);
+              }}
+              className={`cursor-pointer pointer-events-auto w-[340px] backdrop-blur-xl border shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] rounded-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-8 fade-in duration-300
                 ${isReportReminder  ? 'bg-violet-600 border-violet-500/50 text-white'
                   : isNoteReminder   ? 'bg-amber-50 border-amber-200 text-gray-800'
                   : isDailyTaskReminder ? 'bg-blue-600 border-blue-500/50 text-white'

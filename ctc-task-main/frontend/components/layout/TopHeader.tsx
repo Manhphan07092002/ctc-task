@@ -93,7 +93,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     if (!n.isRead) markRead(n.id);
     setOpen(false);
     
-    if (n.type.startsWith('report_') || n.title.toLowerCase().includes('báo cáo') || n.title.toLowerCase().includes('bao cao')) {
+    if (n.type === 'new_mail' || n.title.toLowerCase().includes('email')) {
+      navigate(n.relatedId ? `/mail?mailId=${n.relatedId}` : '/mail');
+    } else if (n.type.startsWith('report_') || n.title.toLowerCase().includes('báo cáo') || n.title.toLowerCase().includes('bao cao')) {
       navigate('/reports');
     } else if (n.type.startsWith('task_') || n.title.toLowerCase().includes('công việc')) {
       navigate('/tasks');

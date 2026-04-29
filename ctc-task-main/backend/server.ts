@@ -53,7 +53,7 @@ async function startServer() {
   // Rate Limiting
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 200,
+    max: 5000, // Increased to support aggressive UI polling (meetings, notifications, mail)
     message: { error: 'Too many requests from this IP' }
   });
   const loginLimiter = rateLimit({

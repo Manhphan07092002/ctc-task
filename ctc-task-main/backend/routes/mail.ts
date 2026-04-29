@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import { simpleParser } from 'mailparser';
 import multer from 'multer';
 import MailComposer from 'nodemailer/lib/mail-composer';
+import tls from 'tls';
 import { encrypt, decrypt } from '../utils/cryptoUtils.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -23,8 +24,7 @@ export function mailRoutes(db: any) {
     console.log(`[IMAP Connect] Vừa nhận yêu cầu đăng nhập từ tài khoản: "${email}"`);
 
     try {
-      const tls = require('tls');
-      const authResult = await new Promise<{success: boolean, reason?: string}>((resolve, reject) => {
+      const authResult = await new Promise<{ success: boolean, reason?: string }>((resolve, reject) => {
         const socket = tls.connect(IMAP_PORT, IMAP_HOST, { rejectUnauthorized: false });
 
         // Timeout after 15s
@@ -32,7 +32,7 @@ export function mailRoutes(db: any) {
           socket.destroy();
           resolve({ success: false, reason: 'Connection timeout' });
         }, 15000);
-        
+
         let buffer = '';
         let loginAttempt = 1; // 1 = full email, 2 = username only
         let greetingReceived = false;
@@ -67,7 +67,7 @@ export function mailRoutes(db: any) {
             }
           }
         });
-        
+
         socket.on('error', (err: any) => {
           clearTimeout(timer);
           resolve({ success: false, reason: err.message });
@@ -83,7 +83,7 @@ export function mailRoutes(db: any) {
       const mailAuthData = JSON.stringify({ email, password });
       const encryptedData = encrypt(mailAuthData);
       await db.run('UPDATE users SET mailPassword = ? WHERE id = ?', [encryptedData, req.user.id]);
-      
+
       res.json({ success: true, message: 'Connected successfully' });
     } catch (error: any) {
       console.error('Mail connect error:', error);
@@ -99,7 +99,7 @@ export function mailRoutes(db: any) {
   const getImapClient = async (userId: string, defaultEmail: string) => {
     const user = await db.get('SELECT mailPassword FROM users WHERE id = ?', [userId]);
     if (!user || !user.mailPassword) throw new Error('No mail credentials found');
-    
+
     const decryptedStr = decrypt(user.mailPassword);
     if (!decryptedStr) throw new Error('Failed to decrypt password');
 
@@ -125,7 +125,7 @@ export function mailRoutes(db: any) {
         rejectUnauthorized: false
       }
     });
-    
+
     try {
       await client.connect();
     } catch (err: any) {
@@ -153,7 +153,7 @@ export function mailRoutes(db: any) {
   const getSmtpTransporter = async (userId: string, defaultEmail: string) => {
     const user = await db.get('SELECT mailPassword FROM users WHERE id = ?', [userId]);
     if (!user || !user.mailPassword) throw new Error('No mail credentials found');
-    
+
     const decryptedStr = decrypt(user.mailPassword);
     if (!decryptedStr) throw new Error('Failed to decrypt password');
 
@@ -178,7 +178,7 @@ export function mailRoutes(db: any) {
         rejectUnauthorized: false
       }
     });
-    
+
     try {
       await transporter.verify();
     } catch (err: any) {
@@ -264,10 +264,10 @@ export function mailRoutes(db: any) {
   const resolveFolder = async (client: any, folderKey: string): Promise<string> => {
     // Try to list mailboxes to find real folder names
     const folderMap: Record<string, string[]> = {
-      sent:    ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'],
-      trash:   ['Trash', 'Deleted Items', 'Deleted Messages', 'INBOX.Trash'],
+      sent: ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'],
+      trash: ['Trash', 'Deleted Items', 'Deleted Messages', 'INBOX.Trash'],
       starred: ['Starred', 'Flagged', 'INBOX.Starred'],
-      inbox:   ['INBOX'],
+      inbox: ['INBOX'],
     };
     const candidates = folderMap[folderKey] || ['INBOX'];
     for (const name of candidates) {
@@ -280,30 +280,66 @@ export function mailRoutes(db: any) {
     return 'INBOX';
   };
 
+  // 3c. Check for new unseen mail globally
+  router.get('/check-new', requireAuth, async (req: any, res: any) => {
+    try {
+      const client = await getImapClient(req.user.id, req.user.email);
+      const folderName = await resolveFolder(client, 'inbox');
+      const lock = await client.getMailboxLock(folderName);
+      try {
+        const mailbox = client.mailbox;
+        if (mailbox !== false && mailbox.exists > 0) {
+          const count = mailbox.exists;
+          for await (let msg of client.fetch(count.toString(), { envelope: true, flags: true, uid: true })) {
+            const isRead = msg.flags ? msg.flags.has('\\Seen') : false;
+            return res.json({ 
+              uid: msg.uid, 
+              subject: msg.envelope?.subject, 
+              fromName: msg.envelope?.from?.[0]?.name,
+              from: msg.envelope?.from?.[0]?.address,
+              isRead 
+            });
+          }
+        }
+        res.json({ uid: null });
+      } finally {
+        lock.release();
+        await client.logout();
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 4. Fetch Folder (inbox / sent / trash / starred)
+
   router.get('/inbox', requireAuth, async (req: any, res: any) => {
     const folderKey = (req.query.folder as string || 'inbox').toLowerCase();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+
     try {
       const client = await getImapClient(req.user.id, req.user.email);
       const folderName = await resolveFolder(client, folderKey);
       const lock = await client.getMailboxLock(folderName);
-      
+
       try {
         const messages: any[] = [];
         const seenMessageIds = new Set<string>();
         const mailbox = client.mailbox;
         if (mailbox !== false) {
           const count = mailbox.exists || 0;
-          const start = Math.max(1, count - 49);
-          const seq = count > 0 ? `${start}:${count}` : '1:*';
-          
-          if (count > 0) {
+          const end = count - (page - 1) * limit;
+          const start = Math.max(1, end - limit + 1);
+
+          if (end > 0) {
+            const seq = `${start}:${end}`;
             for await (let msg of client.fetch(seq, { envelope: true, flags: true, uid: true })) {
               const envelope = msg.envelope;
               const flags = msg.flags ? Array.from(msg.flags) : [];
               const isRead = msg.flags ? msg.flags.has('\\Seen') : false;
               const isStarred = msg.flags ? msg.flags.has('\\Flagged') : false;
-              
+
               if (folderKey === 'starred' && !isStarred) continue;
 
               // Deduplicate by Message-ID to fix duplicate email display issue
@@ -315,7 +351,7 @@ export function mailRoutes(db: any) {
               const fromName = envelope?.from?.[0]?.name || '';
               const toAddress = envelope?.to?.[0]?.address || '';
               const toName = envelope?.to?.[0]?.name || '';
-              
+
               messages.push({
                 id: msg.uid,
                 subject: envelope?.subject || '',
@@ -367,6 +403,29 @@ export function mailRoutes(db: any) {
     }
   });
 
+  // 4b2. Mark read / unread
+  router.patch('/message/:uid/read', requireAuth, async (req: any, res: any) => {
+    const { folder = 'INBOX', isRead } = req.body;
+    try {
+      const client = await getImapClient(req.user.id, req.user.email);
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const uid = req.params.uid;
+        if (isRead) {
+          await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+        } else {
+          await client.messageFlagsRemove(uid, ['\\Seen'], { uid: true });
+        }
+        res.json({ success: true });
+      } finally {
+        lock.release();
+        await client.logout();
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 4c. Move to Trash
   router.delete('/message/:uid', requireAuth, async (req: any, res: any) => {
     const { folder = 'INBOX' } = req.query;
@@ -376,7 +435,7 @@ export function mailRoutes(db: any) {
       try {
         const uid = req.params.uid;
         await client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
-        await client.messageMove(uid, 'Trash', { uid: true }).catch(() => {});
+        await client.messageMove(uid, 'Trash', { uid: true }).catch(() => { });
         res.json({ success: true });
       } finally {
         lock.release();
@@ -393,15 +452,15 @@ export function mailRoutes(db: any) {
     try {
       const client = await getImapClient(req.user.id, req.user.email);
       const lock = await client.getMailboxLock(folder);
-      
+
       try {
         const uid = parseInt(req.params.uid, 10);
         const msg = await client.fetchOne(uid.toString(), { source: true }, { uid: true });
-        
+
         if (!msg || !msg.source) return res.status(404).json({ error: 'Message not found' });
-        
+
         const parsed = await simpleParser(msg.source);
-        
+
         // Mark as read
         await client.messageFlagsAdd(uid.toString(), ['\\Seen'], { uid: true });
 
@@ -435,7 +494,7 @@ export function mailRoutes(db: any) {
 
   // 6. Send Email + Save to Sent folder
   router.post('/send', requireAuth, upload.array('attachments', 10), async (req: any, res: any) => {
-    const { to, subject, body } = req.body;
+    const { to, subject, body, cc, bcc } = req.body;
     if (!to || !subject) return res.status(400).json({ error: 'To and Subject are required' });
 
     try {
@@ -451,7 +510,7 @@ export function mailRoutes(db: any) {
           const parsed = JSON.parse(decrypted);
           if (parsed.email) mailEmail = parsed.email;
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const transporter = await getSmtpTransporter(req.user.id, mailEmail);
 
@@ -481,7 +540,7 @@ export function mailRoutes(db: any) {
         return res.status(400).json({ error: 'Tổng dung lượng đính kèm không được vượt quá 25MB.' });
       }
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: fromLabel,
         to,
         subject,
@@ -489,6 +548,8 @@ export function mailRoutes(db: any) {
         text: body ? body.replace(/<[^>]*>/g, '') : '',
         attachments: mailAttachments
       };
+      if (cc) mailOptions.cc = cc;
+      if (bcc) mailOptions.bcc = bcc;
 
       const info = await transporter.sendMail(mailOptions);
 
