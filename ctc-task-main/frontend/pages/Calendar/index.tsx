@@ -384,7 +384,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                       className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-bold truncate"
                       style={{ background: evt.color + '18', color: evt.color, borderLeftColor: evt.color }}
                     >
-                      <span>{evt.type === 'holiday' ? '🎌' : evt.type === 'company' ? '🏢' : '📌'}</span>
+                      <span>{evt.type === 'holiday' ? '🎉' : evt.type === 'company' ? '🏢' : '📌'}</span>
                       <span className="truncate">{evt.title}</span>
                     </div>
                   ))}

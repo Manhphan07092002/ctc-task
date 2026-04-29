@@ -13,7 +13,7 @@ interface CalendarEvent {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  holiday: '🎌 Ngày lễ Quốc gia',
+  holiday: '🎉 Ngày lễ Quốc gia',
   company:  '🏢 Sự kiện Công ty',
   other:    '📌 Khác',
 };
@@ -97,7 +97,7 @@ export default function AdminEventManagement() {
 
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap">
-        {[['all', '🗂️ Tất cả'], ['holiday', '🎌 Ngày lễ'], ['company', '🏢 Công ty'], ['other', '📌 Khác']].map(([v, l]) => (
+        {[['all', '🗂️ Tất cả'], ['holiday', '🎉 Ngày lễ'], ['company', '🏢 Công ty'], ['other', '📌 Khác']].map(([v, l]) => (
           <button
             key={v}
             onClick={() => setFilterType(v)}
@@ -216,7 +216,7 @@ export default function AdminEventManagement() {
                   <label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Loại sự kiện</label>
                   <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
                     className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    <option value="holiday">🎌 Ngày lễ Quốc gia</option>
+                    <option value="holiday">🎉 Ngày lễ Quốc gia</option>
                     <option value="company">🏢 Sự kiện Công ty</option>
                     <option value="other">📌 Khác</option>
                   </select>
