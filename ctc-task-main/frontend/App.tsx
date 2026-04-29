@@ -372,16 +372,8 @@ export default function CTCTaskApp() {
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
 
-              <Route path="/meetings" element={
-                (user?.permissions || []).some(p => p === 'join_meetings' || p === 'manage_meetings')
-                  ? <React.Suspense fallback={<div className="p-8 text-center">Loading Meetings...</div>}><MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} /></React.Suspense>
-                  : <Navigate to="/" replace />
-              } />
-              <Route path="/meetings/join/:meetingId" element={
-                (user?.permissions || []).some(p => p === 'join_meetings' || p === 'manage_meetings')
-                  ? <React.Suspense fallback={<div className="p-8 text-center">Loading Meeting Room...</div>}><JoinMeetingPage onJoinMeeting={setActiveMeeting} /></React.Suspense>
-                  : <Navigate to="/" replace />
-              } />
+              <Route path="/meetings" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meetings...</div>}><MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} /></React.Suspense>} />
+              <Route path="/meetings/join/:meetingId" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meeting Room...</div>}><JoinMeetingPage onJoinMeeting={setActiveMeeting} /></React.Suspense>} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/forgot-password" element={<Navigate to="/" replace />} />
               <Route path="/reset-password" element={<Navigate to="/" replace />} />
