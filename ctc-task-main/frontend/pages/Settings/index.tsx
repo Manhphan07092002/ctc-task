@@ -1,7 +1,7 @@
 import { apiFetch } from '../../services/api';
 
 import React, { useState, useEffect } from 'react';
-import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, Eye, EyeOff, AlertTriangle, Mail, Wifi, WifiOff, RefreshCw, Unlink } from 'lucide-react';
+import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, Eye, EyeOff, AlertTriangle, Mail, Wifi, WifiOff, RefreshCw, Unlink, Monitor } from 'lucide-react';
 import { Button, Card, Avatar } from "../../components/UI";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +29,7 @@ export const SettingsView: React.FC = () => {
 
   // Appearance
   const [language, setLanguage] = useState<'vi' | 'en'>('vi');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
 
   // Security
   const [currentPassword, setCurrentPassword] = useState('');
@@ -64,6 +65,7 @@ export const SettingsView: React.FC = () => {
         setReportNotifs(user.preferences.reportNotifs ?? true);
         setMeetingNotifs(user.preferences.meetingNotifs ?? true);
         setLanguage(user.preferences.language || 'vi');
+        setTheme(user.preferences.theme || 'system');
       }
     }
   }, [user]);
@@ -103,7 +105,8 @@ export const SettingsView: React.FC = () => {
           taskNotifs,
           reportNotifs,
           meetingNotifs,
-          language
+          language,
+          theme
         }
       };
       await saveUser(updatedUser);
@@ -312,35 +315,89 @@ export const SettingsView: React.FC = () => {
 
       case 'appearance':
         return (
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Theme Selection */}
             <div>
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Ngôn ngữ hệ thống</h3>
-              <div className="flex gap-3">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Sun size={16} /> Chế độ hiển thị
+              </h3>
+              <div className="grid grid-cols-3 gap-4">
                 {[
-                  { value: 'vi', label: '🇻🇳  Tiếng Việt' },
-                  { value: 'en', label: '🇺🇸  English' },
+                  { value: 'light', label: 'Sáng', icon: <Sun size={20} /> },
+                  { value: 'dark', label: 'Tối', icon: <Moon size={20} /> },
+                  { value: 'system', label: 'Hệ thống', icon: <Monitor size={20} /> },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setTheme(opt.value as 'light' | 'dark' | 'system')}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${theme === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-100 bg-white text-gray-500 hover:border-blue-200 hover:bg-gray-50'}`}
+                  >
+                    <div className="mb-2">{opt.icon}</div>
+                    <span className="text-sm font-medium">{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Language Selection */}
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Globe size={16} /> Ngôn ngữ hệ thống
+              </h3>
+              <div className="flex gap-4">
+                {[
+                  { value: 'vi', label: '🇻🇳 Tiếng Việt', desc: 'Ngôn ngữ chính' },
+                  { value: 'en', label: '🇺🇸 English', desc: 'Sắp ra mắt' },
                 ].map(opt => (
                   <button
                     key={opt.value}
                     onClick={() => setLanguage(opt.value as 'vi' | 'en')}
-                    className={`px-5 py-2.5 text-sm font-medium rounded-xl border transition-all ${language === opt.value ? 'bg-blue-500 text-white border-blue-500 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                    className={`flex-1 flex flex-col items-start p-4 rounded-xl border-2 transition-all ${language === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white hover:border-blue-200'}`}
                   >
-                    {opt.label}
+                    <span className={`text-sm font-bold ${language === opt.value ? 'text-blue-700' : 'text-gray-700'}`}>{opt.label}</span>
+                    <span className="text-xs text-gray-500 mt-1">{opt.desc}</span>
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">Thay đổi sẽ có hiệu lực sau khi tải lại trang.</p>
             </div>
 
-            <div className="border-t border-gray-100 pt-5">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Thông tin tài khoản</h3>
-              <div className="bg-gray-50 rounded-xl p-5 grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-gray-500">ID người dùng:</span> <span className="font-mono ml-1 text-gray-700">{user.id}</span></div>
-                <div><span className="text-gray-500">Email:</span> <span className="ml-1 text-gray-700">{user.email}</span></div>
-                <div><span className="text-gray-500">Phòng ban:</span> <span className="ml-1 text-gray-700">{user.department}</span></div>
-                <div><span className="text-gray-500">Vai trò:</span> <span className="ml-1 text-gray-700">{user.role}</span></div>
+            {/* Account Info (Moved to bottom, styled nicely) */}
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Thông tin tài khoản</h3>
+              <div className="bg-gray-50/50 rounded-2xl p-5 border border-gray-100">
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                  <div>
+                    <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">ID Hệ thống</span>
+                    <span className="font-mono text-gray-800 bg-white px-2 py-1 rounded shadow-sm border border-gray-100">{user.id}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Email đăng nhập</span>
+                    <span className="text-gray-800 font-medium">{user.email}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Phòng ban</span>
+                    <span className="text-gray-800">{user.department}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Vai trò</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {user.role}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Save Button */}
+            <div className="border-t border-gray-100 pt-6 flex justify-end">
+              <button
+                onClick={handleSavePreferences}
+                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+              >
+                <Save size={16} /> Lưu cấu hình giao diện
+              </button>
+            </div>
+            {saveSuccess && <p className="text-sm text-green-600 text-right flex items-center justify-end gap-1.5"><CheckCircle size={15}/> Cập nhật thành công!</p>}
           </div>
         );
 

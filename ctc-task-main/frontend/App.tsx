@@ -55,6 +55,21 @@ export default function CTCTaskApp() {
     }
   }, [notes, setNotes]);
 
+  // Apply Theme
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const theme = user?.preferences?.theme || 'system';
+
+    root.classList.remove('light', 'dark');
+
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+  }, [user?.preferences?.theme]);
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);

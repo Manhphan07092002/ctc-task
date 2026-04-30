@@ -348,6 +348,7 @@ export default function MailPage() {
     const newVal = !email.isRead;
     setInbox(prev => prev.map(m => m.id === email.id ? { ...m, isRead: newVal } : m));
     if (selectedMail?.id === email.id) setSelectedMail(prev => prev ? { ...prev, isRead: newVal } : prev);
+    window.dispatchEvent(new Event('mail-count-changed'));
     try {
       await apiFetch(`/api/mail/message/${email.id}/read`, {
         method: 'PATCH',
@@ -462,6 +463,7 @@ export default function MailPage() {
       });
       
       if (res.ok) {
+        window.dispatchEvent(new Event('mail-count-changed'));
         showToast({ type: 'success', title: action === 'delete' ? 'Đã xoá thành công' : 'Đã khôi phục thành công' });
         if (selectAllInMailbox) {
           setInbox([]);
@@ -580,6 +582,9 @@ export default function MailPage() {
   const readMail = async (email: Email) => {
     setIsLoadingMail(true);
     setSelectedMail(null);
+    if (!email.isRead) {
+      window.dispatchEvent(new Event('mail-count-changed'));
+    }
     setInbox(prev => prev.map(m => m.id === email.id ? { ...m, isRead: true } : m));
     try {
       const folder = email.folder || 'INBOX';

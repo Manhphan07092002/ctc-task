@@ -100,6 +100,7 @@ export interface User {
     meetingNotifs?: boolean;
     emailNotifs?: boolean;
     language?: 'vi' | 'en';
+    theme?: 'light' | 'dark' | 'system';
   };
 }
 

@@ -4,6 +4,7 @@ import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote,
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button, Avatar } from '../UI';
+import { apiFetch } from '../../services/api';
 
 interface SidebarProps {
   isMobileMenuOpen: boolean;
@@ -61,6 +62,42 @@ const NAV_LABELS: Record<string, string> = {
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileMenuOpen, openCreateModal }) => {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
+  const [unreadMailCount, setUnreadMailCount] = React.useState(0);
+
+  // Fetch unread mail count periodically
+  React.useEffect(() => {
+    if (!user) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await apiFetch('/api/mail/unread-count');
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadMailCount(data.count || 0);
+        }
+      } catch (err) {
+        console.error('Failed to fetch unread mail count:', err);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000); // Check every 30 seconds
+    window.addEventListener('mail-count-changed', fetchUnreadCount);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('mail-count-changed', fetchUnreadCount);
+    };
+  }, [user]);
+
+  // Update document title
+  React.useEffect(() => {
+    if (unreadMailCount > 0) {
+      document.title = `(${unreadMailCount}) CTC Tasks`;
+    } else {
+      document.title = 'CTC Tasks';
+    }
+  }, [unreadMailCount]);
 
   if (!user) return null;
 
@@ -132,7 +169,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
                         `}
                       >
                         <item.icon size={17} className="flex-shrink-0" />
-                        {NAV_LABELS[item.id] || t(item.id)}
+                        <span className="flex-1 truncate">{NAV_LABELS[item.id] || t(item.id)}</span>
+                        {item.id === 'mail' && unreadMailCount > 0 && (
+                          <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center min-w-[20px]">
+                            {unreadMailCount > 99 ? '99+' : unreadMailCount}
+                          </span>
+                        )}
                       </NavLink>
                     ))}
                   </div>
