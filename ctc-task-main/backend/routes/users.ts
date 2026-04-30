@@ -16,9 +16,9 @@ export function userRoutes(db: any, mailer: any) {
       await db.run(`ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN dob TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN hometown TEXT DEFAULT ''`).catch(() => {});
-      await db.run(`ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'`).catch(() => {});
-      const users = await db.all(`SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, u.bio, u.phone, u.dob, u.hometown, u.preferences, r.permissions FROM users u LEFT JOIN roles r ON u.role = r.name`);
-      res.json(users.map((u: any) => ({ ...u, permissions: u.permissions ? JSON.parse(u.permissions) : [], preferences: u.preferences ? JSON.parse(u.preferences) : {} })));
+      await db.run(`ALTER TABLE users ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0`).catch(() => {});
+      const users = await db.all(`SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, u.bio, u.phone, u.dob, u.hometown, u.preferences, u.isLocked, r.permissions FROM users u LEFT JOIN roles r ON u.role = r.name`);
+      res.json(users.map((u: any) => ({ ...u, isLocked: Boolean(u.isLocked), permissions: u.permissions ? JSON.parse(u.permissions) : [], preferences: u.preferences ? JSON.parse(u.preferences) : {} })));
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
@@ -63,11 +63,37 @@ export function userRoutes(db: any, mailer: any) {
       if (!user) return res.status(404).json({ error: 'User not found' });
       const finalPassword = newPassword && String(newPassword).trim().length >= 6 ? String(newPassword).trim() : generateRandomPassword(8);
       const hashed = await bcrypt.hash(finalPassword, 10);
-      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashed, req.params.id]);
+      await db.run('UPDATE users SET password = ?, failedLogins = 0, lockedUntil = NULL, isLocked = 0 WHERE id = ?', [hashed, req.params.id]);
       await db.run("UPDATE password_reset_requests SET status = 'resolved' WHERE userId = ? AND status = 'pending'", [req.params.id]);
       const emailSent = await mailer.sendResetPasswordEmail(user.email, finalPassword);
       return res.json({ success: true, emailSent, generatedPassword: finalPassword });
     } catch (e) { console.error('reset-password error', e); res.status(500).json({ error: 'Failed' }); }
+  });
+
+  router.put('/:id/lock', async (req, res) => {
+    try {
+      await db.run('UPDATE users SET isLocked = 1, lockedUntil = NULL, failedLogins = 0 WHERE id = ?', [req.params.id]);
+      try {
+        await db.run(
+          `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), req.params.id, 'Khóa tài khoản', req.params.id, 'user', 'Admin chủ động khóa tài khoản', new Date().toISOString()]
+        );
+      } catch (e) {}
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  router.put('/:id/unlock', async (req, res) => {
+    try {
+      await db.run('UPDATE users SET isLocked = 0, lockedUntil = NULL, failedLogins = 0 WHERE id = ?', [req.params.id]);
+      try {
+        await db.run(
+          `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), req.params.id, 'Mở khóa tài khoản', req.params.id, 'user', 'Admin mở khóa tài khoản', new Date().toISOString()]
+        );
+      } catch (e) {}
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   return router;

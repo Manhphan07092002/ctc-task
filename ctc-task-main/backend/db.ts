@@ -129,6 +129,9 @@ export async function initDb() {
   const migrations = [
     'ALTER TABLE users ADD COLUMN password TEXT;',
     'ALTER TABLE users ADD COLUMN mailPassword TEXT;',
+    'ALTER TABLE users ADD COLUMN failedLogins INTEGER NOT NULL DEFAULT 0;',
+    'ALTER TABLE users ADD COLUMN lockedUntil TEXT;',
+    'ALTER TABLE users ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0;',
     "ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';",
     'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;',
     'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',

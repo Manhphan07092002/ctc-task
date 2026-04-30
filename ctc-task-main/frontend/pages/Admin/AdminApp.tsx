@@ -12,12 +12,13 @@ import AdminRoleManagement from './RoleManagement';
 import AdminDepartmentManagement from './DepartmentManagement';
 import AdminDatabaseManagement from './DatabaseManagement';
 import AdminEventManagement from './EventManagement';
+import AdminActivityLogsManagement from './ActivityLogsManagement';
 import { AdminTabGroup, TabItem } from './AdminTabGroup';
 import {
   Shield, LayoutDashboard, Users, Settings, LogOut,
   Bell, ChevronRight, Activity, Menu, X,
   CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays,
-  Layers, Settings2
+  Layers, Settings2, List
 } from 'lucide-react';
 
 const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -174,6 +175,7 @@ const OrganizationTabs: TabItem[] = [
   { id: 'users', label: 'Quản lý Người dùng', icon: Users, component: AdminUserManagement },
   { id: 'roles', label: 'Quản lý Vai trò', icon: ShieldCheck, component: AdminRoleManagement },
   { id: 'departments', label: 'Quản lý Phòng ban', icon: Building2, component: AdminDepartmentManagement },
+  { id: 'logs', label: 'Nhật ký Hoạt động', icon: List, component: AdminActivityLogsManagement },
 ];
 
 const OperationsTabs: TabItem[] = [

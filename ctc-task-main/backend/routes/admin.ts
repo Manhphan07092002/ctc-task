@@ -209,7 +209,12 @@ export function adminRoutes(db: any, mailer: any) {
       const roleBreakdown = await db.all('SELECT role, COUNT(*) as count FROM users GROUP BY role');
       const taskStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM tasks GROUP BY status');
       const taskDeptBreakdown = await db.all('SELECT department, COUNT(*) as count FROM tasks GROUP BY department');
+      const reportStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM reports GROUP BY status');
       
+      const logsCountResult = await db.get('SELECT COUNT(*) as count FROM activity_logs');
+      const emailsCountResult = await db.get('SELECT COUNT(*) as count FROM scheduled_emails');
+      const sentEmailsCountResult = await db.get('SELECT COUNT(*) as count FROM mail_tracking');
+      const resetRequestsCountResult = await db.get('SELECT COUNT(*) as count FROM password_reset_requests WHERE status="pending"');
       let dbSize = 0;
       try {
         const dbPath = path.resolve(process.env.DB_PATH || 'database.sqlite');
@@ -229,10 +234,31 @@ export function adminRoutes(db: any, mailer: any) {
       res.json({ 
         totalUsers: userCountDesc.count, totalTasks: taskCountDesc.count, 
         totalReports: reportCountDesc.count, activeMeetings: meetingCountDesc.count, 
-        roleBreakdown, taskStatusBreakdown, taskDeptBreakdown,
+        totalLogs: logsCountResult ? logsCountResult.count : 0,
+        scheduledEmails: emailsCountResult ? emailsCountResult.count : 0,
+        sentEmails: sentEmailsCountResult ? sentEmailsCountResult.count : 0,
+        pendingResets: resetRequestsCountResult ? resetRequestsCountResult.count : 0,
+        roleBreakdown, taskStatusBreakdown, taskDeptBreakdown, reportStatusBreakdown,
         systemInfo
       });
     } catch (e) { res.status(500).json({ error: 'Failed to fetch admin stats' }); }
+  });
+
+  // --- Detailed Logs & Emails ---
+  router.get('/activity-logs', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await db.all('SELECT * FROM activity_logs ORDER BY createdAt DESC LIMIT ?', [limit]);
+      res.json(logs);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch logs' }); }
+  });
+
+  router.get('/scheduled-emails', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const emails = await db.all('SELECT * FROM scheduled_emails ORDER BY scheduledAt ASC LIMIT ?', [limit]);
+      res.json(emails);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch emails' }); }
   });
 
   return router;

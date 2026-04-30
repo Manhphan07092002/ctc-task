@@ -31,9 +31,82 @@ export function authRoutes(db: any) {
     const { email, password } = req.body;
     try {
       const user = await db.get('SELECT * FROM users WHERE lower(email) = lower(?)', [email]);
-      if (!user || !user.password || !password) return res.status(401).json({ error: 'Invalid credentials' });
+      
+      if (!user) {
+        try {
+          await db.run(
+            `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [crypto.randomUUID(), 'system', 'Đăng nhập thất bại', null, 'user', `Cố gắng đăng nhập với email không tồn tại: ${email}`, new Date().toISOString()]
+          );
+        } catch (e) {}
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      if (user.isLocked) {
+        return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin để được hỗ trợ.' });
+      }
+
+      if (user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now()) {
+        const lockTime = new Date(user.lockedUntil).toLocaleTimeString('vi-VN');
+        return res.status(403).json({ error: `Tài khoản đã bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ${lockTime}.` });
+      }
+
+      if (!user.password || !password) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+      
+      if (!isMatch) {
+        const newFailed = (user.failedLogins || 0) + 1;
+        let lockUntil = null;
+        let isLocked = 0;
+        let lockMessage = '';
+        let errorMessage = 'Invalid credentials';
+        
+        if (newFailed >= 15) {
+          isLocked = 1;
+          lockMessage = 'Khóa tài khoản do nhập sai mật khẩu 15 lần';
+          errorMessage = 'Tài khoản đã bị khóa do nhập sai mật khẩu quá nhiều lần. Vui lòng liên hệ Admin để mở tài khoản.';
+        } else if (newFailed >= 10) {
+          lockUntil = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+          lockMessage = 'Khóa tài khoản 30 phút do nhập sai mật khẩu 10 lần';
+          errorMessage = 'Tài khoản đã bị khóa 30 phút do nhập sai mật khẩu quá nhiều lần.';
+        } else if (newFailed >= 7) {
+          lockUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+          lockMessage = 'Khóa tài khoản 10 phút do nhập sai mật khẩu 7 lần';
+          errorMessage = 'Tài khoản đã bị khóa 10 phút do nhập sai mật khẩu quá nhiều lần.';
+        } else if (newFailed >= 5) {
+          lockUntil = new Date(Date.now() + 1 * 60 * 1000).toISOString();
+          lockMessage = 'Khóa tài khoản 1 phút do nhập sai mật khẩu 5 lần';
+          errorMessage = 'Tài khoản đã bị khóa 1 phút do nhập sai mật khẩu quá nhiều lần.';
+        }
+
+        if (lockUntil || isLocked) {
+          await db.run('UPDATE users SET failedLogins = ?, lockedUntil = ?, isLocked = ? WHERE id = ?', [newFailed, lockUntil, isLocked, user.id]);
+          try {
+            await db.run(
+              `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [crypto.randomUUID(), user.id, 'Khóa tài khoản', user.id, 'user', lockMessage, new Date().toISOString()]
+            );
+          } catch (e) {}
+          return res.status(403).json({ error: errorMessage });
+        } else {
+          await db.run('UPDATE users SET failedLogins = ? WHERE id = ?', [newFailed, user.id]);
+          try {
+            await db.run(
+              `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [crypto.randomUUID(), user.id, 'Đăng nhập thất bại', user.id, 'user', `Nhập sai mật khẩu lần ${newFailed}`, new Date().toISOString()]
+            );
+          } catch (e) {}
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+      }
+
+      if ((user.failedLogins && user.failedLogins > 0) || user.lockedUntil || user.isLocked) {
+        await db.run('UPDATE users SET failedLogins = 0, lockedUntil = NULL, isLocked = 0 WHERE id = ?', [user.id]);
+      }
+
       const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
       
       const userClientData = {
@@ -43,6 +116,16 @@ export function authRoutes(db: any) {
       };
       const jwtPayload = { id: user.id, role: user.role };
       const token = generateToken(jwtPayload);
+      
+      try {
+        await db.run(
+          `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [crypto.randomUUID(), user.id, 'Đăng nhập', user.id, 'user', 'Người dùng đăng nhập thành công qua Email', new Date().toISOString()]
+        );
+      } catch (logErr) {
+        console.error('Failed to log login activity', logErr);
+      }
+
       return res.json({ token, user: userClientData });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -55,7 +138,7 @@ export function authRoutes(db: any) {
       const isMatch = await bcrypt.compare(currentPassword || '', user.password);
       if (!isMatch) return res.status(401).json({ error: 'Current password is incorrect' });
       const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+      await db.run('UPDATE users SET password = ?, failedLogins = 0, lockedUntil = NULL WHERE id = ?', [hashedPassword, userId]);
       return res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
@@ -73,6 +156,16 @@ export function authRoutes(db: any) {
         };
         const jwtPayload = { id: user.id, role: user.role };
         const token = generateToken(jwtPayload);
+        
+        try {
+          await db.run(
+            `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [crypto.randomUUID(), user.id, 'Đăng nhập nhanh', user.id, 'user', 'Người dùng sử dụng Quick Login', new Date().toISOString()]
+          );
+        } catch (logErr) {
+          console.error('Failed to log quick login activity', logErr);
+        }
+
         return res.json({ token, user: userClientData });
       }
       return res.status(401).json({ error: 'Invalid user id' });
@@ -88,8 +181,12 @@ export function forgotPasswordRoutes(db: any, mailer: any) {
   router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     try {
-      const user = await db.get('SELECT id, email FROM users WHERE lower(email) = lower(?)', [email]);
+      const user = await db.get('SELECT id, email, isLocked FROM users WHERE lower(email) = lower(?)', [email]);
       if (!user) return res.status(404).json({ error: 'Email không tồn tại trong hệ thống' });
+
+      if (user.isLocked) {
+        return res.status(403).json({ error: 'Tài khoản của bạn đã bị khóa. Không thể sử dụng tính năng quên mật khẩu. Vui lòng liên hệ Admin.' });
+      }
 
       const recentPending = await db.get("SELECT id, createdAt FROM password_reset_requests WHERE userId = ? AND status = 'pending' ORDER BY createdAt DESC LIMIT 1", [user.id]);
       if (recentPending) {
@@ -145,7 +242,7 @@ export function forgotPasswordRoutes(db: any, mailer: any) {
       if (rt.usedAt) return res.status(400).json({ error: 'Link này đã được sử dụng' });
       if (new Date(rt.expiresAt).getTime() < Date.now()) return res.status(400).json({ error: 'Link đặt lại mật khẩu đã hết hạn' });
       const hashedPassword = await bcrypt.hash(String(newPassword).trim(), 10);
-      await db.run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, rt.userId]);
+      await db.run('UPDATE users SET password = ?, failedLogins = 0, lockedUntil = NULL WHERE id = ?', [hashedPassword, rt.userId]);
       const now = new Date().toISOString();
       await db.run('UPDATE password_reset_tokens SET usedAt = ? WHERE token = ?', [now, token]);
       await db.run("UPDATE password_reset_requests SET status = 'resolved', emailStatus = 'reset_done', emailSentAt = COALESCE(emailSentAt, ?) WHERE userId = ? AND status = 'pending'", [now, rt.userId]);

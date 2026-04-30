@@ -128,7 +128,7 @@ const RoleFormModal: React.FC<{
             {err && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm"><AlertCircle size={14} />{err}</div>}
             {isSystem && (
               <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-                <Lock size={14} />Vai trò hệ thống: chỉ có thể chỉnh sửa màu sắc và mô tả.
+                <Lock size={14} />Vai trò hệ thống: không thể đổi tên, nhưng có thể chỉnh sửa mô tả, màu sắc và quyền hạn.
               </div>
             )}
 
@@ -202,15 +202,13 @@ const RoleFormModal: React.FC<{
             <div>
               <div className="flex items-center justify-between mb-3">
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">Quyền hạn</label>
-                {!isSystem && (
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setPerms(ALL_PERMISSIONS.map(p => p.id))}
-                      className="text-xs text-purple-600 hover:underline flex items-center gap-1"><Plus size={11} />Chọn tất cả</button>
-                    <span className="text-gray-300">|</span>
-                    <button type="button" onClick={() => setPerms([])}
-                      className="text-xs text-red-500 hover:underline flex items-center gap-1"><Minus size={11} />Bỏ chọn</button>
-                  </div>
-                )}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setPerms(ALL_PERMISSIONS.map(p => p.id))}
+                    className="text-xs text-purple-600 hover:underline flex items-center gap-1"><Plus size={11} />Chọn tất cả</button>
+                  <span className="text-gray-300">|</span>
+                  <button type="button" onClick={() => setPerms([])}
+                    className="text-xs text-red-500 hover:underline flex items-center gap-1"><Minus size={11} />Bỏ chọn</button>
+                </div>
               </div>
               <div className="space-y-3">
                 {PERM_GROUPS.map(group => (
@@ -221,16 +219,15 @@ const RoleFormModal: React.FC<{
                         const checked = perms.includes(perm.id);
                         return (
                           <label key={perm.id}
-                            className={`flex items-center gap-3 px-4 py-2.5 transition-colors
-                              ${isSystem ? 'cursor-default' : 'cursor-pointer hover:bg-gray-50'} ${checked ? 'bg-purple-50/50' : ''}`}>
+                            className={`flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer hover:bg-gray-50 ${checked ? 'bg-purple-50/50' : ''}`}>
                             <div
                               className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border-2 transition-all
                                 ${checked ? 'border-transparent' : 'border-gray-300 bg-white'}`}
                               style={checked ? { backgroundColor: color } : {}}>
                               {checked && <CheckCircle size={12} className="text-white" />}
                             </div>
-                            <input type="checkbox" checked={checked} disabled={isSystem}
-                              onChange={() => !isSystem && togglePerm(perm.id)} className="sr-only" />
+                            <input type="checkbox" checked={checked}
+                              onChange={() => togglePerm(perm.id)} className="sr-only" />
                             <span className={`text-sm ${checked ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>{perm.label}</span>
                           </label>
                         );
@@ -262,6 +259,7 @@ export default function AdminRoleManagement() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<Role | null | undefined>(undefined);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [deletingId, setDeletingId]   = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -294,23 +292,26 @@ export default function AdminRoleManagement() {
     await fetchRoles();
   };
 
-  const handleDelete = async (role: Role) => {
-    if (!confirm(`Xóa vai trò "${role.name}"?`)) return;
-    setDeletingId(role.id);
+  const handleDelete = async () => {
+    if (!roleToDelete) return;
+    setDeletingId(roleToDelete.id);
     try {
-      const res = await apiFetch(`/api/roles/${role.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/roles/${roleToDelete.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
-      showToast(`Đã xóa vai trò "${role.name}"`);
+      showToast(`Đã xóa vai trò "${roleToDelete.name}"`);
       await fetchRoles();
-    } catch (e: any) { showToast(e.message, 'error'); }
-    finally { setDeletingId(null); }
+    } catch (e: any) { showToast(e.message || 'Lỗi khi xóa vai trò', 'error'); }
+    finally { 
+      setDeletingId(null); 
+      setRoleToDelete(null);
+    }
   };
 
   return (
     <div className="space-y-6 pb-8">
       {toast && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl text-white text-sm font-medium transition-all
+        <div className={`fixed top-5 right-5 z-[100] flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl text-white text-sm font-medium transition-all
           ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}>
           {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />} {toast.msg}
         </div>
@@ -344,7 +345,7 @@ export default function AdminRoleManagement() {
         <Settings size={18} className="flex-shrink-0 mt-0.5" />
         <div>
           <p className="font-bold mb-0.5">Hướng dẫn</p>
-          <p className="text-blue-600">Vai trò <strong>Hệ thống</strong> (Admin, Director, Manager, Employee) không thể đổi tên hoặc xóa. Bạn chỉ có thể chỉnh sửa màu sắc và mô tả. Vai trò tùy chỉnh có thể xóa khi chưa có người dùng nào được gán.</p>
+          <p className="text-blue-600">Vai trò <strong>Hệ thống</strong> (Admin, Director, Manager, Employee) không thể đổi tên hoặc xóa. Bạn có thể chỉnh sửa màu sắc, mô tả và phân quyền. Vai trò tùy chỉnh có thể xóa khi chưa có người dùng nào được gán.</p>
         </div>
       </div>
 
@@ -367,7 +368,7 @@ export default function AdminRoleManagement() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {roles.filter(r => r.isSystem).map(role => (
-                <RoleCard key={role.id} role={role} onEdit={() => setEditingRole(role)} onDelete={handleDelete} deletingId={deletingId} />
+                <RoleCard key={role.id} role={role} onEdit={() => setEditingRole(role)} onDelete={() => setRoleToDelete(role)} deletingId={deletingId} />
               ))}
             </div>
           </div>
@@ -386,7 +387,7 @@ export default function AdminRoleManagement() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {roles.filter(r => !r.isSystem).map(role => (
-                  <RoleCard key={role.id} role={role} onEdit={() => setEditingRole(role)} onDelete={handleDelete} deletingId={deletingId} />
+                  <RoleCard key={role.id} role={role} onEdit={() => setEditingRole(role)} onDelete={() => setRoleToDelete(role)} deletingId={deletingId} />
                 ))}
               </div>
             )}
@@ -394,9 +395,44 @@ export default function AdminRoleManagement() {
         </>
       )}
 
-      {/* Modal */}
       {editingRole !== undefined && (
         <RoleFormModal role={editingRole} onClose={() => setEditingRole(undefined)} onSave={handleSave} />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {roleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all duration-300 scale-100 opacity-100">
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">
+                <AlertCircle size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Xác nhận xóa vai trò?</h3>
+              <p className="text-sm text-gray-500 text-center mb-6">
+                Bạn có chắc chắn muốn xóa vai trò <strong className="text-gray-900">"{roleToDelete.name}"</strong> không? Hành động này không thể hoàn tác.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRoleToDelete(null)}
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deletingId === roleToDelete.id}
+                  className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {deletingId === roleToDelete.id ? (
+                    <><RefreshCw size={16} className="animate-spin" /> Đang xóa...</>
+                  ) : (
+                    <><Trash2 size={16} /> Xóa vai trò</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -406,7 +442,7 @@ export default function AdminRoleManagement() {
 const RoleCard: React.FC<{
   role: Role;
   onEdit: () => void;
-  onDelete: (r: Role) => void;
+  onDelete: () => void;
   deletingId: string | null;
 }> = ({ role, onEdit, onDelete, deletingId }) => {
   const permLabels = role.permissions
@@ -448,7 +484,7 @@ const RoleCard: React.FC<{
             </button>
             <button
               disabled={!!role.isSystem || deletingId === role.id}
-              onClick={() => onDelete(role)}
+              onClick={onDelete}
               className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title={role.isSystem ? 'Không thể xóa vai trò hệ thống' : 'Xóa'}>
               {deletingId === role.id ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
             </button>

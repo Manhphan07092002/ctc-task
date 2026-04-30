@@ -5,8 +5,8 @@ const LOGIN_API_URL = '/api/auth/login';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  quickLogin: (userId: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  quickLogin: (userId: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
   updateUserSession: (updatedUser: User) => void;
@@ -56,23 +56,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch(LOGIN_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      if (!res.ok) return false;
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.' };
+      }
       setUser(data.user);
       localStorage.setItem('ctc_token', data.token);
       localStorage.setItem('ctc_user', JSON.stringify(data.user));
-      return true;
+      return { success: true };
     } catch (e) {
       console.error('Login failed:', e);
+      return { success: false, error: 'Đã xảy ra lỗi kết nối. Vui lòng thử lại.' };
     }
-    return false;
   };
 
   const logout = () => {
@@ -81,23 +83,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('ctc_user');
   };
 
-  const quickLogin = async (userId: string): Promise<boolean> => {
+  const quickLogin = async (userId: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const res = await fetch('/api/auth/quick-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
-      if (!res.ok) return false;
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Đăng nhập nhanh thất bại.' };
+      }
       setUser(data.user);
       localStorage.setItem('ctc_token', data.token);
       localStorage.setItem('ctc_user', JSON.stringify(data.user));
-      return true;
+      return { success: true };
     } catch (e) {
       console.error('Quick login failed:', e);
+      return { success: false, error: 'Lỗi kết nối.' };
     }
-    return false;
   };
 
   const updateUserSession = (updatedUser: User) => {

@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'; // Trigger restart
 import express from 'express';
 import http from 'http';
 import path from 'path';

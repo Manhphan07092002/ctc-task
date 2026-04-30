@@ -94,6 +94,7 @@ export interface User {
   dob?: string;
   hometown?: string;
   permissions?: string[];
+  isLocked?: boolean;
   preferences?: {
     reportNotifs?: boolean;
     taskNotifs?: boolean;

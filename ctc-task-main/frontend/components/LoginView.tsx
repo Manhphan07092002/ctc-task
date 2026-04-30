@@ -29,9 +29,9 @@ export const LoginView: React.FC = () => {
     setError('');
     setIsLoading(true);
     setTimeout(async () => {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+      const res = await login(email, password);
+      if (!res.success) {
+        setError(res.error || 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
         setIsLoading(false);
       }
     }, 800);
@@ -40,8 +40,8 @@ export const LoginView: React.FC = () => {
   const handleQuickAccess = async (u: User) => {
     setQuickLoading(u.id);
     setError('');
-    const success = await quickLogin(u.id);
-    if (!success) setError('Không thể đăng nhập nhanh cho tài khoản này.');
+    const res = await quickLogin(u.id);
+    if (!res.success) setError(res.error || 'Không thể đăng nhập nhanh cho tài khoản này.');
     setQuickLoading(null);
   };
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, PlusCircle, Edit2, Trash2, Shield, Briefcase,
   Search, RefreshCw, AlertCircle, X, Mail, User as UserIcon,
-  CheckCircle, ChevronDown, Lock, ImagePlus, KeyRound, Copy, ExternalLink, Link as LinkIcon
+  CheckCircle, ChevronDown, Lock, Unlock, ImagePlus, KeyRound, Copy, ExternalLink, Link as LinkIcon
 } from 'lucide-react';
 import { User, UserRole } from '../../types';
 
@@ -480,6 +480,14 @@ export default function AdminUserManagement() {
     await fetchUsers();
   };
 
+  const handleLockToggle = async (u: User, isLocked: boolean) => {
+    const action = isLocked ? 'unlock' : 'lock';
+    const res = await apiFetch(`/api/users/${u.id}/${action}`, { method: 'PUT' });
+    if (!res.ok) { showToast(isLocked ? 'Mở khóa thất bại' : 'Khóa thất bại', 'error'); return; }
+    showToast(isLocked ? `Đã mở khóa tài khoản ${u.name}` : `Đã khóa tài khoản ${u.name}`);
+    await fetchUsers();
+  };
+
   const handleResetPassword = async (u: User, newPassword: string) => {
     const res = await apiFetch(`/api/users/${u.id}/reset-password`, {
       method: 'POST',
@@ -679,7 +687,12 @@ export default function AdminUserManagement() {
                               {getInitials(u.name)}
                             </div>
                           )}
-                          <span className="font-semibold text-gray-800">{u.name}</span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-800 flex items-center gap-2">
+                              {u.name}
+                              {u.isLocked && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600">BỊ KHÓA</span>}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-gray-500">{u.email}</td>
@@ -692,6 +705,11 @@ export default function AdminUserManagement() {
                           <button onClick={() => setEditingUser(u)}
                             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Chỉnh sửa">
                             <Edit2 size={14} />
+                          </button>
+                          <button onClick={() => handleLockToggle(u, !!u.isLocked)}
+                            className={`p-1.5 rounded-lg transition-colors ${u.isLocked ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-500 hover:bg-slate-100'}`} 
+                            title={u.isLocked ? "Mở khóa tài khoản" : "Khóa tài khoản"}>
+                            {u.isLocked ? <Unlock size={14} /> : <Lock size={14} />}
                           </button>
                           <button onClick={() => setResettingUser(u)}
                             className="p-1.5 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Đặt lại mật khẩu">
