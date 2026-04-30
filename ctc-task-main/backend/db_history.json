@@ -1,5 +1,29 @@
 [
   {
+    "id": "9d8jim6d7nlmoli88tr",
+    "action": "import",
+    "filename": "ctc-database-2026-04-30.sqlite",
+    "performedBy": "admin",
+    "note": "Nhập database từ file ctc-database-2026-04-30.sqlite",
+    "createdAt": "2026-04-30T13:13:13.647Z"
+  },
+  {
+    "id": "okbne8tgzkrmoli6dd1",
+    "action": "export",
+    "filename": "database.sqlite",
+    "performedBy": "admin",
+    "note": "Xuất toàn bộ database",
+    "createdAt": "2026-04-30T13:11:46.213Z"
+  },
+  {
+    "id": "vi9nqa5rrtmoli69ai",
+    "action": "export",
+    "filename": "database.sqlite",
+    "performedBy": "admin",
+    "note": "Xuất toàn bộ database",
+    "createdAt": "2026-04-30T13:11:40.938Z"
+  },
+  {
     "id": "6rzwpr9x1pnmol1zdqf",
     "action": "import",
     "filename": "ctc-database-2026-04-30.sqlite",

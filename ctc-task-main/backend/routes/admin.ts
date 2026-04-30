@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import os from 'os';
 import fs from 'fs';
 import path from 'path';
+import { Router } from 'express';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 
@@ -208,7 +209,29 @@ export function adminRoutes(db: any, mailer: any) {
       const roleBreakdown = await db.all('SELECT role, COUNT(*) as count FROM users GROUP BY role');
       const taskStatusBreakdown = await db.all('SELECT status, COUNT(*) as count FROM tasks GROUP BY status');
       const taskDeptBreakdown = await db.all('SELECT department, COUNT(*) as count FROM tasks GROUP BY department');
-      res.json({ totalUsers: userCountDesc.count, totalTasks: taskCountDesc.count, totalReports: reportCountDesc.count, activeMeetings: meetingCountDesc.count, roleBreakdown, taskStatusBreakdown, taskDeptBreakdown });
+      
+      let dbSize = 0;
+      try {
+        const dbPath = path.resolve(process.env.DB_PATH || 'database.sqlite');
+        if (fs.existsSync(dbPath)) {
+          dbSize = fs.statSync(dbPath).size;
+        }
+      } catch (e) {}
+
+      const systemInfo = {
+        nodeVersion: process.version,
+        platform: os.platform(),
+        memoryUsage: process.memoryUsage().rss,
+        uptime: process.uptime(),
+        dbSize
+      };
+
+      res.json({ 
+        totalUsers: userCountDesc.count, totalTasks: taskCountDesc.count, 
+        totalReports: reportCountDesc.count, activeMeetings: meetingCountDesc.count, 
+        roleBreakdown, taskStatusBreakdown, taskDeptBreakdown,
+        systemInfo
+      });
     } catch (e) { res.status(500).json({ error: 'Failed to fetch admin stats' }); }
   });
 

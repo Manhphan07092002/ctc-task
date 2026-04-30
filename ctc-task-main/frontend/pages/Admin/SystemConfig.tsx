@@ -11,6 +11,13 @@ interface SystemInfo {
   totalTasks: number;
   totalReports: number;
   activeMeetings: number;
+  systemInfo?: {
+    nodeVersion: string;
+    platform: string;
+    memoryUsage: number;
+    uptime: number;
+    dbSize: number;
+  };
 }
 
 interface SmtpConfig {
@@ -94,7 +101,7 @@ export default function AdminSystemConfig() {
       if (smtpRes.ok) {
         const smtpData = await smtpRes.json();
         setSmtpConfig(smtpData);
-        if (!testEmail && smtpData.SMTP_USER) setTestEmail(smtpData.SMTP_USER);
+        setTestEmail(prev => prev || smtpData.SMTP_USER);
       }
       if (aiKeysRes.ok) {
         const aiData = await aiKeysRes.json();
@@ -107,7 +114,7 @@ export default function AdminSystemConfig() {
       setSmtpLoading(false);
       setAiKeysLoading(false);
     }
-  }, [testEmail]);
+  }, []);
 
   useEffect(() => { fetchInfo(); }, [fetchInfo]);
 
@@ -214,9 +221,10 @@ export default function AdminSystemConfig() {
             <StatusBadge ok={backendOk} />
           </div>
           <div className="space-y-1">
-            <InfoRow label="Framework" value="Express.js" />
-            <InfoRow label="Port" value="3000" />
-            <InfoRow label="Ngôn ngữ" value="TypeScript" />
+            <InfoRow label="Node.js" value={info?.systemInfo?.nodeVersion || 'Đang tải...'} />
+            <InfoRow label="Nền tảng" value={info?.systemInfo?.platform === 'win32' ? 'Windows' : info?.systemInfo?.platform || 'Đang tải...'} />
+            <InfoRow label="RAM Server" value={info?.systemInfo?.memoryUsage ? `${Math.round(info.systemInfo.memoryUsage / 1024 / 1024)} MB` : 'Đang tải...'} />
+            <InfoRow label="Thời gian chạy (Uptime)" value={info?.systemInfo?.uptime ? `${Math.floor(info.systemInfo.uptime / 3600)} giờ ${Math.floor((info.systemInfo.uptime % 3600) / 60)} phút` : 'Đang tính...'} />
           </div>
         </div>
 
@@ -230,8 +238,8 @@ export default function AdminSystemConfig() {
           </div>
           <div className="space-y-1">
             <InfoRow label="Engine" value="SQLite3" />
-            <InfoRow label="File" value="database.sqlite" />
-            <InfoRow label="Driver" value="better-sqlite3" />
+            <InfoRow label="Tệp tin" value="database.sqlite" />
+            <InfoRow label="Kích thước" value={info?.systemInfo?.dbSize !== undefined ? `${(info.systemInfo.dbSize / 1024 / 1024).toFixed(2)} MB` : 'Đang tính...'} />
           </div>
         </div>
 
@@ -307,49 +315,59 @@ export default function AdminSystemConfig() {
         {smtpLoading ? (
           <div className="py-8 text-center text-gray-400">Đang tải cấu hình SMTP...</div>
         ) : (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2 mt-2 mb-1">
-                <h4 className="text-sm font-bold text-gray-800 border-b pb-2">Cấu hình Nhận thư (IMAP)</h4>
+          <div className="space-y-6">
+            
+            {/* Server Config */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+              <h4 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Server size={16} className="text-blue-500" /> Cấu hình Máy chủ Mail (Dùng chung)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">IMAP Host (Nhận thư)</label>
+                  <input value={smtpConfig.IMAP_HOST} onChange={(e) => handleSmtpChange('IMAP_HOST', e.target.value)} placeholder="imap.vnptemail.vn" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">IMAP Port</label>
+                  <input value={smtpConfig.IMAP_PORT} onChange={(e) => handleSmtpChange('IMAP_PORT', e.target.value)} placeholder="993" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">SMTP Host (Gửi thư)</label>
+                  <input value={smtpConfig.SMTP_HOST} onChange={(e) => handleSmtpChange('SMTP_HOST', e.target.value)} placeholder="smtp.vnptemail.vn" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">SMTP Port</label>
+                  <input value={smtpConfig.SMTP_PORT} onChange={(e) => handleSmtpChange('SMTP_PORT', e.target.value)} placeholder="587" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wider">Kết nối bảo mật (SMTP Secure)</label>
+                  <select value={smtpConfig.SMTP_SECURE} onChange={(e) => handleSmtpChange('SMTP_SECURE', e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none bg-white">
+                    <option value="false">false (thường dùng với port 587)</option>
+                    <option value="true">true (thường dùng với port 465)</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">IMAP Host</label>
-                <input value={smtpConfig.IMAP_HOST} onChange={(e) => handleSmtpChange('IMAP_HOST', e.target.value)} placeholder="imap.vnptemail.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">IMAP Port (thường 993 bảo mật)</label>
-                <input value={smtpConfig.IMAP_PORT} onChange={(e) => handleSmtpChange('IMAP_PORT', e.target.value)} placeholder="993" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
+            </div>
 
-              <div className="md:col-span-2 mt-4 mb-1">
-                <h4 className="text-sm font-bold text-gray-800 border-b pb-2">Cấu hình Gửi thư (SMTP) & Tài khoản</h4>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP Host</label>
-                <input value={smtpConfig.SMTP_HOST} onChange={(e) => handleSmtpChange('SMTP_HOST', e.target.value)} placeholder="smtp.vnptemail.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP Port</label>
-                <input value={smtpConfig.SMTP_PORT} onChange={(e) => handleSmtpChange('SMTP_PORT', e.target.value)} placeholder="587" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Hệ thống (User)</label>
-                <input value={smtpConfig.SMTP_USER} onChange={(e) => handleSmtpChange('SMTP_USER', e.target.value)} placeholder="xuanmanh@ctcdn.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mật khẩu Hệ thống (Password)</label>
-                <input type="password" value={smtpConfig.SMTP_PASS} onChange={(e) => handleSmtpChange('SMTP_PASS', e.target.value)} placeholder="Nhập hoặc giữ nguyên mật khẩu đã lưu" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tên người gửi (SMTP From)</label>
-                <input value={smtpConfig.SMTP_FROM} onChange={(e) => handleSmtpChange('SMTP_FROM', e.target.value)} placeholder='CTC Task <xuanmanh@ctcdn.vn>' className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Kết nối bảo mật</label>
-                <select value={smtpConfig.SMTP_SECURE} onChange={(e) => handleSmtpChange('SMTP_SECURE', e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none bg-white">
-                  <option value="false">false (thường dùng với port 587)</option>
-                  <option value="true">true (thường dùng với port 465)</option>
-                </select>
+            {/* System Account Config */}
+            <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-5">
+              <h4 className="text-sm font-bold text-gray-800 mb-1 flex items-center gap-2">
+                <ShieldCheck size={16} className="text-orange-500" /> Tài khoản Email Hệ thống
+              </h4>
+              <p className="text-xs text-gray-500 mb-4">Tài khoản này dùng để hệ thống gửi các email thông báo tự động (quên mật khẩu, nhắc việc...)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Hệ thống</label>
+                  <input value={smtpConfig.SMTP_USER} onChange={(e) => handleSmtpChange('SMTP_USER', e.target.value)} placeholder="noreply@ctcdn.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mật khẩu</label>
+                  <input type="password" value={smtpConfig.SMTP_PASS} onChange={(e) => handleSmtpChange('SMTP_PASS', e.target.value)} placeholder="Nhập hoặc giữ nguyên mật khẩu đã lưu" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tên hiển thị (SMTP From)</label>
+                  <input value={smtpConfig.SMTP_FROM} onChange={(e) => handleSmtpChange('SMTP_FROM', e.target.value)} placeholder='CTC Task Hệ thống <noreply@ctcdn.vn>' className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+                </div>
               </div>
             </div>
 
