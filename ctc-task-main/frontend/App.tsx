@@ -165,7 +165,11 @@ export default function CTCTaskApp() {
     let result = roleBasedTasks;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(t => t.title.toLowerCase().includes(q) || t.description.toLowerCase().includes(q) || t.tags?.some(tag => tag.toLowerCase().includes(q)));
+      result = result.filter(t =>
+        (t.title ?? '').toLowerCase().includes(q) ||
+        (t.description ?? '').toLowerCase().includes(q) ||
+        t.tags?.some(tag => (tag ?? '').toLowerCase().includes(q))
+      );
     }
     if (selectedTags.length > 0) {
       result = result.filter(t => t.tags && t.tags.some(tag => selectedTags.includes(tag)));
@@ -176,7 +180,10 @@ export default function CTCTaskApp() {
   const filteredNotes = useMemo(() => {
     if (!searchQuery) return notes;
     const q = searchQuery.toLowerCase();
-    return notes.filter(n => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+    return notes.filter(n =>
+      (n.title ?? '').toLowerCase().includes(q) ||
+      (n.content ?? '').toLowerCase().includes(q)
+    );
   }, [notes, searchQuery]);
 
   const handleSaveTask = async (task: Task) => {

@@ -198,6 +198,115 @@ export function mailRoutes(db: any) {
     return transporter;
   };
 
+  // Helper: detect IMAP/SMTP auth errors (ImapFlow throws 'Command failed' with authenticationFailed=true)
+  const isMailAuthError = (error: any): boolean => {
+    if (!error) return false;
+    if (error.authenticationFailed === true) return true;
+    const msg = (error.message || '').toLowerCase();
+    const responseText = (error.responseText || '').toLowerCase();
+    const response = (error.response || '').toLowerCase();
+    return (
+      msg.includes('no mail credentials') ||
+      msg.includes('authenticate failed') ||
+      msg.includes('authentication failed') ||
+      responseText.includes('authenticate failed') ||
+      response.includes('authenticate failed') ||
+      msg.includes('invalid login') ||
+      msg.includes('autherror')
+    );
+  };
+
+  // 3a. Fetch company contacts (all users in DB + IMAP history)
+  router.get('/contacts', requireAuth, async (req: any, res: any) => {
+    try {
+      // 1) Get all company users from DB
+      const dbUsers = await db.all('SELECT id, name, email, department, avatar FROM users ORDER BY name ASC');
+      
+      // 2) Try to get recent IMAP contacts (best-effort)
+      let imapContacts: { email: string; name: string; source: string }[] = [];
+      try {
+        const client = await getImapClient(req.user.id, req.user.email);
+        const contactSet = new Map<string, { email: string; name: string; count: number }>();
+
+        // Scan sent folder
+        const sentCandidates = ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'];
+        let sentFolder = '';
+        for (const name of sentCandidates) {
+          try { const l = await client.getMailboxLock(name); l.release(); sentFolder = name; break; } catch (_) {}
+        }
+
+        if (sentFolder) {
+          const lock = await client.getMailboxLock(sentFolder);
+          try {
+            const mailbox = client.mailbox;
+            if (mailbox !== false && (mailbox as any).exists > 0) {
+              const count = (mailbox as any).exists as number;
+              const start = Math.max(1, count - 199);
+              for await (const msg of client.fetch(`${start}:${count}`, { envelope: true })) {
+                const toList = [...(msg.envelope?.to || []), ...(msg.envelope?.cc || [])];
+                for (const addr of toList) {
+                  if (!addr.address) continue;
+                  const key = addr.address.toLowerCase();
+                  const existing = contactSet.get(key);
+                  if (existing) existing.count++;
+                  else contactSet.set(key, { email: addr.address, name: addr.name || '', count: 1 });
+                }
+              }
+            }
+          } finally { lock.release(); }
+        }
+
+        // Scan inbox (From addresses)
+        const inboxLock = await client.getMailboxLock('INBOX');
+        try {
+          const mailbox = client.mailbox;
+          if (mailbox !== false && (mailbox as any).exists > 0) {
+            const count = (mailbox as any).exists as number;
+            const start = Math.max(1, count - 199);
+            for await (const msg of client.fetch(`${start}:${count}`, { envelope: true })) {
+              const fromList = msg.envelope?.from || [];
+              for (const addr of fromList) {
+                if (!addr.address) continue;
+                const key = addr.address.toLowerCase();
+                const existing = contactSet.get(key);
+                if (existing) existing.count++;
+                else contactSet.set(key, { email: addr.address, name: addr.name || '', count: 1 });
+              }
+            }
+          }
+        } finally { inboxLock.release(); await client.logout(); }
+
+        imapContacts = Array.from(contactSet.values())
+          .sort((a, b) => b.count - a.count)
+          .map(c => ({ email: c.email, name: c.name, source: 'imap' }));
+      } catch (imapErr: any) {
+        console.warn('[Contacts] IMAP scan skipped:', imapErr.message);
+      }
+
+      // 3) Build response: company users first, then external IMAP contacts not already in company
+      const companyEmails = new Set(dbUsers.map((u: any) => u.email?.toLowerCase()));
+      
+      const companyContacts = dbUsers.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        department: u.department || '',
+        avatar: u.avatar || '',
+        source: 'company',
+      }));
+
+      const externalContacts = imapContacts
+        .filter(c => !companyEmails.has(c.email.toLowerCase()))
+        .slice(0, 50)
+        .map(c => ({ id: null, name: c.name, email: c.email, department: '', avatar: '', source: 'external' }));
+
+      res.json({ company: companyContacts, external: externalContacts });
+    } catch (error: any) {
+      console.error('Contacts error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // 3b. Fetch recent recipients (for autocomplete)
   router.get('/recipients', requireAuth, async (req: any, res: any) => {
     try {
@@ -260,6 +369,16 @@ export function mailRoutes(db: any) {
     }
   });
 
+  // Disconnect mail - clear saved credentials
+  router.post('/disconnect', requireAuth, async (req: any, res: any) => {
+    try {
+      await db.run('UPDATE users SET mailPassword = NULL WHERE id = ?', [req.user.id]);
+      res.json({ success: true, message: 'Đã ngắt kết nối email.' });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // IMAP folder name resolver
   const resolveFolder = async (client: any, folderKey: string): Promise<string> => {
     // Try to list mailboxes to find real folder names
@@ -279,6 +398,24 @@ export function mailRoutes(db: any) {
     }
     return 'INBOX';
   };
+
+  // 3b. Get total unread count for INBOX
+  router.get('/unread-count', requireAuth, async (req: any, res: any) => {
+    try {
+      const client = await getImapClient(req.user.id, req.user.email);
+      const folderName = await resolveFolder(client, 'inbox');
+      const lock = await client.getMailboxLock(folderName);
+      try {
+        const uids = await client.search({ seen: false }, { uid: true });
+        res.json({ count: uids ? uids.length : 0 });
+      } finally {
+        lock.release();
+        await client.logout();
+      }
+    } catch (error: any) {
+      res.status(isMailAuthError(error) ? 401 : 500).json({ error: error.message });
+    }
+  });
 
   // 3c. Check for new unseen mail globally
   router.get('/check-new', requireAuth, async (req: any, res: any) => {
@@ -307,7 +444,7 @@ export function mailRoutes(db: any) {
         await client.logout();
       }
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(isMailAuthError(error) ? 401 : 500).json({ error: error.message });
     }
   });
 
@@ -375,8 +512,7 @@ export function mailRoutes(db: any) {
       }
     } catch (error: any) {
       console.error('Fetch folder error:', error);
-      const isAuthError = error.message?.includes('No mail credentials') || error.message?.includes('AUTHENTICATE failed');
-      res.status(isAuthError ? 401 : 500).json({ error: error.message || 'Failed to fetch folder' });
+      res.status(isMailAuthError(error) ? 401 : 500).json({ error: error.message || 'Failed to fetch folder' });
     }
   });
 
@@ -426,16 +562,72 @@ export function mailRoutes(db: any) {
     }
   });
 
-  // 4c. Move to Trash
+  // 4c. Move to Trash or Permanent Delete
   router.delete('/message/:uid', requireAuth, async (req: any, res: any) => {
     const { folder = 'INBOX' } = req.query;
     try {
       const client = await getImapClient(req.user.id, req.user.email);
+      const actualTrashName = await resolveFolder(client, 'trash');
       const lock = await client.getMailboxLock(folder as string);
+      
       try {
         const uid = req.params.uid;
-        await client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
-        await client.messageMove(uid, 'Trash', { uid: true }).catch(() => { });
+        
+        // If the email is already in the Trash folder, delete it permanently
+        if (folder.toLowerCase() === actualTrashName.toLowerCase() || folder.toLowerCase() === 'trash') {
+          await client.messageDelete(uid, { uid: true });
+        } else {
+          // Otherwise, move it to the Trash folder
+          await client.messageMove(uid, actualTrashName, { uid: true }).catch(() => {
+            // Fallback: If MOVE command fails or isn't supported, just mark as deleted
+            client.messageFlagsAdd(uid, ['\\Deleted'], { uid: true });
+          });
+        }
+        res.json({ success: true });
+      } finally {
+        lock.release();
+        await client.logout();
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 4d. Bulk Actions (Delete / Restore)
+  router.post('/bulk', requireAuth, async (req: any, res: any) => {
+    const { uids, action, folder = 'INBOX', allInFolder = false } = req.body;
+    if (!allInFolder && (!uids || !Array.isArray(uids) || uids.length === 0)) {
+      return res.status(400).json({ error: 'uids array is required' });
+    }
+    
+    try {
+      const client = await getImapClient(req.user.id, req.user.email);
+      const actualTrashName = await resolveFolder(client, 'trash');
+      const lock = await client.getMailboxLock(folder as string);
+      
+      try {
+        // If allInFolder, use 1:* to target every message in the mailbox
+        const sequence = allInFolder ? '1:*' : uids.join(',');
+        const useUid = !allInFolder; // 1:* is a seq range, not UID
+        
+        if (action === 'delete') {
+          if (folder.toLowerCase() === actualTrashName.toLowerCase() || folder.toLowerCase() === 'trash') {
+            await client.messageDelete(sequence, { uid: useUid });
+          } else {
+            await client.messageMove(sequence, actualTrashName, { uid: useUid }).catch(() => {
+              client.messageFlagsAdd(sequence, ['\\Deleted'], { uid: useUid });
+            });
+          }
+        } else if (action === 'restore') {
+          // Restore to Inbox
+          const actualInboxName = await resolveFolder(client, 'inbox');
+          await client.messageMove(sequence, actualInboxName, { uid: useUid }).catch(() => {
+            throw new Error('Move to Inbox failed');
+          });
+        } else {
+          return res.status(400).json({ error: 'Invalid action' });
+        }
+        
         res.json({ success: true });
       } finally {
         lock.release();
@@ -484,8 +676,7 @@ export function mailRoutes(db: any) {
       }
     } catch (error: any) {
       console.error('Fetch message error:', error);
-      const isAuthError = error.message?.includes('No mail credentials') || error.message?.includes('AUTHENTICATE failed');
-      res.status(isAuthError ? 401 : 500).json({ error: error.message || 'Failed to fetch message' });
+      res.status(isMailAuthError(error) ? 401 : 500).json({ error: error.message || 'Failed to fetch message' });
     }
   });
 

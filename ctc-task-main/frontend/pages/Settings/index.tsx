@@ -1,7 +1,7 @@
 import { apiFetch } from '../../services/api';
 
 import React, { useState, useEffect } from 'react';
-import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, Eye, EyeOff, AlertTriangle, Mail, Wifi, WifiOff, RefreshCw, Unlink } from 'lucide-react';
 import { Button, Card, Avatar } from "../../components/UI";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +16,9 @@ export const SettingsView: React.FC = () => {
   // Profile State
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const [phone, setPhone] = useState('');
+  const [dob, setDob] = useState('');
+  const [hometown, setHometown] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
   // Notifications
@@ -36,13 +39,41 @@ export const SettingsView: React.FC = () => {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
 
+  // Mail config state
+  const [mailEmail, setMailEmail] = useState('');
+  const [mailPassword, setMailPassword] = useState('');
+  const [showMailPw, setShowMailPw] = useState(false);
+  const [mailStatus, setMailStatus] = useState<'unknown' | 'connected' | 'error'>('unknown');
+  const [isCheckingMail, setIsCheckingMail] = useState(false);
+  const [mailError, setMailError] = useState('');
+  const [mailSuccess, setMailSuccess] = useState('');
+
   useEffect(() => {
     if (user) {
       setName(user.name);
       setAvatarUrl(user.avatar || '');
-      setBio('');
+      setBio(user.bio || '');
+      setPhone(user.phone || '');
+      setDob(user.dob || '');
+      setHometown(user.hometown || '');
+      setMailEmail(user.email || '');
+      
+      if (user.preferences) {
+        setEmailNotifs(user.preferences.emailNotifs ?? true);
+        setTaskNotifs(user.preferences.taskNotifs ?? true);
+        setReportNotifs(user.preferences.reportNotifs ?? true);
+        setMeetingNotifs(user.preferences.meetingNotifs ?? true);
+        setLanguage(user.preferences.language || 'vi');
+      }
     }
   }, [user]);
+
+  // Check mail connection status on mount
+  useEffect(() => {
+    apiFetch('/api/mail/unread-count')
+      .then(r => setMailStatus(r.ok ? 'connected' : 'error'))
+      .catch(() => setMailStatus('error'));
+  }, []);
 
   if (!user) return null;
 
@@ -53,12 +84,33 @@ export const SettingsView: React.FC = () => {
 
   const handleSaveProfile = async () => {
     try {
-      const updatedUser = { ...user, name, avatar: avatarUrl };
+      const updatedUser = { ...user, name, avatar: avatarUrl, bio, phone, dob, hometown };
       await saveUser(updatedUser);
       updateUserSession(updatedUser);
       showSaveSuccess();
     } catch (e) {
-      alert('Lưu thất bại, vui lòng thử lại.');
+      alert('Lưu hồ sơ thất bại, vui lòng thử lại.');
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    try {
+      const updatedUser = {
+        ...user,
+        preferences: {
+          ...user.preferences,
+          emailNotifs,
+          taskNotifs,
+          reportNotifs,
+          meetingNotifs,
+          language
+        }
+      };
+      await saveUser(updatedUser);
+      updateUserSession(updatedUser);
+      showSaveSuccess();
+    } catch (e) {
+      alert('Lưu cài đặt thất bại, vui lòng thử lại.');
     }
   };
 
@@ -108,6 +160,7 @@ export const SettingsView: React.FC = () => {
     { id: 'notifications', label: 'Thông báo',        icon: Bell },
     { id: 'appearance',    label: 'Giao diện',        icon: Moon },
     { id: 'security',      label: 'Bảo mật',          icon: Lock },
+    { id: 'mail',          label: 'Cấu hình Email',   icon: Mail },
   ];
 
   const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) => (
@@ -153,6 +206,35 @@ export const SettingsView: React.FC = () => {
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Số điện thoại</label>
+                <input
+                  type="text"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="Ví dụ: 0987654321"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày sinh</label>
+                <input
+                  type="date"
+                  value={dob}
+                  onChange={e => setDob(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all text-gray-700"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Quê quán</label>
+                <input
+                  type="text"
+                  value={hometown}
+                  onChange={e => setHometown(e.target.value)}
+                  placeholder="Ví dụ: Hà Nội"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all text-gray-700"
                 />
               </div>
               <div>
@@ -218,7 +300,7 @@ export const SettingsView: React.FC = () => {
             </div>
             <div className="flex justify-end">
               <button
-                onClick={showSaveSuccess}
+                onClick={handleSavePreferences}
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
               >
                 <Save size={15} /> Lưu cài đặt
@@ -318,6 +400,149 @@ export const SettingsView: React.FC = () => {
                 </div>
                 <span className="text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-medium">Đang hoạt động</span>
               </div>
+            </div>
+          </div>
+        );
+
+      case 'mail':
+        return (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Connection status banner */}
+            <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+              mailStatus === 'connected'
+                ? 'bg-green-50 border-green-200'
+                : mailStatus === 'error'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                mailStatus === 'connected' ? 'bg-green-100' : mailStatus === 'error' ? 'bg-red-100' : 'bg-gray-100'
+              }`}>
+                {mailStatus === 'connected'
+                  ? <Wifi size={18} className="text-green-600" />
+                  : mailStatus === 'error'
+                    ? <WifiOff size={18} className="text-red-500" />
+                    : <RefreshCw size={18} className="text-gray-400" />}
+              </div>
+              <div className="flex-1">
+                <p className={`text-sm font-semibold ${
+                  mailStatus === 'connected' ? 'text-green-700' : mailStatus === 'error' ? 'text-red-600' : 'text-gray-600'
+                }`}>
+                  {mailStatus === 'connected' ? '✅ Email đang kết nối' : mailStatus === 'error' ? '❌ Chưa kết nối hoặc sai mật khẩu' : 'Đang kiểm tra...'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {mailStatus === 'connected'
+                    ? `Hộp thư VNPT đang hoạt động bình thường.`
+                    : mailStatus === 'error'
+                      ? 'Nhập lại mật khẩu email VNPT để kết nối lại.'
+                      : 'Đang kiểm tra trạng thái kết nối...'}
+                </p>
+              </div>
+              {mailStatus === 'connected' && (
+                <button
+                  onClick={async () => {
+                    if (!confirm('Ngắt kết nối email VNPT? Bạn sẽ không nhận/gửi được thư cho đến khi kết nối lại.')) return;
+                    await apiFetch('/api/mail/disconnect', { method: 'POST' });
+                    setMailStatus('error');
+                    setMailPassword('');
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  <Unlink size={13} /> Ngắt kết nối
+                </button>
+              )}
+            </div>
+
+            {/* Config form */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Cấu hình Email VNPT</h3>
+              <div className="space-y-4 max-w-md">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Địa chỉ Email</label>
+                  <input
+                    type="email"
+                    value={mailEmail}
+                    onChange={e => setMailEmail(e.target.value)}
+                    placeholder="vd: ten.nhanvien@ctchn.com.vn"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Email hộp thư VNPT của bạn (có thể khác email đăng nhập hệ thống)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Mật khẩu Email VNPT</label>
+                  <div className="relative">
+                    <input
+                      type={showMailPw ? 'text' : 'password'}
+                      value={mailPassword}
+                      onChange={e => setMailPassword(e.target.value)}
+                      placeholder={mailStatus === 'connected' ? '(giữ nguyên nếu không đổi)' : 'Nhập mật khẩu email VNPT...'}
+                      className="w-full px-4 py-2.5 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+                    />
+                    <button type="button" onClick={() => setShowMailPw(v => !v)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
+                      {showMailPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Mật khẩu được mã hóa và lưu an toàn trên máy chủ</p>
+                </div>
+
+                {mailError && (
+                  <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2.5">
+                    <WifiOff size={14} /> {mailError}
+                  </div>
+                )}
+                {mailSuccess && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-xl px-4 py-2.5">
+                    <CheckCircle size={14} /> {mailSuccess}
+                  </div>
+                )}
+
+                <button
+                  onClick={async () => {
+                    if (!mailEmail || !mailPassword) { setMailError('Vui lòng nhập đầy đủ email và mật khẩu.'); return; }
+                    setIsCheckingMail(true);
+                    setMailError('');
+                    setMailSuccess('');
+                    try {
+                      const res = await apiFetch('/api/mail/connect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: mailEmail, password: mailPassword }),
+                      });
+                      if (res.ok) {
+                        setMailStatus('connected');
+                        setMailSuccess('Kết nối thành công! Hộp thư đã được đồng bộ.');
+                        setMailPassword('');
+                        setTimeout(() => setMailSuccess(''), 4000);
+                      } else {
+                        const err = await res.json();
+                        setMailError(err.error || 'Kết nối thất bại. Kiểm tra lại email và mật khẩu.');
+                        setMailStatus('error');
+                      }
+                    } catch {
+                      setMailError('Không thể kết nối đến máy chủ VNPT. Vui lòng thử lại.');
+                      setMailStatus('error');
+                    } finally {
+                      setIsCheckingMail(false);
+                    }
+                  }}
+                  disabled={isCheckingMail}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+                >
+                  {isCheckingMail ? <RefreshCw size={15} className="animate-spin" /> : <Wifi size={15} />}
+                  {isCheckingMail ? 'Đang kết nối...' : mailStatus === 'connected' ? 'Cập nhật mật khẩu' : 'Kết nối Email VNPT'}
+                </button>
+              </div>
+            </div>
+
+            {/* Info box */}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-blue-700 mb-2">ℹ️ Hướng dẫn lấy mật khẩu Email VNPT</p>
+              <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                <li>Đăng nhập vào <strong>webmail.vnptemail.vn</strong> hoặc liên hệ IT để lấy mật khẩu email.</li>
+                <li>Mật khẩu email VNPT có thể <strong>khác</strong> mật khẩu đăng nhập hệ thống CTC Task.</li>
+                <li>Nếu quên mật khẩu, liên hệ bộ phận IT để được cấp lại.</li>
+              </ul>
             </div>
           </div>
         );

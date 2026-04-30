@@ -134,6 +134,27 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Global mail polling
   useEffect(() => {
     if (!user) return;
+
+    // Scan unread mail count on login
+    const scanUnreadCount = async () => {
+      try {
+        const res = await apiFetch('/api/mail/unread-count');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.count > 0) {
+            pushLocalNotification({
+              userId: user.id,
+              type: 'new_mail',
+              title: `📩 Hộp thư đến`,
+              message: `Bạn có ${data.count} email chưa đọc.`
+            });
+            playSound();
+          }
+        }
+      } catch (e) { }
+    };
+    scanUnreadCount();
+
     const checkNewMail = async () => {
       try {
         const res = await apiFetch('/api/mail/check-new');

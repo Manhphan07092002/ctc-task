@@ -89,7 +89,18 @@ export interface User {
   role: UserRole;
   department: string;
   avatar: string;
+  bio?: string;
+  phone?: string;
+  dob?: string;
+  hometown?: string;
   permissions?: string[];
+  preferences?: {
+    reportNotifs?: boolean;
+    taskNotifs?: boolean;
+    meetingNotifs?: boolean;
+    emailNotifs?: boolean;
+    language?: 'vi' | 'en';
+  };
 }
 
 export type MeetingStatus = 'scheduled' | 'ongoing' | 'completed' | 'cancelled';

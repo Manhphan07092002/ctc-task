@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Mail, Send, Inbox, Trash2, Edit3, X, RefreshCw,
   Paperclip, Search, Star, ChevronDown, Wifi, WifiOff, Reply,
-  MailOpen, Forward, Download, MailX, Bold, Italic, Underline, Link, Filter
+  MailOpen, Forward, Download, MailX, Bold, Italic, Underline, Link, Filter,
+  Users, Building2, UserCircle2, PhoneCall, ExternalLink
 } from 'lucide-react';
 import { apiFetch } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import DOMPurify from 'dompurify';
 
 interface Email {
@@ -80,6 +82,11 @@ export default function MailPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMail, setSelectedMail] = useState<FullEmail | null>(null);
   const [isLoadingMail, setIsLoadingMail] = useState(false);
+  const [selectedUids, setSelectedUids] = useState<Set<number>>(new Set());
+  const [selectAllInMailbox, setSelectAllInMailbox] = useState(false);
+  const [totalMailboxCount, setTotalMailboxCount] = useState(0);
+  const [isBulkActioning, setIsBulkActioning] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'single'; email: Email } | { type: 'bulk' } | null>(null);
 
   const [isComposing, setIsComposing] = useState(false);
   const [composeTo, setComposeTo] = useState('');
@@ -96,6 +103,45 @@ export default function MailPage() {
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterStarred, setFilterStarred] = useState(false);
   const [filterHasAttachment, setFilterHasAttachment] = useState(false);
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const dateFilterRef = useRef<HTMLDivElement>(null);
+
+  // Contacts / Address Book
+  interface Contact { id: string | null; name: string; email: string; department: string; avatar: string; source: 'company' | 'external'; }
+  const [showContacts, setShowContacts] = useState(false);
+  const [contacts, setContacts] = useState<{ company: Contact[]; external: Contact[] }>({ company: [], external: [] });
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactsLastUpdated, setContactsLastUpdated] = useState<Date | null>(null);
+  const [contactsError, setContactsError] = useState('');
+
+  const fetchContacts = async () => {
+    setIsLoadingContacts(true);
+    setContactsError('');
+    try {
+      const res = await apiFetch('/api/mail/contacts');
+      if (res.ok) {
+        const data = await res.json();
+        setContacts(data);
+        setContactsLastUpdated(new Date());
+        showToast({
+          type: 'success',
+          title: 'Danh bạ đã cập nhật',
+          message: `${data.company?.length || 0} nhân viên • ${data.external?.length || 0} liên lạc ngoài`,
+        });
+      } else {
+        throw new Error('Không thể tải danh bạ');
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Lỗi không xác định';
+      setContactsError(msg);
+      showToast({ type: 'error', title: 'Quét danh bạ thất bại', message: msg });
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
 
   // Autocomplete recipients
   const [allRecipients, setAllRecipients] = useState<{email: string; name: string; count: number}[]>([]);
@@ -233,6 +279,17 @@ export default function MailPage() {
     setTimeout(() => toInputRef.current?.focus(), 0);
   };
 
+  // Close date filter dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target as Node)) {
+        setShowDateFilter(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     const q = search.toLowerCase();
     setFiltered(inbox.filter(m => {
@@ -242,14 +299,36 @@ export default function MailPage() {
         m.subject.toLowerCase().includes(q);
       const matchUnread = !filterUnread || !m.isRead;
       const matchStarred = !filterStarred || m.isStarred;
-      return matchSearch && matchUnread && matchStarred;
+      // Date range filter
+      let matchDate = true;
+      if (filterDateFrom || filterDateTo) {
+        const mailDate = new Date(m.date);
+        mailDate.setHours(0, 0, 0, 0);
+        if (filterDateFrom) {
+          const from = new Date(filterDateFrom);
+          from.setHours(0, 0, 0, 0);
+          if (mailDate < from) matchDate = false;
+        }
+        if (filterDateTo && matchDate) {
+          const to = new Date(filterDateTo);
+          to.setHours(23, 59, 59, 999);
+          if (mailDate > to) matchDate = false;
+        }
+      }
+      return matchSearch && matchUnread && matchStarred && matchDate;
     }));
-  }, [search, inbox, filterUnread, filterStarred]);
+  }, [search, inbox, filterUnread, filterStarred, filterDateFrom, filterDateTo]);
 
   const switchFolder = (f: FolderKey) => {
     setActiveFolder(f);
     setSearch('');
     setSelectedMail(null);
+    setSelectedUids(new Set());
+    setSelectAllInMailbox(false);
+    setTotalMailboxCount(0);
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setShowDateFilter(false);
   };
 
   const toggleStar = async (email: Email, e: React.MouseEvent) => {
@@ -322,14 +401,98 @@ export default function MailPage() {
   };
 
 
-  const deleteMail = async (email: Email, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const executeSingleDelete = async (email: Email) => {
     setInbox(prev => prev.filter(m => m.id !== email.id));
     if (selectedMail?.id === email.id) setSelectedMail(null);
     try {
       await apiFetch(`/api/mail/message/${email.id}?folder=${email.folder || 'INBOX'}`, { method: 'DELETE' });
-      showToast({ type: 'info', title: 'Đã xoá email' });
+      showToast({ 
+        type: 'info', 
+        title: activeFolder === 'trash' ? 'Đã xoá vĩnh viễn' : 'Đã chuyển vào thùng rác' 
+      });
     } catch { showToast({ type: 'error', title: 'Xoá thất bại' }); }
+  };
+
+  const deleteMail = (email: Email, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeFolder === 'trash') {
+      setConfirmAction({ type: 'single', email });
+    } else {
+      executeSingleDelete(email);
+    }
+  };
+
+  const toggleSelectMail = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedUids(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAllInMailbox) {
+      // Deselect all
+      setSelectAllInMailbox(false);
+      setSelectedUids(new Set());
+    } else {
+      // Select all currently loaded
+      setSelectedUids(new Set(inbox.map(m => m.id)));
+    }
+  };
+
+  const executeBulkAction = async (action: 'delete' | 'restore') => {
+    setIsBulkActioning(true);
+    const uidsArray = Array.from(selectedUids);
+    try {
+      const sampleEmail = inbox.find(m => m.id === uidsArray[0]) || inbox[0];
+      const apiFolder = sampleEmail?.folder || 'INBOX';
+
+      const res = await apiFetch(`/api/mail/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uids: selectAllInMailbox ? [] : uidsArray,
+          action,
+          folder: apiFolder,
+          allInFolder: selectAllInMailbox
+        })
+      });
+      
+      if (res.ok) {
+        showToast({ type: 'success', title: action === 'delete' ? 'Đã xoá thành công' : 'Đã khôi phục thành công' });
+        if (selectAllInMailbox) {
+          setInbox([]);
+          setSelectAllInMailbox(false);
+          setTotalMailboxCount(0);
+        } else {
+          setInbox(prev => prev.filter(m => !selectedUids.has(m.id)));
+        }
+        setSelectedUids(new Set());
+        if (selectedMail && (selectAllInMailbox || selectedUids.has(selectedMail.id))) {
+          setSelectedMail(null);
+        }
+      } else {
+        showToast({ type: 'error', title: 'Thao tác thất bại' });
+      }
+    } catch {
+      showToast({ type: 'error', title: 'Đã có lỗi xảy ra' });
+    } finally {
+      setIsBulkActioning(false);
+    }
+  };
+
+  const handleBulkAction = async (action: 'delete' | 'restore') => {
+    if (selectedUids.size === 0 && !selectAllInMailbox) return;
+    
+    if (action === 'delete' && activeFolder === 'trash') {
+      setConfirmAction({ type: 'bulk' });
+      return;
+    }
+    
+    executeBulkAction(action);
   };
 
   // Auto-poll every 60s silently
@@ -504,12 +667,17 @@ export default function MailPage() {
       <div className="h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#f0f4ff 0%,#faf0ff 100%)' }}>
         <div className="bg-white/90 backdrop-blur-xl p-10 rounded-3xl border border-gray-100 shadow-2xl max-w-md w-full">
           {/* Icon */}
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
-            <Mail size={36} className="text-white" />
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg ${loginError ? 'bg-gradient-to-br from-red-400 to-rose-500 shadow-red-200' : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'}`}>
+            {loginError ? <WifiOff size={36} className="text-white" /> : <Mail size={36} className="text-white" />}
           </div>
-          <h2 className="text-2xl font-extrabold text-center text-gray-900 mb-1">Kết nối Hộp Thư</h2>
+          <h2 className="text-2xl font-extrabold text-center text-gray-900 mb-1">
+            {loginError ? 'Lỗi Kết Nối Email' : 'Kết nối Hộp Thư'}
+          </h2>
           <p className="text-center text-gray-400 mb-8 text-sm leading-relaxed">
-            Nhập mật khẩu hòm thư <span className="font-semibold text-blue-600">{loginEmail}</span><br />để đồng bộ email VNPT của bạn.
+            {loginError
+              ? <span className="text-red-500 font-medium">{loginError}</span>
+              : <>Nhập mật khẩu hòm thư <span className="font-semibold text-blue-600">{loginEmail}</span><br />để đồng bộ email VNPT của bạn.</>
+            }
           </p>
 
           <form onSubmit={handleConnect} className="space-y-4">
@@ -526,15 +694,18 @@ export default function MailPage() {
               <input
                 type="password" required value={loginPassword}
                 onChange={e => setLoginPassword(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none text-sm transition-colors bg-gray-50 focus:bg-white"
+                className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none text-sm transition-colors bg-gray-50 focus:bg-white ${loginError ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'}`}
                 placeholder="••••••••••••"
               />
             </div>
 
             {loginError && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                <WifiOff size={16} className="flex-shrink-0" />
-                {loginError}
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                <WifiOff size={16} className="flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">Xác thực thất bại</p>
+                  <p className="text-xs text-red-400 mt-0.5">{loginError}</p>
+                </div>
               </div>
             )}
 
@@ -547,6 +718,18 @@ export default function MailPage() {
               {isConnecting ? 'Đang kết nối...' : 'Kết Nối Máy Chủ VNPT'}
             </button>
           </form>
+
+          {/* Divider + Settings link */}
+          <div className="mt-5 pt-5 border-t border-gray-100 flex items-center justify-center gap-2">
+            <span className="text-xs text-gray-400">Hoặc cấu hình trong</span>
+            <a
+              href="/settings"
+              onClick={e => { e.preventDefault(); window.location.hash = ''; window.history.pushState({}, '', '/settings'); window.dispatchEvent(new PopStateEvent('popstate')); }}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2 flex items-center gap-1"
+            >
+              ⚙️ Cài đặt → Cấu hình Email
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -558,7 +741,21 @@ export default function MailPage() {
   const unread = inbox.filter(m => !m.isRead).length;
 
   return (
-    <div className="h-full flex overflow-hidden rounded-2xl border border-gray-200 shadow-sm bg-white relative">
+    <>
+      <ConfirmDialog 
+        isOpen={!!confirmAction}
+        title="Xoá vĩnh viễn email"
+        message={confirmAction?.type === 'bulk' ? 'Bạn có chắc chắn muốn xoá vĩnh viễn các email đã chọn không? Không thể khôi phục sau khi xoá.' : 'Bạn có chắc chắn muốn xoá vĩnh viễn email này không? Không thể khôi phục sau khi xoá.'}
+        confirmText="Xoá vĩnh viễn"
+        cancelText="Huỷ"
+        onConfirm={() => {
+          if (confirmAction?.type === 'single') executeSingleDelete(confirmAction.email);
+          else if (confirmAction?.type === 'bulk') executeBulkAction('delete');
+          setConfirmAction(null);
+        }}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <div className="h-full flex overflow-hidden rounded-2xl border border-gray-200 shadow-sm bg-white relative">
 
       {/* ── INBOX LIST ── */}
       <div className="w-80 flex-shrink-0 border-r border-gray-100 flex flex-col bg-gray-50/50">
@@ -581,6 +778,22 @@ export default function MailPage() {
               title="Làm mới"
             >
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            </button>
+            {/* Contacts button */}
+            <button
+              onClick={() => {
+                const opening = !showContacts;
+                setShowContacts(opening);
+                if (opening && contacts.company.length === 0) {
+                  fetchContacts();
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showContacts ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:bg-gray-100 hover:text-indigo-600'
+              }`}
+              title="Danh bạ công ty"
+            >
+              <Users size={14} />
             </button>
             <button
               onClick={() => openCompose()}
@@ -613,20 +826,84 @@ export default function MailPage() {
           ))}
         </div>
 
-        {/* Search + Filters */}
-        <div className="p-3 border-b border-gray-100 space-y-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm email..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-blue-400 transition-colors"
-            />
-          </div>
+        {/* Search + Filters or Bulk Actions */}
+        <div className="p-3 border-b border-gray-100 space-y-2 min-h-[85px] flex flex-col justify-center">
+          {(selectedUids.size > 0 || selectAllInMailbox) ? (
+            <div className="space-y-1.5 animate-fade-in">
+              <div className="flex items-center justify-between bg-blue-50/80 p-2 rounded-lg border border-blue-200 shadow-sm">
+                <span className="text-xs font-bold text-blue-700 px-1">
+                  {selectAllInMailbox ? `Đã chọn tất cả trong hộp thư` : `Đã chọn ${selectedUids.size}`}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => { setSelectedUids(new Set()); setSelectAllInMailbox(false); }}
+                    className="px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    Bỏ chọn
+                  </button>
+                  {activeFolder === 'trash' && (
+                    <button
+                      onClick={() => handleBulkAction('restore')}
+                      disabled={isBulkActioning}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-green-500 hover:bg-green-600 rounded transition-colors disabled:opacity-50 shadow-sm"
+                    >
+                      <RefreshCw size={12} className={isBulkActioning ? 'animate-spin' : ''} /> Khôi phục
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleBulkAction('delete')}
+                    disabled={isBulkActioning}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded transition-colors disabled:opacity-50 shadow-sm"
+                  >
+                    <Trash2 size={12} /> {activeFolder === 'trash' ? 'Xóa vĩnh viễn' : 'Xóa'}
+                  </button>
+                </div>
+              </div>
+              {/* Banner to select ALL in mailbox when only current page is selected */}
+              {!selectAllInMailbox && selectedUids.size === inbox.length && (
+                <div className="flex items-center gap-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-700">
+                  <span className="flex-1">Đã chọn {inbox.length} thư đang hiển thị. Muốn chọn toàn bộ hộp thư?</span>
+                  <button
+                    onClick={() => setSelectAllInMailbox(true)}
+                    className="font-bold text-blue-600 hover:text-blue-800 whitespace-nowrap underline"
+                  >
+                    Chọn tất cả
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative animate-fade-in">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm email..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-gray-200 bg-white focus:outline-none focus:border-blue-400 transition-colors"
+              />
+            </div>
+          )}
           {/* Quick filters */}
           <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={toggleSelectAll}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-semibold transition-colors border ${
+                selectAllInMailbox || (selectedUids.size > 0 && selectedUids.size === inbox.length)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'
+              }`}
+              title={`Chọn tất cả ${inbox.length} thư đang tải`}
+            >
+              <div className={`w-3 h-3 rounded-[3px] border flex items-center justify-center transition-colors ${
+                selectAllInMailbox || (selectedUids.size > 0 && selectedUids.size === inbox.length) ? 'border-white' : 'border-gray-400'
+              }`}>
+                {(selectAllInMailbox || (selectedUids.size > 0 && selectedUids.size === inbox.length)) &&
+                  <svg viewBox="0 0 14 14" fill="none" className="w-2.5 h-2.5 text-current"><path d="M3 7.5L5.5 10L11 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              </div>
+              Chọn trang này ({inbox.length})
+            </button>
+            <div className="w-px h-3 bg-gray-200 mx-1" />
             <button
               onClick={() => setFilterUnread(v => !v)}
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors border ${
@@ -643,9 +920,89 @@ export default function MailPage() {
             >
               <Star size={10} /> Có sao
             </button>
-            {(filterUnread || filterStarred) && (
+            {/* Date range filter button */}
+            <div className="relative" ref={dateFilterRef}>
               <button
-                onClick={() => { setFilterUnread(false); setFilterStarred(false); }}
+                onClick={() => setShowDateFilter(v => !v)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors border ${
+                  filterDateFrom || filterDateTo
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300'
+                }`}
+                title="Lọc theo ngày"
+              >
+                <Filter size={10} />
+                {filterDateFrom || filterDateTo ? (
+                  <span>
+                    {filterDateFrom ? new Date(filterDateFrom).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '...'}
+                    {' – '}
+                    {filterDateTo ? new Date(filterDateTo).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '...'}
+                  </span>
+                ) : 'Ngày'}
+              </button>
+
+              {showDateFilter && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-64 animate-fade-in">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Lọc theo khoảng ngày</p>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1 font-medium">Từ ngày</label>
+                      <input
+                        type="date"
+                        value={filterDateFrom}
+                        onChange={e => setFilterDateFrom(e.target.value)}
+                        max={filterDateTo || undefined}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 transition-colors bg-gray-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-400 mb-1 font-medium">Đến ngày</label>
+                      <input
+                        type="date"
+                        value={filterDateTo}
+                        onChange={e => setFilterDateTo(e.target.value)}
+                        min={filterDateFrom || undefined}
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 transition-colors bg-gray-50"
+                      />
+                    </div>
+                  </div>
+                  {/* Quick shortcuts */}
+                  <div className="mt-2.5 pt-2 border-t border-gray-100">
+                    <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Chọn nhanh</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { label: 'Hôm nay', fn: () => { const t = new Date().toISOString().slice(0,10); setFilterDateFrom(t); setFilterDateTo(t); } },
+                        { label: 'Hôm qua', fn: () => { const d = new Date(); d.setDate(d.getDate()-1); const s = d.toISOString().slice(0,10); setFilterDateFrom(s); setFilterDateTo(s); } },
+                        { label: '7 ngày qua', fn: () => { const d = new Date(); d.setDate(d.getDate()-6); setFilterDateFrom(d.toISOString().slice(0,10)); setFilterDateTo(new Date().toISOString().slice(0,10)); } },
+                        { label: 'Tháng này', fn: () => { const now = new Date(); const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10); setFilterDateFrom(from); setFilterDateTo(now.toISOString().slice(0,10)); } },
+                        { label: 'Tháng trước', fn: () => { const now = new Date(); const from = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,10); const to = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0,10); setFilterDateFrom(from); setFilterDateTo(to); } },
+                        { label: 'Năm nay', fn: () => { const now = new Date(); setFilterDateFrom(`${now.getFullYear()}-01-01`); setFilterDateTo(now.toISOString().slice(0,10)); } },
+                      ].map(({ label, fn }) => (
+                        <button
+                          key={label}
+                          onClick={() => { fn(); setShowDateFilter(false); }}
+                          className="px-2 py-1.5 text-[10px] font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors text-left"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {(filterDateFrom || filterDateTo) && (
+                    <button
+                      onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setShowDateFilter(false); }}
+                      className="mt-2 w-full py-1.5 text-[10px] font-semibold text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                    >
+                      Xóa bộ lọc ngày
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {(filterUnread || filterStarred || filterDateFrom || filterDateTo) && (
+              <button
+                onClick={() => { setFilterUnread(false); setFilterStarred(false); setFilterDateFrom(''); setFilterDateTo(''); }}
                 className="px-2 py-1 rounded-md text-[10px] text-gray-400 hover:text-red-500 border border-gray-200 transition-colors"
               >
                 Xóa lọc
@@ -682,10 +1039,15 @@ export default function MailPage() {
                     <div
                       key={email.id}
                       onClick={() => readMail(email)}
-                      className={`relative flex gap-3 p-3.5 cursor-pointer transition-all border-b border-gray-100/80 group
+                      className={`relative flex gap-2.5 p-3.5 cursor-pointer transition-all border-b border-gray-100/80 group
                         ${isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : email.isRead ? 'hover:bg-gray-50' : 'bg-white border-l-2 border-l-blue-400 hover:bg-blue-50/30'}
                       `}
                     >
+                      <div className="flex flex-col items-center pt-1" onClick={e => toggleSelectMail(email.id, e)}>
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors cursor-pointer ${selectedUids.has(email.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white group-hover:border-blue-400'}`}>
+                          {selectedUids.has(email.id) && <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3 text-white"><path d="M3 7.5L5.5 10L11 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                      </div>
                       <Avatar name={displayName} size={9} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
@@ -742,6 +1104,215 @@ export default function MailPage() {
           )}
         </div>
       </div>
+
+      {/* ── CONTACTS PANEL ── */}
+      {showContacts && (
+        <div className="w-72 flex-shrink-0 border-l border-gray-100 flex flex-col bg-white overflow-hidden" style={{ animation: 'slideInRight 0.2s ease-out' }}>
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <Users size={13} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-800">Danh Bạ</p>
+                  <p className="text-[10px] text-gray-400">
+                    {contacts.company.length} nhân viên
+                    {contactsLastUpdated && (
+                      <span className="text-gray-300 ml-1">
+                        • {contactsLastUpdated.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={fetchContacts}
+                  disabled={isLoadingContacts}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    isLoadingContacts
+                      ? 'text-indigo-400 bg-indigo-50 cursor-not-allowed'
+                      : 'hover:bg-gray-100 text-gray-400 hover:text-indigo-600'
+                  }`}
+                  title={isLoadingContacts ? 'Đang quét IMAP...' : 'Quét lại danh bạ (IMAP)'}
+                >
+                  <RefreshCw size={13} className={isLoadingContacts ? 'animate-spin text-indigo-500' : ''} />
+                </button>
+                <button
+                  onClick={() => setShowContacts(false)}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+            {/* Scanning progress indicator */}
+            {isLoadingContacts && (
+              <div className="mt-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span className="text-[10px] text-indigo-500 font-medium">Đang quét IMAP...</span>
+                </div>
+                <div className="h-0.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-400 rounded-full" style={{ animation: 'scanProgress 2s ease-in-out infinite' }} />
+                </div>
+              </div>
+            )}
+            {/* Error state */}
+            {contactsError && !isLoadingContacts && (
+              <div className="mt-2 flex items-center gap-1.5 p-1.5 bg-red-50 rounded-lg border border-red-100">
+                <span className="text-[10px] text-red-500 flex-1">{contactsError}</span>
+                <button
+                  onClick={fetchContacts}
+                  className="text-[10px] font-semibold text-red-500 hover:text-red-700 underline whitespace-nowrap"
+                >
+                  Thử lại
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="px-3 py-2 border-b border-gray-100">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Tìm theo tên, email..."
+                value={contactSearch}
+                onChange={e => setContactSearch(e.target.value)}
+                className="w-full pl-7 pr-3 py-1.5 text-[11px] rounded-lg border border-gray-200 bg-gray-50 focus:outline-none focus:border-indigo-400 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Contact list */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {isLoadingContacts ? (
+              <div className="p-8 text-center text-gray-400">
+                <RefreshCw className="animate-spin mx-auto mb-2" size={18} />
+                <p className="text-xs">Đang quét danh bạ...</p>
+              </div>
+            ) : (() => {
+              const q = contactSearch.toLowerCase();
+              const filterFn = (c: any) =>
+                !q || c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.department?.toLowerCase().includes(q);
+              const filteredCompany = contacts.company.filter(filterFn);
+              const filteredExternal = contacts.external.filter(filterFn);
+
+              return (
+                <>
+                  {/* Company contacts */}
+                  {filteredCompany.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 flex items-center gap-1.5 sticky top-0 bg-indigo-50/80 border-b border-indigo-100 z-10">
+                        <Building2 size={11} className="text-indigo-500" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Nhân viên công ty</span>
+                        <span className="ml-auto text-[10px] text-indigo-400">{filteredCompany.length}</span>
+                      </div>
+                      {filteredCompany.map(contact => {
+                        const initials = contact.name?.split(' ').slice(-2).map((w: string) => w[0]).join('').toUpperCase() || '?';
+                        const colorClass = AVATAR_COLORS[initials.charCodeAt(0) % AVATAR_COLORS.length];
+                        const isMe = contact.email === user?.email;
+                        return (
+                          <div
+                            key={contact.id || contact.email}
+                            className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-50 transition-colors group ${isMe ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
+                              {initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1">
+                                <p className="text-xs font-semibold text-gray-800 truncate">{contact.name}</p>
+                                {isMe && <span className="text-[9px] bg-blue-100 text-blue-600 px-1 rounded font-medium">Bạn</span>}
+                              </div>
+                              <p className="text-[10px] text-gray-400 truncate">{contact.email}</p>
+                              {contact.department && (
+                                <p className="text-[9px] text-indigo-400 truncate">{contact.department}</p>
+                              )}
+                            </div>
+                            {!isMe && (
+                              <button
+                                onClick={() => {
+                                  setComposeTo(contact.email);
+                                  setComposeSubject('');
+                                  setComposeBody('<br><br><span style="color: #9ca3af;">--<br>Được gửi từ hệ thống CTC Task</span>');
+                                  setComposeAttachments([]);
+                                  setIsComposing(true);
+                                  setShowContacts(false);
+                                }}
+                                className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-indigo-600 text-white hover:bg-indigo-700 transition-all flex-shrink-0 shadow-sm"
+                                title={`Gửi thư cho ${contact.name}`}
+                              >
+                                <Send size={11} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* External contacts */}
+                  {filteredExternal.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 flex items-center gap-1.5 sticky top-0 bg-amber-50/80 border-b border-amber-100 z-10">
+                        <ExternalLink size={11} className="text-amber-500" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Liên lạc ngoài</span>
+                        <span className="ml-auto text-[10px] text-amber-400">{filteredExternal.length}</span>
+                      </div>
+                      {filteredExternal.map((contact, i) => {
+                        const initials = contact.name?.split(' ').slice(-2).map((w: string) => w[0]).join('').toUpperCase() || contact.email[0]?.toUpperCase() || '?';
+                        const colorClass = AVATAR_COLORS[i % AVATAR_COLORS.length];
+                        return (
+                          <div
+                            key={contact.email}
+                            className="flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-50 hover:bg-gray-50 transition-colors group"
+                          >
+                            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0 opacity-70`}>
+                              {initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-700 truncate">{contact.name || contact.email}</p>
+                              <p className="text-[10px] text-gray-400 truncate">{contact.email}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setComposeTo(contact.email);
+                                setComposeSubject('');
+                                setComposeBody('<br><br><span style="color: #9ca3af;">--<br>Được gửi từ hệ thống CTC Task</span>');
+                                setComposeAttachments([]);
+                                setIsComposing(true);
+                                setShowContacts(false);
+                              }}
+                              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-amber-500 text-white hover:bg-amber-600 transition-all flex-shrink-0 shadow-sm"
+                              title={`Gửi thư cho ${contact.email}`}
+                            >
+                              <Send size={11} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {filteredCompany.length === 0 && filteredExternal.length === 0 && (
+                    <div className="p-8 text-center text-gray-400">
+                      <UserCircle2 size={28} className="opacity-30 mx-auto mb-2" />
+                      <p className="text-xs">Không tìm thấy liên lạc nào.</p>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* ── READING PANE ── */}
       <div className="flex-1 hidden md:flex flex-col bg-white overflow-hidden">
@@ -821,15 +1392,13 @@ export default function MailPage() {
                   >
                     <Forward size={16} />
                   </button>
-                  {activeFolder !== 'trash' && (
-                    <button
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                      title="Xoá"
-                      onClick={e => deleteMail(selectedMail, e as any)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                  <button
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                    title={activeFolder === 'trash' ? 'Xoá vĩnh viễn' : 'Chuyển vào thùng rác'}
+                    onClick={e => deleteMail(selectedMail, e as any)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -1131,7 +1700,17 @@ export default function MailPage() {
           from { transform: translateY(100%); opacity: 0; }
           to   { transform: translateY(0);    opacity: 1; }
         }
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+        @keyframes scanProgress {
+          0%   { width: 0%;   margin-left: 0; }
+          50%  { width: 70%;  margin-left: 15%; }
+          100% { width: 0%;   margin-left: 100%; }
+        }
       `}</style>
     </div>
+    </>
   );
 }
