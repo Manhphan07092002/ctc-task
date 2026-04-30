@@ -4,7 +4,7 @@ import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, CalendarDays, Building2, Trash2, Search, Filter, PieChart, BarChart } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, Printer, CalendarDays, Building2, Trash2, Search, Filter, PieChart, BarChart } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { ReportModal } from './ReportModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -284,7 +284,10 @@ export default function ReportsPage() {
           <button onClick={() => setShowAnalytics(!showAnalytics)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors shadow-sm border ${showAnalytics ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
             <PieChart size={16}/> Thống kê
           </button>
-          <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-200 rounded-xl hover:bg-green-50 transition-colors shadow-sm">
+          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-700 bg-white border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm no-print">
+            <Printer size={16}/> Xuất PDF
+          </button>
+          <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-200 rounded-xl hover:bg-green-50 transition-colors shadow-sm no-print">
             <Download size={16}/> Xuất Excel
           </button>
           {(canCreate || canApprove) && !canViewAll && (

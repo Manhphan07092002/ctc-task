@@ -16,34 +16,37 @@ export function userRoutes(db: any, mailer: any) {
       await db.run(`ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN dob TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN hometown TEXT DEFAULT ''`).catch(() => {});
-      await db.run(`ALTER TABLE users ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0`).catch(() => {});
-      const users = await db.all(`SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, u.bio, u.phone, u.dob, u.hometown, u.preferences, u.isLocked, r.permissions FROM users u LEFT JOIN roles r ON u.role = r.name`);
+      await db.run(`ALTER TABLE users ADD COLUMN cccd TEXT DEFAULT ''`).catch(() => {});
+      await db.run(`ALTER TABLE users ADD COLUMN gender TEXT DEFAULT ''`).catch(() => {});
+      const users = await db.all(`SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, u.bio, u.phone, u.dob, u.hometown, u.cccd, u.gender, u.preferences, u.isLocked, r.permissions FROM users u LEFT JOIN roles r ON u.role = r.name`);
       res.json(users.map((u: any) => ({ ...u, isLocked: Boolean(u.isLocked), permissions: u.permissions ? JSON.parse(u.permissions) : [], preferences: u.preferences ? JSON.parse(u.preferences) : {} })));
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   router.post('/', async (req, res) => {
-    const { id, name, email, password, role, department, avatar, bio, phone, dob, hometown, preferences } = req.body;
+    const { id, name, email, password, role, department, avatar, bio, phone, dob, hometown, cccd, gender, preferences } = req.body;
     try {
       await db.run(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN dob TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN hometown TEXT DEFAULT ''`).catch(() => {});
+      await db.run(`ALTER TABLE users ADD COLUMN cccd TEXT DEFAULT ''`).catch(() => {});
+      await db.run(`ALTER TABLE users ADD COLUMN gender TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'`).catch(() => {});
       const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
-      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar, bio, phone, dob, hometown, preferences) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, name, email, hashedPassword, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', preferences ? JSON.stringify(preferences) : '{}']);
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar, bio, phone, dob, hometown, cccd, gender, preferences) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, name, email, hashedPassword, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', cccd || '', gender || '', preferences ? JSON.stringify(preferences) : '{}']);
       res.json({ id });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   router.put('/:id', async (req, res) => {
-    const { name, email, password, role, department, avatar, bio, phone, dob, hometown, preferences } = req.body;
+    const { name, email, password, role, department, avatar, bio, phone, dob, hometown, cccd, gender, preferences } = req.body;
     try {
       if (password) {
         const hashed = await bcrypt.hash(password, 10);
-        await db.run('UPDATE users SET name=?, email=?, password=?, role=?, department=?, avatar=?, bio=?, phone=?, dob=?, hometown=?, preferences=? WHERE id=?', [name, email, hashed, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', preferences ? JSON.stringify(preferences) : '{}', req.params.id]);
+        await db.run('UPDATE users SET name=?, email=?, password=?, role=?, department=?, avatar=?, bio=?, phone=?, dob=?, hometown=?, cccd=?, gender=?, preferences=? WHERE id=?', [name, email, hashed, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', cccd || '', gender || '', preferences ? JSON.stringify(preferences) : '{}', req.params.id]);
       } else {
-        await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=?, bio=?, phone=?, dob=?, hometown=?, preferences=? WHERE id=?', [name, email, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', preferences ? JSON.stringify(preferences) : '{}', req.params.id]);
+        await db.run('UPDATE users SET name=?, email=?, role=?, department=?, avatar=?, bio=?, phone=?, dob=?, hometown=?, cccd=?, gender=?, preferences=? WHERE id=?', [name, email, role, department, avatar, bio || '', phone || '', dob || '', hometown || '', cccd || '', gender || '', preferences ? JSON.stringify(preferences) : '{}', req.params.id]);
       }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }

@@ -60,6 +60,20 @@ export default function ComposeModal({ initialData, onClose, onDiscard, onSendSu
     }));
   }, [composeTo, composeCc, composeBcc, composeSubject, composeBody]);
 
+  // Prevent accidentally closing the tab if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const signatureStripped = composeBody.replace(/<br\s*\/?>/gi, '').replace(/<[^>]*>/g, '').trim();
+      const hasContent = composeTo.trim() || composeSubject.trim() || signatureStripped;
+      if (hasContent) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard for most browsers to show a prompt
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [composeTo, composeSubject, composeBody]);
+
   // Fetch recipient suggestions
   useEffect(() => {
     apiFetch('/api/mail/recipients').then(r => r.ok ? r.json() : []).then(data => {
@@ -404,17 +418,24 @@ export default function ComposeModal({ initialData, onClose, onDiscard, onSendSu
               <input type="checkbox" checked={trackOpens} onChange={e => setTrackOpens(e.target.checked)} className="rounded text-blue-500 w-3.5 h-3.5 border-gray-300 focus:ring-blue-500" />
               <span className="text-xs text-gray-500">Tracking</span>
             </label>
-            <input
-              type="datetime-local"
-              value={scheduleAt}
-              onChange={e => setScheduleAt(e.target.value)}
-              className="text-xs bg-white border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:border-blue-500"
-              title="Gửi theo lịch"
-            />
+            <div className="relative flex items-center">
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={e => setScheduleAt(e.target.value)}
+                className="text-xs bg-white border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:border-blue-500 pr-6"
+                title="Gửi theo lịch"
+              />
+              {scheduleAt && (
+                <button onClick={() => setScheduleAt('')} className="absolute right-1 text-gray-400 hover:text-red-500" title="Xóa lịch gửi">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        <button onClick={() => setScheduleAt('')} title="Xóa lịch gửi để gửi ngay" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+        <button onClick={onDiscard} title="Xóa bản nháp" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
           <Trash2 size={17} />
         </button>
       </div>

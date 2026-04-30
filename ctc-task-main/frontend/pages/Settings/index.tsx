@@ -5,11 +5,12 @@ import { User, Bell, Moon, Sun, Lock, Shield, Save, CheckCircle, Camera, Globe, 
 import { Button, Card, Avatar } from "../../components/UI";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { saveUser } from '../../services/userService';
+import { useData } from '../../contexts/DataContext';
 
 export const SettingsView: React.FC = () => {
   const { t } = useLanguage();
   const { user, updateUserSession } = useAuth();
+  const { saveUser } = useData();
   const [activeTab, setActiveTab] = useState('profile');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -19,6 +20,8 @@ export const SettingsView: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
   const [hometown, setHometown] = useState('');
+  const [cccd, setCccd] = useState('');
+  const [gender, setGender] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
   // Notifications
@@ -57,6 +60,8 @@ export const SettingsView: React.FC = () => {
       setPhone(user.phone || '');
       setDob(user.dob || '');
       setHometown(user.hometown || '');
+      setCccd(user.cccd || '');
+      setGender(user.gender || '');
       setMailEmail(user.email || '');
       
       if (user.preferences) {
@@ -86,7 +91,7 @@ export const SettingsView: React.FC = () => {
 
   const handleSaveProfile = async () => {
     try {
-      const updatedUser = { ...user, name, avatar: avatarUrl, bio, phone, dob, hometown };
+      const updatedUser = { ...user, name, avatar: avatarUrl, bio, phone, dob, hometown, cccd, gender };
       await saveUser(updatedUser);
       updateUserSession(updatedUser);
       showSaveSuccess();
@@ -241,6 +246,29 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">CCCD / ID Card</label>
+                <input
+                  type="text"
+                  value={cccd}
+                  onChange={e => setCccd(e.target.value)}
+                  placeholder="Nhập số CCCD"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all text-gray-700"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Giới tính</label>
+                <select
+                  value={gender}
+                  onChange={e => setGender(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all text-gray-700 bg-white"
+                >
+                  <option value="">Chọn giới tính</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Phòng ban</label>
                 <input defaultValue={user.department} disabled className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-500 text-sm" />
               </div>
@@ -347,7 +375,7 @@ export const SettingsView: React.FC = () => {
               <div className="flex gap-4">
                 {[
                   { value: 'vi', label: '🇻🇳 Tiếng Việt', desc: 'Ngôn ngữ chính' },
-                  { value: 'en', label: '🇺🇸 English', desc: 'Sắp ra mắt' },
+                  { value: 'en', label: '🇺🇸 English', desc: 'Secondary Language' },
                 ].map(opt => (
                   <button
                     key={opt.value}

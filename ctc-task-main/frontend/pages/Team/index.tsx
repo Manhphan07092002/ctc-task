@@ -1,9 +1,11 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, Shield, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, X, Mail, Phone, MapPin, Calendar, Info, CreditCard, Users } from 'lucide-react';
 import { User } from '../../types';
 import { useData } from '../../contexts/DataContext';
+import { UserProfilePopup } from '../../components/UserProfilePopup';
+import { getSignature } from '../Mail/utils';
 
 interface TeamPageProps {
   t: (key: string) => string;
@@ -21,6 +23,9 @@ export default function TeamPage({
   const perms = user.permissions || [];
   const canViewTeam = perms.includes('view_dept_users') || perms.includes('manage_users');
   const canManageTeam = perms.includes('manage_users');
+  const navigate = useNavigate();
+
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   if (!canViewTeam) {
     return <Navigate to="/" replace />;
@@ -41,7 +46,11 @@ export default function TeamPage({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {users.filter(u => canManageTeam ? true : u.department === user.department).map(u => (
-          <Card key={u.id} className="p-6 flex items-center gap-4 relative group">
+          <Card 
+            key={u.id} 
+            className="p-6 flex items-center gap-4 relative group cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setSelectedUser(u)}
+          >
             <Avatar src={u.avatar} alt={u.name} size={16} />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-gray-800 dark:text-slate-100 text-lg truncate">{u.name}</h4>
@@ -62,13 +71,13 @@ export default function TeamPage({
             {canManageTeam && (
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-700 shadow-sm rounded-lg p-1">
                 <button 
-                  onClick={() => openEditUserModal(u)} 
+                  onClick={(e) => { e.stopPropagation(); openEditUserModal(u); }} 
                   className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md hover:text-blue-600"
                 >
                   <Edit size={14} />
                 </button>
                 <button 
-                  onClick={() => handleDeleteUser(u.id)} 
+                  onClick={(e) => { e.stopPropagation(); handleDeleteUser(u.id); }} 
                   className="p-1.5 text-gray-500 hover:bg-red-50 rounded-md hover:text-red-600"
                 >
                   <Trash2 size={14} />
@@ -78,6 +87,16 @@ export default function TeamPage({
           </Card>
         ))}
       </div>
+
+      {/* User Profile Modal */}
+      {selectedUser && (
+        <UserProfilePopup 
+          user={user}
+          selectedUser={selectedUser}
+          roles={roles}
+          onClose={() => setSelectedUser(null)}
+        />
+      )}
     </div>
   );
 }

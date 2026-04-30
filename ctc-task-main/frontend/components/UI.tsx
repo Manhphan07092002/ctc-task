@@ -38,8 +38,8 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white/70 dark:bg-slate-800/80 backdrop-blur-2xl rounded-[1.5rem] border border-white/60 dark:border-slate-700/60 shadow-xl shadow-gray-200/50 dark:shadow-slate-900/50 hover:shadow-2xl hover:shadow-brand-500/10 transition-shadow ${className}`}>
+export const Card: React.FC<{ children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>> = ({ children, className = '', ...props }) => (
+  <div className={`bg-white/70 dark:bg-slate-800/80 backdrop-blur-2xl rounded-[1.5rem] border border-white/60 dark:border-slate-700/60 shadow-xl shadow-gray-200/50 dark:shadow-slate-900/50 hover:shadow-2xl hover:shadow-brand-500/10 transition-shadow ${className}`} {...props}>
     {children}
   </div>
 );

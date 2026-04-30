@@ -93,6 +93,8 @@ export interface User {
   phone?: string;
   dob?: string;
   hometown?: string;
+  cccd?: string;
+  gender?: string;
   permissions?: string[];
   isLocked?: boolean;
   preferences?: {

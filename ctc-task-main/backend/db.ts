@@ -139,6 +139,15 @@ export async function initDb() {
     'ALTER TABLE reports ADD COLUMN deletedAt TEXT;',
     'ALTER TABLE notes ADD COLUMN userId TEXT;',
     'ALTER TABLE notes ADD COLUMN reminderAt TEXT;',
+    'ALTER TABLE users ADD COLUMN phone TEXT;',
+    'ALTER TABLE users ADD COLUMN dob TEXT;',
+    'ALTER TABLE users ADD COLUMN hometown TEXT;',
+    'ALTER TABLE users ADD COLUMN bio TEXT;',
+    'ALTER TABLE users ADD COLUMN cccd TEXT;',
+    'ALTER TABLE users ADD COLUMN gender TEXT;',
+    "UPDATE users SET phone = '0987654321', dob = '1985-06-15', hometown = 'Hà Nội', bio = 'Chuyên gia quản trị với hơn 10 năm kinh nghiệm trong lĩnh vực phát triển kinh doanh.', cccd = '001085123456', gender = 'Nam' WHERE email = 'vandat@ctcdn.vn' AND phone IS NULL;",
+    "UPDATE users SET phone = '0123456789', dob = '2002-09-07', hometown = 'Đà Nẵng', bio = 'Nhân viên năng nổ, luôn nỗ lực học hỏi và hoàn thành xuất sắc các dự án được giao.', cccd = '048202012345', gender = 'Nam' WHERE email = 'xuanmanh@ctcdn.vn' AND phone IS NULL;",
+    "UPDATE users SET phone = '0912345678', dob = '1990-01-01', hometown = 'Hồ Chí Minh', bio = 'Quản trị viên hệ thống cấp cao.', cccd = '079190001111', gender = 'Khác' WHERE email = 'admin@ctcdn.vn' AND phone IS NULL;"
   ];
   for (const sql of migrations) {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }
@@ -248,13 +257,13 @@ export async function initDb() {
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
     const INITIAL_USERS = [
-      { id: 'u1', name: 'Admin', email: 'admin@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1' },
-      { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
-      { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
-      { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u4' },
+      { id: 'u1', name: 'Admin', email: 'admin@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1', phone: '0912345678', dob: '1990-01-01', hometown: 'Hồ Chí Minh', bio: 'Quản trị viên hệ thống.' },
+      { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2', phone: '0987654321', dob: '1985-06-15', hometown: 'Hà Nội', bio: 'Chuyên gia quản trị.' },
+      { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3', phone: '0123456789', dob: '2002-09-07', hometown: 'Đà Nẵng', bio: 'Nhân viên ưu tú.' },
+      { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u4', phone: '0933333333', dob: '1980-02-20', hometown: 'Hải Phòng', bio: 'Giám đốc điều hành.' },
     ];
     for (const u of INITIAL_USERS) {
-      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar]);
+      await db.run('INSERT INTO users (id, name, email, password, role, department, avatar, phone, dob, hometown, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar, u.phone, u.dob, u.hometown, u.bio]);
     }
   }
 

@@ -4,6 +4,9 @@ import { Contact } from '../types';
 import { apiFetch } from '../../../services/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useData } from '../../../contexts/DataContext';
+import { User } from '../../../types';
+import { UserProfilePopup } from '../../../components/UserProfilePopup';
 import { AVATAR_COLORS } from '../utils';
 
 interface ContactsPanelProps {
@@ -14,11 +17,13 @@ interface ContactsPanelProps {
 export default function ContactsPanel({ onClose, onComposeTo }: ContactsPanelProps) {
   const { user } = useAuth();
   const { showToast } = useNotifications();
+  const { users, roles } = useData();
   const [contacts, setContacts] = useState<{ company: Contact[]; external: Contact[] }>({ company: [], external: [] });
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [contactsLastUpdated, setContactsLastUpdated] = useState<Date | null>(null);
   const [contactsError, setContactsError] = useState('');
+  const [selectedProfileUser, setSelectedProfileUser] = useState<User | null>(null);
 
   const fetchContacts = async () => {
     setIsLoadingContacts(true);
@@ -157,7 +162,15 @@ export default function ContactsPanel({ onClose, onComposeTo }: ContactsPanelPro
                   return (
                     <div
                       key={contact.id || contact.email}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-50 transition-colors group ${isMe ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 border-b border-gray-50 transition-colors group cursor-pointer ${isMe ? 'bg-blue-50/50 hover:bg-blue-100/50' : 'hover:bg-gray-50'}`}
+                      onClick={() => {
+                        const fullUser = users.find(u => u.email.toLowerCase() === contact.email.toLowerCase());
+                        if (fullUser) {
+                          setSelectedProfileUser(fullUser);
+                        } else {
+                          showToast({ type: 'error', title: 'Lỗi mở hồ sơ', message: 'Không tìm thấy thông tin chi tiết của người này.' });
+                        }
+                      }}
                     >
                       <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0`}>
                         {initials}
@@ -174,7 +187,7 @@ export default function ContactsPanel({ onClose, onComposeTo }: ContactsPanelPro
                       </div>
                       {!isMe && (
                         <button
-                          onClick={() => onComposeTo(contact.email)}
+                          onClick={(e) => { e.stopPropagation(); onComposeTo(contact.email); }}
                           className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-indigo-600 text-white hover:bg-indigo-700 transition-all flex-shrink-0 shadow-sm"
                           title={`Gửi thư cho ${contact.name}`}
                         >
@@ -232,6 +245,15 @@ export default function ContactsPanel({ onClose, onComposeTo }: ContactsPanelPro
           </>
         )}
       </div>
+
+      {selectedProfileUser && user && (
+        <UserProfilePopup
+          user={user}
+          selectedUser={selectedProfileUser}
+          roles={roles}
+          onClose={() => setSelectedProfileUser(null)}
+        />
+      )}
     </div>
   );
 }
