@@ -30,7 +30,7 @@ interface FullEmail extends Email {
   attachments: { filename: string; contentType: string; size: number; content: string | null }[];
 }
 
-type FolderKey = 'inbox' | 'sent' | 'starred' | 'trash';
+type FolderKey = 'inbox' | 'sent' | 'starred' | 'trash' | 'drafts';
 
 const AVATAR_COLORS = [
   'from-violet-500 to-purple-600',
@@ -74,6 +74,12 @@ export default function MailPage() {
   const [loginEmail, setLoginEmail] = useState(user?.email || '');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+
+  // Draft confirm dialog state (shown when user tries to leave with unsaved draft)
+  const [draftDialog, setDraftDialog] = useState<{
+    open: boolean;
+    pendingAction: () => void;
+  } | null>(null);
 
   const [activeFolder, setActiveFolder] = useState<FolderKey>('inbox');
   const [inbox, setInbox] = useState<Email[]>([]);
@@ -197,17 +203,85 @@ export default function MailPage() {
     }
   }, []);
 
-  // Save drafts when changed
+  // Auto-save draft silently while composing
   useEffect(() => {
     if (isComposing) {
       localStorage.setItem('mail_draft', JSON.stringify({
         to: composeTo, cc: composeCc, bcc: composeBcc,
         subject: composeSubject, body: composeBody
       }));
-    } else {
-      localStorage.removeItem('mail_draft');
     }
   }, [composeTo, composeCc, composeBcc, composeSubject, composeBody, isComposing]);
+
+  // Warn before browser refresh/close if composing with content
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isComposing && hasComposeContent()) {
+        e.preventDefault();
+        e.returnValue = 'Bạn có thư nháp chưa lưu. Bạn có chắc muốn rời trang?';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isComposing, composeTo, composeSubject, composeBody]);
+
+  // Check if compose has meaningful content (exclude empty signature)
+  const hasComposeContent = () => {
+    const signatureStripped = composeBody.replace(/<br\s*\/?>/gi, '').replace(/<[^>]*>/g, '').trim();
+    return composeTo.trim() || composeSubject.trim() || signatureStripped;
+  };
+
+  // Close compose: if has content, ask to save draft
+  const handleCloseCompose = (discard = false) => {
+    if (!discard && hasComposeContent()) {
+      // Save draft silently
+      localStorage.setItem('mail_draft', JSON.stringify({
+        to: composeTo, cc: composeCc, bcc: composeBcc,
+        subject: composeSubject, body: composeBody
+      }));
+      setIsComposing(false);
+      showToast({
+        type: 'info',
+        title: 'Đã lưu thư nháp',
+        message: 'Email được lưu vào Thư nháp. Bấm dưới để mở lại.',
+        duration: 6000,
+        action: {
+          label: 'Mở lại',
+          onClick: () => {
+            const draftStr = localStorage.getItem('mail_draft');
+            if (draftStr) {
+              try {
+                const draft = JSON.parse(draftStr);
+                setComposeTo(draft.to || '');
+                setComposeCc(draft.cc || '');
+                setComposeBcc(draft.bcc || '');
+                if (draft.cc) setShowCc(true);
+                if (draft.bcc) setShowBcc(true);
+                setComposeSubject(draft.subject || '');
+                setComposeBody(draft.body || '');
+                setIsComposing(true);
+              } catch { }
+            }
+          }
+        }
+      });
+    } else {
+      // Discard draft
+      localStorage.removeItem('mail_draft');
+      setIsComposing(false);
+      setComposeTo(''); setComposeCc(''); setComposeBcc('');
+      setComposeSubject(''); setComposeBody(''); setComposeAttachments([]);
+    }
+  };
+
+  // guardAction: if composing with content, show draft dialog before proceeding
+  const guardAction = (action: () => void) => {
+    if (isComposing && hasComposeContent()) {
+      setDraftDialog({ open: true, pendingAction: action });
+    } else {
+      action();
+    }
+  };
 
   // Sync programmatic changes to composeBody (e.g. Forward, Reply) into the contentEditable div
   useEffect(() => {
@@ -282,6 +356,7 @@ export default function MailPage() {
   }, [activeFolder]);
 
   useEffect(() => {
+    if (activeFolder === 'drafts') return; // Drafts are local, no API needed
     setPage(1);
     setHasMore(true);
     fetchInbox(activeFolder, false, 1);
@@ -371,6 +446,10 @@ export default function MailPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
     setShowDateFilter(false);
+    // Drafts are local-only, no API fetch needed
+    if (f !== 'drafts') {
+      // fetchInbox is triggered by useEffect on activeFolder change
+    }
   };
 
   const toggleStar = async (email: Email, e: React.MouseEvent) => {
@@ -699,6 +778,7 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
   };
 
   const readThread = async (thread: Email[]) => {
+    const doRead = async () => {
     setSelectedThread(thread);
     const firstMail = thread[0];
 
@@ -732,6 +812,8 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
         setIsLoadingMail(false);
       }
     }
+    };
+    guardAction(doRead);
   };
 
   // Handle opening mail from notification (URL ?mailId=...)
@@ -947,6 +1029,65 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
         }}
         onCancel={() => setConfirmAction(null)}
       />
+
+      {/* Draft save dialog */}
+      {draftDialog?.open && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-sm mx-4 overflow-hidden">
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Mail size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Lưu thư nháp?</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">Bạn có thư chưa gửi. Bạn muốn làm gì?</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  // Save draft then do the pending action
+                  localStorage.setItem('mail_draft', JSON.stringify({
+                    to: composeTo, cc: composeCc, bcc: composeBcc,
+                    subject: composeSubject, body: composeBody
+                  }));
+                  setIsComposing(false);
+                  const pending = draftDialog.pendingAction;
+                  setDraftDialog(null);
+                  showToast({ type: 'info', title: 'Đã lưu thư nháp', message: 'Bạn có thể mở lại từ Thư nháp.', duration: 5000 });
+                  pending();
+                }}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                💾 Lưu vào Thư nháp
+              </button>
+              <button
+                onClick={() => {
+                  // Discard draft then do the pending action
+                  localStorage.removeItem('mail_draft');
+                  setIsComposing(false);
+                  setComposeTo(''); setComposeCc(''); setComposeBcc('');
+                  setComposeSubject(''); setComposeBody(''); setComposeAttachments([]);
+                  const pending = draftDialog.pendingAction;
+                  setDraftDialog(null);
+                  pending();
+                }}
+                className="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-xl transition-colors border border-red-100"
+              >
+                🗑️ Hủy thư (không lưu)
+              </button>
+              <button
+                onClick={() => setDraftDialog(null)}
+                className="w-full py-2 px-4 text-gray-500 hover:text-gray-700 text-sm rounded-xl transition-colors"
+              >
+                ← Quay lại soạn thư
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="h-full flex overflow-hidden rounded-2xl border border-gray-200 shadow-sm bg-white relative">
 
         {/* ── INBOX LIST ── */}
@@ -1008,10 +1149,11 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
           {/* Folder tabs */}
           <div className="flex border-b border-gray-100 bg-white">
             {([
-              { key: 'inbox', label: 'Hộp đến', icon: Inbox },
-              { key: 'sent', label: 'Đã gửi', icon: Send },
-              { key: 'starred', label: 'Sao', icon: Star },
-              { key: 'trash', label: 'Rác', icon: Trash2 },
+              { key: 'inbox',  label: 'Hộp đến', icon: Inbox },
+              { key: 'sent',   label: 'Đã gửi',  icon: Send },
+              { key: 'drafts', label: 'Nháp',    icon: Edit3 },
+              { key: 'starred',label: 'Sao',     icon: Star },
+              { key: 'trash',  label: 'Thùng rác', icon: Trash2 },
             ] as { key: FolderKey; label: string; icon: any }[]).map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -1210,7 +1352,63 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
 
           {/* Mail list */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {isLoading && inbox.length === 0 ? (
+            {activeFolder === 'drafts' ? (
+              /* ── DRAFTS VIEW ── */
+              (() => {
+                const draftStr = localStorage.getItem('mail_draft');
+                const draft = draftStr ? (() => { try { return JSON.parse(draftStr); } catch { return null; } })() : null;
+                return draft && (draft.to || draft.subject || draft.body) ? (
+                  <div className="p-3">
+                    <div
+                      onClick={() => {
+                        setComposeTo(draft.to || '');
+                        setComposeCc(draft.cc || '');
+                        setComposeBcc(draft.bcc || '');
+                        if (draft.cc) setShowCc(true);
+                        if (draft.bcc) setShowBcc(true);
+                        setComposeSubject(draft.subject || '');
+                        setComposeBody(draft.body || '');
+                        setIsComposing(true);
+                      }}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 cursor-pointer transition-colors group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Edit3 size={15} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs font-bold text-amber-800 truncate">
+                            {draft.subject || '(Không có tiêu đề)'}
+                          </span>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              localStorage.removeItem('mail_draft');
+                              setActiveFolder('inbox');
+                              showToast({ type: 'info', title: 'Đã xóa thư nháp', message: '' });
+                            }}
+                            className="p-1 rounded text-amber-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all ml-2 flex-shrink-0"
+                            title="Xóa nháp"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-amber-700 truncate">Đến: {draft.to || '(chưa có người nhận)'}</p>
+                        <p className="text-[10px] text-amber-500 mt-0.5 line-clamp-1"
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(draft.body?.replace(/<[^>]*>/g, ' ').trim() || '(Nội dung trống)') }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 text-center mt-3">Bấm để tiếp tục soạn thư nháp</p>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-gray-400 text-sm">
+                    <Edit3 size={32} className="opacity-30 mx-auto mb-2" />
+                    Không có thư nháp nào.
+                  </div>
+                );
+              })()
+            ) : isLoading && inbox.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-sm">
                 <RefreshCw className="animate-spin mx-auto mb-2" size={20} />
                 Đang tải hộp thư...
@@ -1712,10 +1910,10 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
                 <span className="font-semibold text-white text-sm">Thư mới</span>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => setIsComposing(false)} className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                <button onClick={() => handleCloseCompose()} title="Thu nhỏ" className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
                   <ChevronDown size={16} />
                 </button>
-                <button onClick={() => setIsComposing(false)} className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
+                <button onClick={() => handleCloseCompose()} title="Lưu nháp & Đóng" className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
                   <X size={16} />
                 </button>
               </div>
