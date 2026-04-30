@@ -19,6 +19,7 @@ export default function NotificationsPage() {
     if (typeLower.includes('report') || titleLower.includes('báo cáo')) navigate('/reports');
     else if (typeLower.includes('task') || titleLower.includes('công việc')) navigate('/tasks');
     else if (typeLower.includes('meeting') || titleLower.includes('họp')) navigate('/meetings');
+    else if (typeLower.includes('mail') || titleLower.includes('email') || titleLower.includes('thư')) navigate(n.relatedId ? `/mail?mailId=${n.relatedId}` : '/mail');
   };
 
   const handleDeleteAllRead = async () => {

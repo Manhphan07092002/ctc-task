@@ -176,3 +176,28 @@ model activity_logs {
   createdAt  String
 }
 
+model scheduled_emails {
+  id          String  @id
+  userId      String
+  to          String
+  cc          String?
+  bcc         String?
+  subject     String
+  body        String
+  attachments String?
+  scheduledAt String
+  status      String  @default("pending")
+  createdAt   String
+}
+
+model mail_tracking {
+  id        String  @id
+  userId    String
+  messageId String
+  subject   String
+  to        String
+  opens     Int     @default(0)
+  lastOpen  String?
+  createdAt String
+}
+

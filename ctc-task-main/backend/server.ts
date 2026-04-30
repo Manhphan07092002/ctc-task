@@ -29,6 +29,7 @@ import { initSocket } from './socket.js';
 import { scheduleFridayReminder } from './schedulers/fridayReminder.js';
 import { scheduleNoteReminders } from './schedulers/noteReminder.js';
 import { scheduleDailyTaskReminder } from './schedulers/dailyTaskReminder.js';
+import { initMailScheduler } from './schedulers/mailScheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,6 +87,7 @@ async function startServer() {
   scheduleFridayReminder(db);
   scheduleNoteReminders(db);
   scheduleDailyTaskReminder(db);
+  initMailScheduler(db);
 
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));

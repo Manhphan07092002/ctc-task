@@ -113,6 +113,16 @@ export async function initDb() {
       note TEXT,
       createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS scheduled_emails (
+      id TEXT PRIMARY KEY, userId TEXT NOT NULL, "to" TEXT NOT NULL, cc TEXT, bcc TEXT,
+      subject TEXT NOT NULL, body TEXT NOT NULL, attachments TEXT,
+      scheduledAt TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', createdAt TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mail_tracking (
+      id TEXT PRIMARY KEY, userId TEXT NOT NULL, messageId TEXT NOT NULL,
+      subject TEXT NOT NULL, "to" TEXT NOT NULL, opens INTEGER NOT NULL DEFAULT 0,
+      lastOpen TEXT, createdAt TEXT NOT NULL
+    );
   `);
 
   // Migrations (safe to run multiple times)

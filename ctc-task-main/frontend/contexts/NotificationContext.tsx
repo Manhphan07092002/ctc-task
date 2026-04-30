@@ -18,10 +18,14 @@ export interface AppNotification {
 }
 
 export interface ToastOptions {
-  type?: 'success' | 'error' | 'info';
+  type?: 'success' | 'error' | 'info' | 'warning';
   title: string;
   message?: string;
   duration?: number; // ms, default 4000
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 interface NotificationContextType {
@@ -309,18 +313,20 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         {simpleToasts.map(t => {
           const isSuccess = t.type === 'success';
           const isError = t.type === 'error';
+          const isWarning = t.type === 'warning';
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-bottom-4 fade-in duration-300 min-w-[280px] max-w-[420px]
+              className={`pointer-events-auto flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-xl animate-in slide-in-from-bottom-4 fade-in duration-300 min-w-[280px] max-w-[480px]
                 ${
                   isSuccess ? 'bg-emerald-600 border-emerald-500/50 text-white'
                   : isError ? 'bg-red-600 border-red-500/50 text-white'
+                  : isWarning ? 'bg-amber-500 border-amber-400/50 text-white'
                   : 'bg-gray-900 border-gray-700 text-white'
                 }`}
             >
               <div className={`p-2 rounded-xl flex-shrink-0 ${
-                isSuccess ? 'bg-white/20' : isError ? 'bg-white/20' : 'bg-white/10'
+                isSuccess || isError || isWarning ? 'bg-white/20' : 'bg-white/10'
               }`}>
                 {isSuccess ? <CheckCircle size={20} className="text-white" /> :
                  isError ? <AlertCircle size={20} className="text-white" /> :
@@ -330,9 +336,22 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
                 <p className="font-bold text-sm">{t.title}</p>
                 {t.message && <p className="text-xs opacity-80 mt-0.5 leading-relaxed">{t.message}</p>}
               </div>
+
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action!.onClick();
+                    dismissSimpleToast(t.id);
+                  }}
+                  className="px-3 py-1.5 ml-2 text-xs font-bold bg-white/20 hover:bg-white/30 rounded-lg transition-colors flex-shrink-0 shadow-sm"
+                >
+                  {t.action.label}
+                </button>
+              )}
+
               <button
                 onClick={() => dismissSimpleToast(t.id)}
-                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0"
+                className="p-1.5 rounded-lg hover:bg-white/20 transition-colors flex-shrink-0 ml-1"
               >
                 <X size={15} />
               </button>

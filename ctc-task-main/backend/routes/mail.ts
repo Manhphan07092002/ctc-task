@@ -3,6 +3,7 @@ import { ImapFlow } from 'imapflow';
 import nodemailer from 'nodemailer';
 import { simpleParser } from 'mailparser';
 import multer from 'multer';
+// @ts-ignore
 import MailComposer from 'nodemailer/lib/mail-composer';
 import tls from 'tls';
 import { encrypt, decrypt } from '../utils/cryptoUtils.js';
@@ -731,11 +732,24 @@ export function mailRoutes(db: any) {
         return res.status(400).json({ error: 'Tổng dung lượng đính kèm không được vượt quá 25MB.' });
       }
 
+      let finalHtml = body || '';
+      let trackingId = null;
+      if (req.body.track === 'true' || req.body.track === true) {
+        trackingId = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        const trackingUrl = `${req.protocol}://${req.get('host')}/api/mail/track/${trackingId}.gif`;
+        finalHtml += `<img src="${trackingUrl}" width="1" height="1" style="display:none;" alt="" />`;
+        
+        await db.run(
+          'INSERT INTO mail_tracking (id, userId, messageId, subject, "to", opens, createdAt) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          [trackingId, req.user.id, '', subject, to, new Date().toISOString()]
+        );
+      }
+
       const mailOptions: any = {
         from: fromLabel,
         to,
         subject,
-        html: body || '',
+        html: finalHtml,
         text: body ? body.replace(/<[^>]*>/g, '') : '',
         attachments: mailAttachments
       };
@@ -743,6 +757,10 @@ export function mailRoutes(db: any) {
       if (bcc) mailOptions.bcc = bcc;
 
       const info = await transporter.sendMail(mailOptions);
+
+      if (trackingId && info.messageId) {
+        await db.run('UPDATE mail_tracking SET messageId = ? WHERE id = ?', [info.messageId, trackingId]);
+      }
 
       console.log(`[SMTP] Response: ${info.response}`);
       console.log(`[SMTP] Accepted: ${JSON.stringify(info.accepted)}`);
@@ -758,45 +776,112 @@ export function mailRoutes(db: any) {
         });
       }
 
-      // Try to append to Sent folder via IMAP (best-effort)
-      try {
-        const client = await getImapClient(req.user.id, senderEmail);
-        const sentFolderCandidates = ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'];
-        let sentFolder = 'Sent';
-        for (const name of sentFolderCandidates) {
-          try {
-            const lock = await client.getMailboxLock(name);
-            lock.release();
-            sentFolder = name;
-            break;
-          } catch (_) { /* try next */ }
-        }
-
-        // Use MailComposer to generate raw RFC2822 message with attachments
-        const composer = new (MailComposer as any)(mailOptions);
-        const rawMessageBuffer = await composer.compile().build();
-
-        const lock = await client.getMailboxLock(sentFolder);
-        try {
-          await client.append(sentFolder, rawMessageBuffer, ['\\Seen']);
-          console.log(`[Mail] Appended sent message to "${sentFolder}"`);
-        } finally {
-          lock.release();
-          await client.logout();
-        }
-      } catch (appendErr: any) {
-        console.warn('[Mail] Could not append to Sent folder:', appendErr.message);
-      }
-
+      // Return response immediately for better UI performance
       res.json({
         success: true,
         message: `Đã gửi kèm ${mailAttachments.length} tệp.`,
         accepted: info.accepted,
         messageId: info.messageId,
       });
+
+      // Try to append to Sent folder via IMAP (best-effort, in background)
+      (async () => {
+        try {
+          const client = await getImapClient(req.user.id, senderEmail);
+          const sentFolderCandidates = ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'];
+          let sentFolder = 'Sent';
+          for (const name of sentFolderCandidates) {
+            try {
+              const lock = await client.getMailboxLock(name);
+              lock.release();
+              sentFolder = name;
+              break;
+            } catch (_) { /* try next */ }
+          }
+
+          // Use MailComposer to generate raw RFC2822 message with attachments
+          const composer = new (MailComposer as any)(mailOptions);
+          const rawMessageBuffer = await composer.compile().build();
+
+          const lock = await client.getMailboxLock(sentFolder);
+          try {
+            await client.append(sentFolder, rawMessageBuffer, ['\\Seen']);
+            console.log(`[Mail] Appended sent message to "${sentFolder}"`);
+          } finally {
+            lock.release();
+            await client.logout();
+          }
+        } catch (appendErr: any) {
+          console.warn('[Mail] Could not append to Sent folder:', appendErr.message);
+        }
+      })();
     } catch (error: any) {
       console.error('Send email error:', error);
       res.status(500).json({ error: error.message || 'Failed to send email' });
+    }
+  });
+
+  // 7. Schedule Email
+  router.post('/schedule', requireAuth, upload.array('attachments', 10), async (req: any, res: any) => {
+    const { to, subject, body, cc, bcc, scheduledAt } = req.body;
+    if (!to || !subject || !scheduledAt) return res.status(400).json({ error: 'To, Subject and ScheduledAt are required' });
+
+    try {
+      const dbUser = await db.get('SELECT id, mailPassword FROM users WHERE id = ?', [req.user.id]);
+      if (!dbUser || !dbUser.mailPassword) return res.status(400).json({ error: 'Chưa cấu hình tài khoản mail VNPT.' });
+
+      const mailAttachments = req.files ? (req.files as any[]).map(f => ({
+        filename: f.originalname,
+        content: f.buffer.toString('base64'),
+        contentType: f.mimetype
+      })) : [];
+
+      const id = Math.random().toString(36).substr(2, 9);
+      await db.run(
+        'INSERT INTO scheduled_emails (id, userId, "to", cc, bcc, subject, body, attachments, scheduledAt, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, req.user.id, to, cc || null, bcc || null, subject, body || '', JSON.stringify(mailAttachments), scheduledAt, 'pending', new Date().toISOString()]
+      );
+
+      res.json({ success: true, message: 'Đã lên lịch gửi email.' });
+    } catch (error: any) {
+      console.error('Schedule email error:', error);
+      res.status(500).json({ error: error.message || 'Failed to schedule email' });
+    }
+  });
+
+  // 8. Tracking Pixel Route
+  router.get('/track/:trackingId.gif', async (req: any, res: any) => {
+    const { trackingId } = req.params;
+    try {
+      await db.run(
+        'UPDATE mail_tracking SET opens = opens + 1, lastOpen = ? WHERE id = ?',
+        [new Date().toISOString(), trackingId]
+      );
+    } catch (err) {
+      console.error('Tracking error:', err);
+    }
+    // 1x1 transparent GIF
+    const img = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    res.writeHead(200, {
+      'Content-Type': 'image/gif',
+      'Content-Length': img.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    res.end(img);
+  });
+
+  // 9. Get Tracking Stats
+  router.get('/tracking-stats', requireAuth, async (req: any, res: any) => {
+    try {
+      const stats = await db.all(
+        'SELECT id, subject, "to", opens, lastOpen, createdAt FROM mail_tracking WHERE userId = ? ORDER BY createdAt DESC',
+        [req.user.id]
+      );
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
