@@ -14,6 +14,8 @@ interface SystemInfo {
 }
 
 interface SmtpConfig {
+  IMAP_HOST: string;
+  IMAP_PORT: string;
   SMTP_HOST: string;
   SMTP_PORT: string;
   SMTP_SECURE: string;
@@ -47,6 +49,8 @@ export default function AdminSystemConfig() {
   });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfig>({
+    IMAP_HOST: '',
+    IMAP_PORT: '993',
     SMTP_HOST: '',
     SMTP_PORT: '587',
     SMTP_SECURE: 'false',
@@ -305,6 +309,21 @@ export default function AdminSystemConfig() {
         ) : (
           <div className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2 mt-2 mb-1">
+                <h4 className="text-sm font-bold text-gray-800 border-b pb-2">Cấu hình Nhận thư (IMAP)</h4>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">IMAP Host</label>
+                <input value={smtpConfig.IMAP_HOST} onChange={(e) => handleSmtpChange('IMAP_HOST', e.target.value)} placeholder="imap.vnptemail.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">IMAP Port (thường 993 bảo mật)</label>
+                <input value={smtpConfig.IMAP_PORT} onChange={(e) => handleSmtpChange('IMAP_PORT', e.target.value)} placeholder="993" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
+              </div>
+
+              <div className="md:col-span-2 mt-4 mb-1">
+                <h4 className="text-sm font-bold text-gray-800 border-b pb-2">Cấu hình Gửi thư (SMTP) & Tài khoản</h4>
+              </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP Host</label>
                 <input value={smtpConfig.SMTP_HOST} onChange={(e) => handleSmtpChange('SMTP_HOST', e.target.value)} placeholder="smtp.vnptemail.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
@@ -314,15 +333,15 @@ export default function AdminSystemConfig() {
                 <input value={smtpConfig.SMTP_PORT} onChange={(e) => handleSmtpChange('SMTP_PORT', e.target.value)} placeholder="587" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP User</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Hệ thống (User)</label>
                 <input value={smtpConfig.SMTP_USER} onChange={(e) => handleSmtpChange('SMTP_USER', e.target.value)} placeholder="xuanmanh@ctcdn.vn" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">SMTP Password</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mật khẩu Hệ thống (Password)</label>
                 <input type="password" value={smtpConfig.SMTP_PASS} onChange={(e) => handleSmtpChange('SMTP_PASS', e.target.value)} placeholder="Nhập hoặc giữ nguyên mật khẩu đã lưu" className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email gửi đi (SMTP From)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tên người gửi (SMTP From)</label>
                 <input value={smtpConfig.SMTP_FROM} onChange={(e) => handleSmtpChange('SMTP_FROM', e.target.value)} placeholder='CTC Task <xuanmanh@ctcdn.vn>' className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-200 outline-none" />
               </div>
               <div>

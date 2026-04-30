@@ -145,14 +145,20 @@ export function adminRoutes(db: any, mailer: any) {
   router.get('/system-config/smtp', async (_req, res) => {
     try {
       const smtp = await mailer.getSystemConfig();
-      res.json({ SMTP_HOST: smtp.SMTP_HOST, SMTP_PORT: smtp.SMTP_PORT, SMTP_SECURE: smtp.SMTP_SECURE, SMTP_USER: smtp.SMTP_USER, SMTP_PASS: smtp.SMTP_PASS ? '********' : '', SMTP_FROM: smtp.SMTP_FROM });
+      res.json({ 
+        IMAP_HOST: smtp.IMAP_HOST, IMAP_PORT: smtp.IMAP_PORT,
+        SMTP_HOST: smtp.SMTP_HOST, SMTP_PORT: smtp.SMTP_PORT, 
+        SMTP_SECURE: smtp.SMTP_SECURE, SMTP_USER: smtp.SMTP_USER, 
+        SMTP_PASS: smtp.SMTP_PASS ? '********' : '', SMTP_FROM: smtp.SMTP_FROM 
+      });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   router.post('/system-config/smtp', async (req, res) => {
     try {
-      const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM } = req.body;
+      const { IMAP_HOST, IMAP_PORT, SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM } = req.body;
       const entries: [string, string][] = [
+        ['IMAP_HOST', IMAP_HOST || ''], ['IMAP_PORT', String(IMAP_PORT || '993')],
         ['SMTP_HOST', SMTP_HOST || ''], ['SMTP_PORT', String(SMTP_PORT || '587')],
         ['SMTP_SECURE', String(SMTP_SECURE || 'false')], ['SMTP_USER', SMTP_USER || ''], ['SMTP_FROM', SMTP_FROM || ''],
       ];

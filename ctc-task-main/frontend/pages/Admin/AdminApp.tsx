@@ -12,26 +12,22 @@ import AdminRoleManagement from './RoleManagement';
 import AdminDepartmentManagement from './DepartmentManagement';
 import AdminDatabaseManagement from './DatabaseManagement';
 import AdminEventManagement from './EventManagement';
+import { AdminTabGroup, TabItem } from './AdminTabGroup';
 import {
   Shield, LayoutDashboard, Users, Settings, LogOut,
   Bell, ChevronRight, Activity, Menu, X,
-  CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays
+  CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays,
+  Layers, Settings2
 } from 'lucide-react';
 
 const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth();
 
   const navItems = [
-    { id: 'dashboard', label: 'Tổng quan hệ thống', icon: LayoutDashboard, path: '/admin' },
-    { id: 'users',       label: 'Quản lý Người dùng', icon: Users,       path: '/admin/users' },
-    { id: 'roles',       label: 'Quản lý Vai trò',    icon: ShieldCheck,  path: '/admin/roles' },
-    { id: 'departments', label: 'Quản lý Phòng ban',  icon: Building2,    path: '/admin/departments' },
-    { id: 'tasks',       label: 'Quản lý Công việc',  icon: CheckSquare,  path: '/admin/tasks' },
-    { id: 'reports',     label: 'Quản lý Báo cáo',   icon: FileText,     path: '/admin/reports' },
-    { id: 'meetings',    label: 'Quản lý Cuộc họp',   icon: Video,        path: '/admin/meetings' },
-    { id: 'events',      label: 'Sự kiện & Ngày lễ',   icon: CalendarDays, path: '/admin/events' },
-    { id: 'database',    label: 'Quản lý Database',    icon: Database,     path: '/admin/database' },
-    { id: 'settings',    label: 'Cấu hình Hệ thống', icon: Settings,     path: '/admin/settings' },
+    { id: 'dashboard',    label: 'Tổng quan hệ thống', icon: LayoutDashboard, path: '/admin' },
+    { id: 'organization', label: 'Tổ chức & Nhân sự',  icon: Users,           path: '/admin/organization' },
+    { id: 'operations',   label: 'Hoạt động & Vận hành',icon: Layers,          path: '/admin/operations' },
+    { id: 'system',       label: 'Cấu hình & Dữ liệu', icon: Settings2,       path: '/admin/system' },
   ];
 
   return (
@@ -56,7 +52,7 @@ const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
         {/* Logo */}
         <div className="h-20 flex items-center px-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20">
               <Shield size={20} className="text-white" />
             </div>
             <div>
@@ -94,7 +90,7 @@ const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOp
             <NavLink
                 key={item.id}
                 to={item.path}
-                end
+                end={item.path === '/admin'}
                 onClick={onClose}
                 className={({ isActive }) => `
                   flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm
@@ -152,7 +148,7 @@ const AdminTopBar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => 
         <div className="hidden lg:flex items-center gap-2 text-xs text-gray-400">
           <span>Admin Panel</span>
           <ChevronRight size={12} />
-          <span className="text-gray-600 font-medium">Tổng quan hệ thống</span>
+          <span className="text-gray-600 font-medium">Trung tâm Quản trị</span>
         </div>
       </div>
       <div className="flex items-center gap-4">
@@ -172,6 +168,25 @@ const AdminTopBar: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => 
     </header>
   );
 };
+
+// --- Tab Groups Configuration ---
+const OrganizationTabs: TabItem[] = [
+  { id: 'users', label: 'Quản lý Người dùng', icon: Users, component: AdminUserManagement },
+  { id: 'roles', label: 'Quản lý Vai trò', icon: ShieldCheck, component: AdminRoleManagement },
+  { id: 'departments', label: 'Quản lý Phòng ban', icon: Building2, component: AdminDepartmentManagement },
+];
+
+const OperationsTabs: TabItem[] = [
+  { id: 'tasks', label: 'Quản lý Công việc', icon: CheckSquare, component: AdminTaskManagement },
+  { id: 'reports', label: 'Quản lý Báo cáo', icon: FileText, component: AdminReportManagement },
+  { id: 'meetings', label: 'Quản lý Cuộc họp', icon: Video, component: AdminMeetingManagement },
+  { id: 'events', label: 'Sự kiện & Ngày lễ', icon: CalendarDays, component: AdminEventManagement },
+];
+
+const SystemTabs: TabItem[] = [
+  { id: 'settings', label: 'Cấu hình Hệ thống', icon: Settings, component: AdminSystemConfig },
+  { id: 'database', label: 'Quản lý Database', icon: Database, component: AdminDatabaseManagement },
+];
 
 export default function AdminApp() {
   const { user, isLoading } = useAuth();
@@ -212,33 +227,53 @@ export default function AdminApp() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-
-      {/* Dedicated Admin Sidebar */}
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-72">
-
-        {/* Admin Top Bar */}
         <AdminTopBar onMenuClick={() => setSidebarOpen(true)} />
 
-        {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-6 lg:p-8">
           <Routes>
             <Route path="/" element={<AdminDashboard />} />
-            <Route path="/users" element={<AdminUserManagement />} />
-            <Route path="/roles" element={<AdminRoleManagement />} />
-            <Route path="/departments" element={<AdminDepartmentManagement />} />
-            <Route path="/tasks" element={<AdminTaskManagement />} />
-            <Route path="/reports" element={<AdminReportManagement />} />
-            <Route path="/meetings" element={<AdminMeetingManagement />} />
-            <Route path="/events" element={<AdminEventManagement />} />
-            <Route path="/settings" element={<AdminSystemConfig />} />
-            <Route path="/database" element={<AdminDatabaseManagement />} />
+            <Route path="/organization" element={
+              <AdminTabGroup 
+                title="Tổ chức & Nhân sự" 
+                description="Quản lý thành viên, vai trò phân quyền và cơ cấu phòng ban công ty." 
+                icon={Users} 
+                tabs={OrganizationTabs} 
+              />
+            } />
+            <Route path="/operations" element={
+              <AdminTabGroup 
+                title="Hoạt động & Vận hành" 
+                description="Quản lý các tác vụ, báo cáo, lịch họp và sự kiện của hệ thống." 
+                icon={Layers} 
+                tabs={OperationsTabs} 
+              />
+            } />
+            <Route path="/system" element={
+              <AdminTabGroup 
+                title="Cấu hình & Dữ liệu" 
+                description="Thay đổi các thiết lập cốt lõi và quản lý sao lưu dữ liệu toàn hệ thống." 
+                icon={Settings2} 
+                tabs={SystemTabs} 
+              />
+            } />
+            
+            {/* Redirect old routes for backward compatibility */}
+            <Route path="/users" element={<Navigate to="/admin/organization?tab=users" replace />} />
+            <Route path="/roles" element={<Navigate to="/admin/organization?tab=roles" replace />} />
+            <Route path="/departments" element={<Navigate to="/admin/organization?tab=departments" replace />} />
+            <Route path="/tasks" element={<Navigate to="/admin/operations?tab=tasks" replace />} />
+            <Route path="/reports" element={<Navigate to="/admin/operations?tab=reports" replace />} />
+            <Route path="/meetings" element={<Navigate to="/admin/operations?tab=meetings" replace />} />
+            <Route path="/events" element={<Navigate to="/admin/operations?tab=events" replace />} />
+            <Route path="/settings" element={<Navigate to="/admin/system?tab=settings" replace />} />
+            <Route path="/database" element={<Navigate to="/admin/system?tab=database" replace />} />
+            
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
         </main>
-
       </div>
     </div>
   );

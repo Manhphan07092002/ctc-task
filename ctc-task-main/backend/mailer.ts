@@ -7,6 +7,8 @@ export function createMailer(db: DbType) {
     const rows = await db.all('SELECT key, value FROM system_config');
     const config = Object.fromEntries(rows.map((row: any) => [row.key, row.value]));
     return {
+      IMAP_HOST: config.IMAP_HOST || process.env.IMAP_HOST || 'imap.vnptemail.vn',
+      IMAP_PORT: config.IMAP_PORT || process.env.IMAP_PORT || '993',
       SMTP_HOST: config.SMTP_HOST || process.env.SMTP_HOST || '',
       SMTP_PORT: config.SMTP_PORT || process.env.SMTP_PORT || '587',
       SMTP_SECURE: config.SMTP_SECURE || process.env.SMTP_SECURE || 'false',

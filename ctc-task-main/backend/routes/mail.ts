@@ -8,14 +8,15 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import tls from 'tls';
 import { encrypt, decrypt } from '../utils/cryptoUtils.js';
 import { requireAuth } from '../middleware/auth.js';
+import { createMailer } from '../mailer.js';
 
 export function mailRoutes(db: any) {
   const router = Router();
 
-  const IMAP_HOST = 'imap.vnptemail.vn';
-  const IMAP_PORT = 993;
-  const SMTP_HOST = 'smtp.vnptemail.vn';
-  const SMTP_PORT = 587; // STARTTLS
+  const getDynamicConfig = async () => {
+    const mailer = createMailer(db);
+    return await mailer.getSystemConfig();
+  };
 
   // 1. Connect and Save Credentials
   router.post('/connect', requireAuth, async (req: any, res: any) => {
@@ -25,8 +26,9 @@ export function mailRoutes(db: any) {
     console.log(`[IMAP Connect] Vừa nhận yêu cầu đăng nhập từ tài khoản: "${email}"`);
 
     try {
+      const config = await getDynamicConfig();
       const authResult = await new Promise<{ success: boolean, reason?: string }>((resolve, reject) => {
-        const socket = tls.connect(IMAP_PORT, IMAP_HOST, { rejectUnauthorized: false });
+        const socket = tls.connect(Number(config.IMAP_PORT), config.IMAP_HOST, { rejectUnauthorized: false });
 
         // Timeout after 15s
         const timer = setTimeout(() => {
@@ -116,9 +118,10 @@ export function mailRoutes(db: any) {
       // It's a raw password from old format
     }
 
+    const config = await getDynamicConfig();
     let client = new ImapFlow({
-      host: IMAP_HOST,
-      port: IMAP_PORT,
+      host: config.IMAP_HOST,
+      port: Number(config.IMAP_PORT),
       secure: true,
       auth: { user: email, pass: password },
       logger: false as any,
@@ -135,8 +138,8 @@ export function mailRoutes(db: any) {
         const usernameOnly = email.split('@')[0];
         console.log(`[ImapFlow] Full email failed. Retrying with username: ${usernameOnly}`);
         client = new ImapFlow({
-          host: IMAP_HOST,
-          port: IMAP_PORT,
+          host: config.IMAP_HOST,
+          port: Number(config.IMAP_PORT),
           secure: true,
           auth: { user: usernameOnly, pass: password },
           logger: false as any,
@@ -177,10 +180,12 @@ export function mailRoutes(db: any) {
       // It's a raw password from old format
     }
 
+    const config = await getDynamicConfig();
+
     const makeTransporter = (user: string) => nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: false,
+      host: config.SMTP_HOST || 'smtp.vnptemail.vn',
+      port: Number(config.SMTP_PORT || 587),
+      secure: config.SMTP_SECURE === 'true',
       auth: { user, pass: password },
       tls: { rejectUnauthorized: false },
       connectionTimeout: 60000,
@@ -836,6 +841,26 @@ export function mailRoutes(db: any) {
     try {
       const dbUser = await db.get('SELECT id, mailPassword FROM users WHERE id = ?', [req.user.id]);
       if (!dbUser || !dbUser.mailPassword) return res.status(400).json({ error: 'Chưa cấu hình tài khoản mail VNPT.' });
+
+      let senderEmail = '';
+      let password = '';
+      try {
+        const parsed = JSON.parse(decrypt(dbUser.mailPassword) || '{}');
+        senderEmail = parsed.email || '';
+        password = parsed.password || '';
+      } catch (e) {
+        return res.status(400).json({ error: 'Vui lòng kết nối lại tài khoản Mail.' });
+      }
+
+      const config = await getDynamicConfig();
+      // 1. Configure Nodemailer
+      const transporter = nodemailer.createTransport({
+        host: config.SMTP_HOST || 'smtp.vnptemail.vn',
+        port: Number(config.SMTP_PORT || 587),
+        secure: config.SMTP_SECURE === 'true',
+        auth: { user: senderEmail, pass: password },
+        tls: { rejectUnauthorized: false }
+      });
 
       const mailAttachments = req.files ? (req.files as any[]).map(f => ({
         filename: f.originalname,
