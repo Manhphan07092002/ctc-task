@@ -112,15 +112,15 @@ export default function DashboardPage({
   return (
     <>
       {/* Header Banner */}
-      <div className="mb-6 flex items-center justify-between bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="mb-6 flex items-center justify-between bg-white dark:bg-slate-800/80 p-5 rounded-2xl border border-gray-100 dark:border-slate-700/60 shadow-sm">
         <div className="flex items-center gap-4">
-          <Avatar src={user.avatar} alt={user.name} size={12} className="ring-4 ring-gray-50" />
+          <Avatar src={user.avatar} alt={user.name} size={12} className="ring-4 ring-gray-50 dark:ring-slate-700" />
           <div>
             <div className="flex items-center gap-2 mb-1">
               <timeOfDay.icon size={18} className={timeOfDay.color} />
-              <h1 className="text-xl font-bold text-gray-800">{timeOfDay.label}, {user.name}!</h1>
+              <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100">{timeOfDay.label}, {user.name}!</h1>
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-slate-400">
               Hôm nay là {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
@@ -142,7 +142,7 @@ export default function DashboardPage({
           {/* Today's Tasks */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
                 <ListTodo size={20} className="text-purple-500" />
                 {t('todaysSchedule')}
               </h2>
@@ -152,8 +152,8 @@ export default function DashboardPage({
             </div>
             <div className="space-y-3">
               {todaysTasks.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-xl border border-dashed border-gray-300">
-                  <p className="text-gray-500 mb-3">
+                <div className="p-8 text-center bg-white dark:bg-slate-800/60 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
+                  <p className="text-gray-500 dark:text-slate-400 mb-3">
                     {searchQuery ? t('noMatchingTasks') : t('noTasksToday')}
                   </p>
                   {!searchQuery && (
@@ -188,7 +188,7 @@ export default function DashboardPage({
           {/* Recent Reports */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
                 <FileText size={20} className="text-amber-500" />
                 Hoạt động Báo cáo gần đây
               </h2>
@@ -198,26 +198,26 @@ export default function DashboardPage({
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {recentReports.length === 0 ? (
-                <div className="col-span-1 md:col-span-2 p-8 text-center bg-white rounded-xl border border-dashed border-gray-300">
-                  <p className="text-gray-500">Chưa có báo cáo nào gần đây</p>
+                <div className="col-span-1 md:col-span-2 p-8 text-center bg-white dark:bg-slate-800/60 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
+                  <p className="text-gray-500 dark:text-slate-400">Chưa có báo cáo nào gần đây</p>
                 </div>
               ) : (
                 recentReports.map(report => {
                   const author = users.find(u => u.id === report.authorId);
                   return (
-                    <div key={report.id} onClick={() => navigate('/reports')} className="bg-white p-4 rounded-xl border border-gray-100 hover:shadow-md transition-shadow cursor-pointer">
+                    <div key={report.id} onClick={() => navigate('/reports')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           {author && <Avatar src={author.avatar} alt={author.name} size={6} />}
                           <div>
-                            <p className="text-sm font-bold text-gray-800">{author?.name || 'Unknown'}</p>
-                            <p className="text-xs text-gray-400">{report.department}</p>
+                            <p className="text-sm font-bold text-gray-800 dark:text-slate-100">{author?.name || 'Unknown'}</p>
+                            <p className="text-xs text-gray-400 dark:text-slate-500">{report.department}</p>
                           </div>
                         </div>
                         {getReportStatusBadge(report.status)}
                       </div>
-                      <h4 className="text-sm font-semibold text-gray-700 truncate mb-1">{report.title}</h4>
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <h4 className="text-sm font-semibold text-gray-700 dark:text-slate-200 truncate mb-1">{report.title}</h4>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-500">
                         <Clock size={12} /> {new Date(report.createdAt).toLocaleDateString('vi-VN')}
                       </div>
                     </div>
@@ -230,7 +230,7 @@ export default function DashboardPage({
           {/* Notes Preview */}
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
                 <FileText size={20} className="text-emerald-500" />
                 {t('quickNotes')}
               </h2>
@@ -240,14 +240,14 @@ export default function DashboardPage({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredNotes.slice(0, 3).map((note: Note) => (
-                <div key={note.id} onClick={() => navigate('/notes')} className={`\${note.color} p-4 rounded-xl border border-black/5 cursor-pointer hover:shadow-md transition-all h-32 flex flex-col`}>
+                <div key={note.id} onClick={() => navigate('/notes')} className={`${note.color} dark:opacity-90 p-4 rounded-xl border border-black/5 dark:border-white/10 cursor-pointer hover:shadow-md transition-all h-32 flex flex-col`}>
                   <h4 className="font-bold text-gray-800 mb-2 truncate">{note.title || 'Untitled Note'}</h4>
                   <p className="text-sm text-gray-600 line-clamp-3 flex-1">{note.content}</p>
                 </div>
               ))}
               {notes.length === 0 && !searchQuery && (
-                <div onClick={() => navigate('/notes')} className="col-span-1 sm:col-span-2 lg:col-span-3 bg-white p-6 rounded-xl border border-dashed border-gray-300 text-center text-sm text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">
-                  <Plus size={20} className="mx-auto mb-2 text-gray-400" />
+                <div onClick={() => navigate('/notes')} className="col-span-1 sm:col-span-2 lg:col-span-3 bg-white dark:bg-slate-800/60 p-6 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-center text-sm text-gray-500 dark:text-slate-400 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <Plus size={20} className="mx-auto mb-2 text-gray-400 dark:text-slate-500" />
                   {t('createNote')}
                 </div>
               )}
@@ -262,21 +262,21 @@ export default function DashboardPage({
           {/* Upcoming Meetings Widget */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+              <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
                 <Video size={18} className="text-brand-500" /> Lịch họp hôm nay
               </h3>
             </div>
             <div className="space-y-3">
               {todayUpcomingMeetings.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">Không có cuộc họp nào sắp tới trong hôm nay.</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 text-center py-4">Không có cuộc họp nào sắp tới trong hôm nay.</p>
               ) : (
                 todayUpcomingMeetings.slice(0, 3).map(meeting => (
-                  <div key={meeting.id} className="p-3 bg-brand-50 rounded-xl border border-brand-100 flex items-start gap-3">
-                    <div className="mt-0.5 bg-white p-2 rounded-lg text-brand-600 shadow-sm">
+                  <div key={meeting.id} className="p-3 bg-brand-50 dark:bg-blue-900/30 rounded-xl border border-brand-100 dark:border-blue-700/40 flex items-start gap-3">
+                    <div className="mt-0.5 bg-white dark:bg-slate-700 p-2 rounded-lg text-brand-600 shadow-sm">
                       <Clock size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-bold text-gray-800 truncate mb-0.5">{meeting.title}</h4>
+                      <h4 className="text-sm font-bold text-gray-800 dark:text-slate-100 truncate mb-0.5">{meeting.title}</h4>
                       <p className="text-xs text-brand-600 font-medium mb-2">
                         {formatTime(meeting.startTime)} - {formatTime(meeting.endTime)}
                       </p>
@@ -292,7 +292,7 @@ export default function DashboardPage({
 
           {/* Weekly Progress */}
           <Card className="p-6">
-            <h3 className="text-base font-bold text-gray-800 mb-4">{t('weeklyProgress')}</h3>
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">{t('weeklyProgress')}</h3>
             <div className="relative" style={{ height: 192 }}>
               {stats.total === 0 ? (
                 <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
@@ -317,8 +317,8 @@ export default function DashboardPage({
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-                    <span className="text-2xl font-bold text-gray-800">{Math.round((stats.done / (stats.total || 1)) * 100)}%</span>
-                    <span className="text-xs text-gray-400">{t('done')}</span>
+                    <span className="text-2xl font-bold text-gray-800 dark:text-slate-100">{Math.round((stats.done / (stats.total || 1)) * 100)}%</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{t('done')}</span>
                   </div>
                 </>
               )}
@@ -329,8 +329,8 @@ export default function DashboardPage({
           {/* Team Widget */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-gray-800">{t('team')}</h3>
-              <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded-full">{users.length} thành viên</span>
+              <h3 className="text-base font-bold text-gray-800 dark:text-slate-100">{t('team')}</h3>
+              <span className="text-xs font-bold text-brand-600 dark:text-blue-400 bg-brand-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">{users.length} thành viên</span>
             </div>
             <div className="flex flex-col gap-4 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
               {(() => {
@@ -341,7 +341,7 @@ export default function DashboardPage({
                 });
                 return Array.from(deptMap.entries()).map(([dept, deptUsers]) => (
                   <div key={dept}>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 border-b border-gray-100 pb-1">
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 border-b border-gray-100 dark:border-slate-700 pb-1">
                       {dept}
                     </p>
                     <div className="flex flex-col gap-2">
@@ -349,9 +349,9 @@ export default function DashboardPage({
                         <div key={u.id} className="flex items-center justify-between group">
                           <div className="flex items-center gap-2">
                             <Avatar src={u.avatar} alt={u.name} size={7} />
-                            <span className="text-sm font-medium text-gray-700 group-hover:text-brand-600 transition-colors">{u.name}</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-slate-300 group-hover:text-brand-600 dark:group-hover:text-blue-400 transition-colors">{u.name}</span>
                           </div>
-                          <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={u.role}>{u.role}</span>
+                          <span className="text-[10px] text-gray-400 dark:text-slate-500 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded truncate max-w-[80px]" title={u.role}>{u.role}</span>
                         </div>
                       ))}
                     </div>

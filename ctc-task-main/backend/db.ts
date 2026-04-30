@@ -15,6 +15,10 @@ export async function initDb() {
       hostId TEXT NOT NULL, startTime TEXT NOT NULL, endTime TEXT NOT NULL,
       meetingLink TEXT NOT NULL, status TEXT NOT NULL, participants TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS meeting_participants (
+      meetingId TEXT NOT NULL, userId TEXT NOT NULL,
+      PRIMARY KEY (meetingId, userId)
+    );
     CREATE TABLE IF NOT EXISTS signals (
       id TEXT PRIMARY KEY, meetingId TEXT NOT NULL,
       \`from\` TEXT NOT NULL, \`to\` TEXT NOT NULL,
@@ -30,6 +34,22 @@ export async function initDb() {
       startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
       assignees TEXT, tags TEXT, createdBy TEXT, department TEXT,
       recurrence TEXT, subtasks TEXT, comments TEXT
+    );
+    CREATE TABLE IF NOT EXISTS task_assignees (
+      taskId TEXT NOT NULL, userId TEXT NOT NULL,
+      PRIMARY KEY (taskId, userId)
+    );
+    CREATE TABLE IF NOT EXISTS task_tags (
+      taskId TEXT NOT NULL, tag TEXT NOT NULL,
+      PRIMARY KEY (taskId, tag)
+    );
+    CREATE TABLE IF NOT EXISTS task_subtasks (
+      id TEXT PRIMARY KEY, taskId TEXT NOT NULL, title TEXT NOT NULL,
+      isCompleted INTEGER NOT NULL DEFAULT 0, sortOrder INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS task_comments (
+      id TEXT PRIMARY KEY, taskId TEXT NOT NULL, userId TEXT NOT NULL,
+      content TEXT NOT NULL, createdAt TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS notes (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT,
@@ -109,6 +129,53 @@ export async function initDb() {
   ];
   for (const sql of migrations) {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }
+  }
+
+  // Migrate existing JSON task columns to normalized tables (idempotent via INSERT OR IGNORE)
+  const existingTasks = await db.all('SELECT id, assignees, tags, subtasks, comments FROM tasks');
+  for (const task of existingTasks) {
+    try {
+      const assignees: string[] = task.assignees ? JSON.parse(task.assignees) : [];
+      for (const userId of assignees) {
+        await db.run('INSERT OR IGNORE INTO task_assignees (taskId, userId) VALUES (?, ?)', [task.id, userId]);
+      }
+    } catch { /* malformed JSON */ }
+    try {
+      const tags: string[] = task.tags ? JSON.parse(task.tags) : [];
+      for (const tag of tags) {
+        await db.run('INSERT OR IGNORE INTO task_tags (taskId, tag) VALUES (?, ?)', [task.id, tag]);
+      }
+    } catch { /* malformed JSON */ }
+    try {
+      const subtasks: any[] = task.subtasks ? JSON.parse(task.subtasks) : [];
+      for (let i = 0; i < subtasks.length; i++) {
+        const s = subtasks[i];
+        if (s.id) await db.run(
+          'INSERT OR IGNORE INTO task_subtasks (id, taskId, title, isCompleted, sortOrder) VALUES (?, ?, ?, ?, ?)',
+          [s.id, task.id, s.title, s.isCompleted ? 1 : 0, i],
+        );
+      }
+    } catch { /* malformed JSON */ }
+    try {
+      const comments: any[] = task.comments ? JSON.parse(task.comments) : [];
+      for (const c of comments) {
+        if (c.id) await db.run(
+          'INSERT OR IGNORE INTO task_comments (id, taskId, userId, content, createdAt) VALUES (?, ?, ?, ?, ?)',
+          [c.id, task.id, c.userId, c.content, c.createdAt],
+        );
+      }
+    } catch { /* malformed JSON */ }
+  }
+
+  // Migrate meetings.participants JSON → meeting_participants table
+  const existingMeetings = await db.all('SELECT id, participants FROM meetings');
+  for (const meeting of existingMeetings) {
+    try {
+      const parts: string[] = meeting.participants ? JSON.parse(meeting.participants) : [];
+      for (const userId of parts) {
+        await db.run('INSERT OR IGNORE INTO meeting_participants (meetingId, userId) VALUES (?, ?)', [meeting.id, userId]);
+      }
+    } catch { /* malformed JSON */ }
   }
 
   // Patch existing system roles to ensure meetings permissions are included

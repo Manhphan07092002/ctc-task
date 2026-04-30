@@ -80,7 +80,9 @@ export default function MailPage() {
   const [filtered, setFiltered] = useState<Email[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedMail, setSelectedMail] = useState<FullEmail | null>(null);
+  const [selectedThread, setSelectedThread] = useState<Email[] | null>(null);
+  const [expandedMailIds, setExpandedMailIds] = useState<Set<number>>(new Set());
+  const [loadedMails, setLoadedMails] = useState<Record<number, FullEmail>>({});
   const [isLoadingMail, setIsLoadingMail] = useState(false);
   const [selectedUids, setSelectedUids] = useState<Set<number>>(new Set());
   const [selectAllInMailbox, setSelectAllInMailbox] = useState(false);
@@ -102,7 +104,6 @@ export default function MailPage() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [filterUnread, setFilterUnread] = useState(false);
   const [filterStarred, setFilterStarred] = useState(false);
-  const [filterHasAttachment, setFilterHasAttachment] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
@@ -195,7 +196,7 @@ export default function MailPage() {
 
   const fetchInbox = useCallback(async (folder: FolderKey = activeFolder, silent = false, pageNum = 1) => {
     if (!silent && pageNum === 1) setIsLoading(true);
-    if (!silent && pageNum === 1) setSelectedMail(null);
+    if (!silent && pageNum === 1) setSelectedThread(null);
     try {
       const res = await apiFetch(`/api/mail/inbox?folder=${folder}&page=${pageNum}&limit=50`);
       if (!res.ok) {
@@ -322,7 +323,7 @@ export default function MailPage() {
   const switchFolder = (f: FolderKey) => {
     setActiveFolder(f);
     setSearch('');
-    setSelectedMail(null);
+    setSelectedThread(null);
     setSelectedUids(new Set());
     setSelectAllInMailbox(false);
     setTotalMailboxCount(0);
@@ -347,7 +348,7 @@ export default function MailPage() {
     e.stopPropagation();
     const newVal = !email.isRead;
     setInbox(prev => prev.map(m => m.id === email.id ? { ...m, isRead: newVal } : m));
-    if (selectedMail?.id === email.id) setSelectedMail(prev => prev ? { ...prev, isRead: newVal } : prev);
+    if (selectedThread?.some(m => m.id === email.id)) setSelectedThread(prev => prev ? prev.map(m => m.id === email.id ? { ...m, isRead: newVal } : m) : prev);
     window.dispatchEvent(new Event('mail-count-changed'));
     try {
       await apiFetch(`/api/mail/message/${email.id}/read`, {
@@ -404,7 +405,12 @@ export default function MailPage() {
 
   const executeSingleDelete = async (email: Email) => {
     setInbox(prev => prev.filter(m => m.id !== email.id));
-    if (selectedMail?.id === email.id) setSelectedMail(null);
+    if (selectedThread?.some(m => m.id === email.id)) {
+      setSelectedThread(prev => {
+        const next = prev?.filter(m => m.id !== email.id) || null;
+        return next && next.length > 0 ? next : null;
+      });
+    }
     try {
       await apiFetch(`/api/mail/message/${email.id}?folder=${email.folder || 'INBOX'}`, { method: 'DELETE' });
       showToast({ 
@@ -473,8 +479,8 @@ export default function MailPage() {
           setInbox(prev => prev.filter(m => !selectedUids.has(m.id)));
         }
         setSelectedUids(new Set());
-        if (selectedMail && (selectAllInMailbox || selectedUids.has(selectedMail.id))) {
-          setSelectedMail(null);
+        if (selectedThread && (selectAllInMailbox || selectedThread.some(m => selectedUids.has(m.id)))) {
+          setSelectedThread(null);
         }
       } else {
         showToast({ type: 'error', title: 'Thao tác thất bại' });
@@ -536,23 +542,44 @@ export default function MailPage() {
     document.execCommand(cmd, false, value);
   };
 
-  // Group emails by date for the list
-  const groupEmailsByDate = (emails: Email[]) => {
+  const normalizeSubject = (subject: string) => {
+    if (!subject) return '';
+    let s = subject;
+    let prev;
+    do {
+      prev = s;
+      s = s.replace(/^(re|fwd|fw|trả lời|chuyển tiếp)\s*:\s*/gi, '').trim();
+    } while (s !== prev);
+    return s.toLowerCase();
+  };
+
+  const groupThreads = (emails: Email[]) => {
+    const threads = new Map<string, Email[]>();
+    emails.forEach(email => {
+      const key = normalizeSubject(email.subject) || 'no-subject';
+      if (!threads.has(key)) threads.set(key, []);
+      threads.get(key)!.push(email);
+    });
+    return Array.from(threads.values()).sort((a, b) => new Date(b[0].date).getTime() - new Date(a[0].date).getTime());
+  };
+
+  // Group emails by date for the list (using threaded items)
+  const groupEmailsByDate = (items: { representative: Email, thread: Email[] }[]) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const yesterday = new Date(today); yesterday.setDate(today.getDate()-1);
     const weekAgo = new Date(today); weekAgo.setDate(today.getDate()-7);
-    const groups: { label: string; items: Email[] }[] = [
+    const groups: { label: string; items: { representative: Email, thread: Email[] }[] }[] = [
       { label: 'Hôm nay', items: [] },
       { label: 'Hôm qua', items: [] },
       { label: 'Tuần trước', items: [] },
       { label: 'Cũ hơn', items: [] },
     ];
-    emails.forEach(m => {
-      const d = new Date(m.date); d.setHours(0,0,0,0);
-      if (d >= today) groups[0].items.push(m);
-      else if (d >= yesterday) groups[1].items.push(m);
-      else if (d >= weekAgo) groups[2].items.push(m);
-      else groups[3].items.push(m);
+    items.forEach(item => {
+      const d = new Date(item.representative.date); d.setHours(0,0,0,0);
+      if (d >= today) groups[0].items.push(item);
+      else if (d >= yesterday) groups[1].items.push(item);
+      else if (d >= weekAgo) groups[2].items.push(item);
+      else groups[3].items.push(item);
     });
     return groups.filter(g => g.items.length > 0);
   };
@@ -579,34 +606,86 @@ export default function MailPage() {
     }
   };
 
-  const readMail = async (email: Email) => {
-    setIsLoadingMail(true);
-    setSelectedMail(null);
-    if (!email.isRead) {
-      window.dispatchEvent(new Event('mail-count-changed'));
+  const toggleExpandMail = async (email: Email, forceExpand?: boolean) => {
+    const isCurrentlyExpanded = expandedMailIds.has(email.id);
+    if (isCurrentlyExpanded && !forceExpand) {
+      setExpandedMailIds(prev => { const n = new Set(prev); n.delete(email.id); return n; });
+      return;
     }
-    setInbox(prev => prev.map(m => m.id === email.id ? { ...m, isRead: true } : m));
-    try {
-      const folder = email.folder || 'INBOX';
-      const res = await apiFetch(`/api/mail/message/${email.id}?folder=${encodeURIComponent(folder)}`);
-      if (res.ok) setSelectedMail(await res.json());
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoadingMail(false);
+    
+    if (!isCurrentlyExpanded) {
+       setExpandedMailIds(prev => { const n = new Set(prev); n.add(email.id); return n; });
+    }
+
+    if (!loadedMails[email.id]) {
+      setIsLoadingMail(true);
+      try {
+        const res = await apiFetch(`/api/mail/message/${email.id}?folder=${encodeURIComponent(email.folder || 'INBOX')}`);
+        if (res.ok) {
+          const full = await res.json();
+          setLoadedMails(prev => ({ ...prev, [full.id]: full }));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoadingMail(false);
+      }
+    }
+  };
+
+  const readThread = async (thread: Email[]) => {
+    setSelectedThread(thread);
+    const firstMail = thread[0];
+    
+    // Auto-read unread emails in thread
+    const unreadMails = thread.filter(m => !m.isRead);
+    if (unreadMails.length > 0) {
+      window.dispatchEvent(new Event('mail-count-changed'));
+      setInbox(prev => prev.map(m => unreadMails.find(u => u.id === m.id) ? { ...m, isRead: true } : m));
+      unreadMails.forEach(u => {
+        apiFetch(`/api/mail/message/${u.id}/read`, {
+          method: 'PATCH',
+          body: JSON.stringify({ folder: u.folder || 'INBOX', isRead: true }),
+        }).catch(()=>{});
+      });
+    }
+
+    // Expand only the latest email
+    setExpandedMailIds(new Set([firstMail.id]));
+
+    if (!loadedMails[firstMail.id]) {
+      setIsLoadingMail(true);
+      try {
+        const res = await apiFetch(`/api/mail/message/${firstMail.id}?folder=${encodeURIComponent(firstMail.folder || 'INBOX')}`);
+        if (res.ok) {
+          const full = await res.json();
+          setLoadedMails(prev => ({ ...prev, [full.id]: full }));
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoadingMail(false);
+      }
     }
   };
 
   // Handle opening mail from notification (URL ?mailId=...)
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isConnected || inbox.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const mailId = params.get('mailId');
     if (mailId) {
-      readMail({ id: mailId, folder: 'INBOX' } as any);
+      const email = inbox.find(m => m.id.toString() === mailId);
+      if (email) {
+         const threadKey = normalizeSubject(email.subject);
+         const thread = inbox.filter(m => normalizeSubject(m.subject) === threadKey);
+         readThread(thread);
+      } else {
+         readThread([{ id: Number(mailId), folder: 'INBOX', subject: '', isRead: false, isStarred: false, date: new Date().toISOString(), from: '', fromName: '' } as any]);
+      }
       window.history.replaceState({}, '', '/mail');
     }
-  }, [isConnected]);
+  }, [isConnected, inbox]);
 
   const handleSend = async () => {
     if (!composeTo || !composeSubject) {
@@ -622,7 +701,6 @@ export default function MailPage() {
       formData.append('subject', composeSubject);
       formData.append('body', composeBody);
       
-      console.log('Sending attachments:', composeAttachments.length);
       composeAttachments.forEach(file => {
         formData.append('attachments', file);
       });
@@ -1030,22 +1108,23 @@ export default function MailPage() {
               Không có email nào.
             </div>
           ) : (
-            groupEmailsByDate(filtered).map(group => (
+            groupEmailsByDate(groupThreads(filtered).map(t => ({ representative: t[0], thread: t }))).map(group => (
               <div key={group.label}>
                 <div className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 bg-gray-50/80 border-b border-gray-100 sticky top-0 z-10">
                   {group.label}
                 </div>
-                {group.items.map(email => {
-                  const isSelected = selectedMail?.id === email.id;
+                {group.items.map(({ representative: email, thread }) => {
+                  const isSelected = selectedThread && selectedThread[0].id === email.id;
                   const displayName = activeFolder === 'sent'
                     ? (email.toName || email.to || 'Không rõ')
                     : (email.fromName || email.from);
+                  const isRead = thread.every(m => m.isRead);
                   return (
                     <div
                       key={email.id}
-                      onClick={() => readMail(email)}
+                      onClick={() => readThread(thread)}
                       className={`relative flex gap-2.5 p-3.5 cursor-pointer transition-all border-b border-gray-100/80 group
-                        ${isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : email.isRead ? 'hover:bg-gray-50' : 'bg-white border-l-2 border-l-blue-400 hover:bg-blue-50/30'}
+                        ${isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : isRead ? 'hover:bg-gray-50' : 'bg-white border-l-2 border-l-blue-400 hover:bg-blue-50/30'}
                       `}
                     >
                       <div className="flex flex-col items-center pt-1" onClick={e => toggleSelectMail(email.id, e)}>
@@ -1056,12 +1135,12 @@ export default function MailPage() {
                       <Avatar name={displayName} size={9} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className={`text-xs truncate max-w-[120px] ${!email.isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>
-                            {displayName}
+                          <span className={`text-xs truncate max-w-[120px] ${!isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>
+                            {displayName} {thread.length > 1 && <span className="text-gray-400 font-normal ml-1">({thread.length})</span>}
                           </span>
                           <span className="text-[10px] text-gray-400 whitespace-nowrap ml-1">{formatDate(email.date)}</span>
                         </div>
-                        <p className={`text-xs truncate ${!email.isRead ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
+                        <p className={`text-xs truncate ${!isRead ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>
                           {email.subject || '(Không có tiêu đề)'}
                         </p>
                       </div>
@@ -1079,7 +1158,7 @@ export default function MailPage() {
                           </button>
                         )}
                       </div>
-                      {!email.isRead && !email.isStarred && (
+                      {!isRead && !email.isStarred && (
                         <span className="absolute right-3 top-3 w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 group-hover:hidden" />
                       )}
                       {email.isStarred && (
@@ -1321,121 +1400,153 @@ export default function MailPage() {
 
       {/* ── READING PANE ── */}
       <div className="flex-1 hidden md:flex flex-col bg-white overflow-hidden">
-        {isLoadingMail ? (
+        {isLoadingMail && !selectedThread ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-gray-400">
               <RefreshCw className="animate-spin" size={24} />
               <p className="text-sm">Đang tải email...</p>
             </div>
           </div>
-        ) : selectedMail ? (
-          <>
-            {/* Mail header bar */}
-            <div className="px-8 py-5 border-b border-gray-100 bg-white">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 leading-tight">{selectedMail.subject}</h2>
-              <div className="flex items-center gap-4">
-                <Avatar name={
-                  activeFolder === 'sent'
-                    ? (selectedMail.toName || selectedMail.to || 'Unknown')
-                    : (selectedMail.fromName || selectedMail.from)
-                } size={11} />
-                <div className="flex-1 min-w-0">
-                  {activeFolder === 'sent' ? (
-                    <>
-                      <p className="font-semibold text-gray-800 text-sm">Đến: {selectedMail.to || selectedMail.from}</p>
-                      <p className="text-xs text-gray-400">Bạn → {selectedMail.to}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-semibold text-gray-800 text-sm">{selectedMail.fromName || selectedMail.from}</p>
-                      <p className="text-xs text-gray-400">&lt;{selectedMail.from}&gt; → tôi</p>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-                  <span>{new Date(selectedMail.date).toLocaleString('vi-VN')}</span>
-                  {/* Toggle read */}
-                  <button
-                    className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors ${selectedMail.isRead ? 'text-gray-400 hover:text-blue-600' : 'text-blue-500'}`}
-                    title={selectedMail.isRead ? 'Đánh dấu chưa đọc' : 'Đánh dấu đã đọc'}
-                    onClick={e => toggleRead(selectedMail, e as any)}
-                  >
-                    {selectedMail.isRead ? <MailX size={16} /> : <MailOpen size={16} />}
-                  </button>
-                  {/* Star */}
-                  <button
-                    className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors ${selectedMail.isStarred ? 'text-amber-400' : 'text-gray-400 hover:text-amber-400'}`}
-                    title={selectedMail.isStarred ? 'Bỏ sao' : 'Gắn sao'}
-                    onClick={() => toggleStar(selectedMail, { stopPropagation: () => {} } as any)}
-                  >
-                    <Star size={16} fill={selectedMail.isStarred ? 'currentColor' : 'none'} />
-                  </button>
-                  {/* Resend / Forward / Reply */}
-                  {activeFolder === 'sent' && (
-                    <button
-                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Gửi lại"
-                      onClick={() => handleResend(selectedMail)}
-                    >
-                      <RefreshCw size={16} />
-                    </button>
-                  )}
-                  {activeFolder !== 'sent' && (
-                    <button
-                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
-                      title="Trả lời"
-                      onClick={() => handleReply(selectedMail)}
-                    >
-                      <Reply size={16} />
-                    </button>
-                  )}
-                  {/* Forward */}
-                  <button
-                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-colors"
-                    title="Chuyển tiếp"
-                    onClick={() => handleForward(selectedMail)}
-                  >
-                    <Forward size={16} />
-                  </button>
-                  <button
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                    title={activeFolder === 'trash' ? 'Xoá vĩnh viễn' : 'Chuyển vào thùng rác'}
-                    onClick={e => deleteMail(selectedMail, e as any)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
+        ) : selectedThread ? (
+          <div className="flex-1 flex flex-col bg-white overflow-hidden">
+            {/* Thread header bar */}
+            <div className="px-8 py-5 border-b border-gray-100 bg-white flex justify-between items-center z-10 shadow-sm flex-shrink-0">
+              <h2 className="text-xl font-bold text-gray-900 leading-tight">
+                {selectedThread[0].subject || '(Không có tiêu đề)'}
+              </h2>
+              {selectedThread.length > 1 && (
+                <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded-md border border-blue-100">{selectedThread.length} thư</span>
+              )}
             </div>
 
-            {/* Attachments */}
-            {selectedMail.attachments?.length > 0 && (
-              <div className="px-8 py-3 border-b border-gray-100 flex flex-wrap gap-2 bg-gray-50/50">
-                {selectedMail.attachments.map((a, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 shadow-sm hover:border-blue-300 transition-colors group">
-                    <Paperclip size={12} className="text-blue-400 flex-shrink-0" />
-                    <span className="truncate max-w-[160px]">{a.filename}</span>
-                    <span className="text-gray-400">({Math.round(a.size / 1024)}KB)</span>
-                    <button
-                      onClick={() => downloadAttachment(a)}
-                      className="ml-1 opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700 transition-all"
-                      title="Tải xuống"
+            {/* Thread messages list */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-gray-50/50 space-y-4">
+              {selectedThread.map((email) => {
+                const isExpanded = expandedMailIds.has(email.id);
+                const fullMail = loadedMails[email.id];
+                const displayName = activeFolder === 'sent'
+                  ? (email.toName || email.to || 'Không rõ')
+                  : (email.fromName || email.from);
+                  
+                return (
+                  <div key={email.id} className={`bg-white border ${isExpanded ? 'border-blue-200 shadow-md' : 'border-gray-200 shadow-sm hover:border-blue-300'} rounded-xl overflow-hidden transition-all duration-200`}>
+                    {/* Message Header */}
+                    <div 
+                      className="px-6 py-4 flex items-center justify-between cursor-pointer bg-white group"
+                      onClick={() => toggleExpandMail(email)}
                     >
-                      <Download size={12} />
-                    </button>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={displayName} size={10} />
+                        <div className="min-w-0">
+                          {activeFolder === 'sent' ? (
+                            <>
+                              <p className="font-semibold text-gray-800 text-sm truncate">Đến: {email.to || email.from}</p>
+                              <p className="text-[10px] text-gray-400 truncate">Bạn → {email.to}</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-gray-800 text-sm truncate">{displayName}</p>
+                              <p className="text-[10px] text-gray-400 truncate">&lt;{email.from}&gt; → tôi</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-xs text-gray-400 font-medium">{formatDate(email.date)}</span>
+                        
+                        {/* Quick Actions */}
+                        <div className={`items-center gap-1 ${isExpanded ? 'flex' : 'hidden group-hover:flex'}`} onClick={e => e.stopPropagation()}>
+                          <button
+                            className={`p-1.5 rounded-lg hover:bg-gray-100 transition-colors ${email.isStarred ? 'text-amber-400' : 'text-gray-300 hover:text-amber-400'}`}
+                            title={email.isStarred ? 'Bỏ sao' : 'Gắn sao'}
+                            onClick={() => toggleStar(email, { stopPropagation: () => {} } as any)}
+                          >
+                            <Star size={14} fill={email.isStarred ? 'currentColor' : 'none'} />
+                          </button>
+                          
+                          {isExpanded && fullMail && activeFolder === 'sent' && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Gửi lại"
+                              onClick={() => handleResend(fullMail)}
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                          )}
+                          {isExpanded && fullMail && activeFolder !== 'sent' && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Trả lời"
+                              onClick={() => handleReply(fullMail)}
+                            >
+                              <Reply size={14} />
+                            </button>
+                          )}
+                          {isExpanded && fullMail && (
+                            <button
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="Chuyển tiếp"
+                              onClick={() => handleForward(fullMail)}
+                            >
+                              <Forward size={14} />
+                            </button>
+                          )}
+                          <button
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
+                            title="Xoá"
+                            onClick={(e) => deleteMail(email, e as any)}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Message Body */}
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 bg-white">
+                        {isLoadingMail && !fullMail ? (
+                          <div className="p-8 text-center text-gray-400">
+                            <RefreshCw className="animate-spin mx-auto" size={20} />
+                            <p className="text-xs mt-2">Đang tải...</p>
+                          </div>
+                        ) : fullMail ? (
+                          <>
+                            {fullMail.attachments?.length > 0 && (
+                              <div className="px-6 py-3 border-b border-gray-50 flex flex-wrap gap-2 bg-gray-50/30">
+                                {fullMail.attachments.map((a, i) => (
+                                  <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 shadow-sm hover:border-blue-300 transition-colors group">
+                                    <Paperclip size={12} className="text-blue-400 flex-shrink-0" />
+                                    <span className="truncate max-w-[160px]">{a.filename}</span>
+                                    <span className="text-gray-400">({Math.round(a.size / 1024)}KB)</span>
+                                    <button
+                                      onClick={() => downloadAttachment(a)}
+                                      className="ml-1 opacity-0 group-hover:opacity-100 text-blue-500 hover:text-blue-700 transition-all"
+                                      title="Tải xuống"
+                                    >
+                                      <Download size={12} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="px-6 py-6 overflow-x-auto">
+                              <div
+                                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(fullMail.html || '') }}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="p-6 text-red-500 text-sm">Không thể tải nội dung email.</div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-8 py-6">
-              <div
-                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedMail.html || '') }}
-              />
+                );
+              })}
             </div>
-          </>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-gray-300">
             <div className="w-24 h-24 rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center">

@@ -128,9 +128,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileMenuOpen, setIsMobileM
 
           {/* Logo */}
           <div className="h-20 flex items-center px-6 border-b border-gray-100/80 flex-shrink-0">
-            <img src="/logo.png" alt="CTC Logo" className="h-9 w-auto object-contain mr-3 drop-shadow-sm mix-blend-multiply" />
+            <img src="/logo.png" alt="CTC Logo" className="h-9 w-auto object-contain mr-3 drop-shadow-sm dark:mix-blend-normal mix-blend-multiply" />
             <div>
-              <span className="text-base font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 tracking-tight block leading-tight">
+              <span className="text-base font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-300 tracking-tight block leading-tight">
                 CTC Tasks
               </span>
               <span className="text-[10px] text-gray-400 font-medium leading-tight block">Hệ thống quản lý</span>

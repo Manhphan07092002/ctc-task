@@ -3,20 +3,26 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:../database.sqlite"
+  provider = env("DB_PROVIDER")
+  url      = env("DATABASE_URL")
 }
 
 model meetings {
-  id           String  @id
-  title        String
-  description  String?
-  hostId       String
-  startTime    String
-  endTime      String
-  meetingLink  String
-  status       String
-  participants String
+  id          String  @id
+  title       String
+  description String?
+  hostId      String
+  startTime   String
+  endTime     String
+  meetingLink String
+  status      String
+}
+
+model meeting_participants {
+  meetingId String
+  userId    String
+
+  @@id([meetingId, userId])
 }
 
 model signals {
@@ -48,13 +54,39 @@ model tasks {
   estimatedEndAt String?
   priority       String?
   status         String?
-  assignees      String?
-  tags           String?
   createdBy      String?
   department     String?
   recurrence     String?
-  subtasks       String?
-  comments       String?
+}
+
+model task_assignees {
+  taskId String
+  userId String
+
+  @@id([taskId, userId])
+}
+
+model task_tags {
+  taskId String
+  tag    String
+
+  @@id([taskId, tag])
+}
+
+model task_subtasks {
+  id          String @id
+  taskId      String
+  title       String
+  isCompleted Int    @default(0)
+  sortOrder   Int    @default(0)
+}
+
+model task_comments {
+  id        String @id
+  taskId    String
+  userId    String
+  content   String
+  createdAt String
 }
 
 model notes {

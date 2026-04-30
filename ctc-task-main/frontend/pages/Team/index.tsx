@@ -44,8 +44,8 @@ export default function TeamPage({
           <Card key={u.id} className="p-6 flex items-center gap-4 relative group">
             <Avatar src={u.avatar} alt={u.name} size={16} />
             <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-gray-800 text-lg truncate">{u.name}</h4>
-              <p className="text-gray-500 text-sm mb-2">{u.department} • {u.email}</p>
+              <h4 className="font-bold text-gray-800 dark:text-slate-100 text-lg truncate">{u.name}</h4>
+              <p className="text-gray-500 dark:text-slate-400 text-sm mb-2">{u.department} • {u.email}</p>
               
               {(() => {
                 const roleObj = roles.find(r => r.name === u.role);
@@ -60,7 +60,7 @@ export default function TeamPage({
               })()}
             </div>
             {canManageTeam && (
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white shadow-sm rounded-lg p-1">
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-700 shadow-sm rounded-lg p-1">
                 <button 
                   onClick={() => openEditUserModal(u)} 
                   className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-md hover:text-blue-600"

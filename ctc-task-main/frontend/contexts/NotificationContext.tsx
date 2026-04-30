@@ -198,12 +198,10 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     });
 
     socket.on('connect', () => {
-      console.log('Socket connected, joining room:', user.id);
       socket.emit('join', user.id);
     });
 
     socket.on('new_notification', (data: AppNotification) => {
-      console.log('Received real-time notification:', data);
       
       setNotifications(prev => {
         // Prevent duplicate if already exists

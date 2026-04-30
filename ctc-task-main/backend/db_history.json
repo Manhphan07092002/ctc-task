@@ -1,5 +1,21 @@
 [
   {
+    "id": "6rzwpr9x1pnmol1zdqf",
+    "action": "import",
+    "filename": "ctc-database-2026-04-30.sqlite",
+    "performedBy": "admin",
+    "note": "Nhập database từ file ctc-database-2026-04-30.sqlite",
+    "createdAt": "2026-04-30T05:38:26.247Z"
+  },
+  {
+    "id": "3u0zdb2g3urmol1ytj0",
+    "action": "export",
+    "filename": "database.sqlite",
+    "performedBy": "admin",
+    "note": "Xuất toàn bộ database",
+    "createdAt": "2026-04-30T05:38:00.060Z"
+  },
+  {
     "id": "52bwvmm7et9mok278s8",
     "action": "import",
     "filename": "ctc-database-2026-04-29.sqlite",

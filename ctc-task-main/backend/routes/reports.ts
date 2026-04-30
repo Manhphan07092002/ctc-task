@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { sendNotification } from '../utils/notify.js';
 
-export function reportRoutes(prisma: PrismaClient, db: any) {
+export function reportRoutes(_prisma: any, db: any) {
   const router = Router();
 
   router.get('/', async (_req, res) => {
     try {
-      const reports = await prisma.reports.findMany();
+      const reports = await db.all('SELECT * FROM reports');
       res.json(reports);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch reports' }); }
   });
@@ -16,15 +15,18 @@ export function reportRoutes(prisma: PrismaClient, db: any) {
   router.post('/', async (req, res) => {
     const { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
-      await prisma.reports.create({ data: { id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } });
-      await prisma.activity_logs.create({
-        data: { id: randomUUID(), userId: authorId, action: 'report.created', entityId: id, entityType: 'report', createdAt: new Date().toISOString() }
-      });
+      await db.run(
+        'INSERT INTO reports (id, title, content, authorId, department, status, createdAt, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, title, content ?? null, authorId, department, status, createdAt, submittedAt ?? null, approvedAt ?? null, approvedBy ?? null, directorFeedback ?? null, managerFeedback ?? null],
+      );
+      await db.run(
+        'INSERT INTO activity_logs (id, userId, action, entityId, entityType, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [randomUUID(), authorId, 'report.created', id, 'report', new Date().toISOString()],
+      );
 
-      // Notify Manager
       if (status === 'Pending Manager') {
         const dept = await db.get('SELECT managerId FROM departments WHERE name = ? OR id = ?', [department, department]);
-        if (dept && dept.managerId) {
+        if (dept?.managerId) {
           await sendNotification(db, dept.managerId, 'report_submitted', 'Báo cáo mới', `Nhân viên vừa nộp báo cáo: ${title}`, id);
         }
       }
@@ -36,20 +38,22 @@ export function reportRoutes(prisma: PrismaClient, db: any) {
   router.put('/:id', async (req, res) => {
     const { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } = req.body;
     try {
-      const existingReport = await prisma.reports.findUnique({ where: { id: req.params.id } });
-      
-      await prisma.reports.update({ where: { id: req.params.id }, data: { title, content, status, submittedAt, approvedAt, approvedBy, directorFeedback, managerFeedback } });
-      await prisma.activity_logs.create({
-        data: { id: randomUUID(), userId: approvedBy || 'system', action: `report.${status}`, entityId: req.params.id, entityType: 'report', createdAt: new Date().toISOString() }
-      });
+      const existing = await db.get('SELECT * FROM reports WHERE id = ?', [req.params.id]);
 
-      if (existingReport && existingReport.status !== status) {
-        // Notify Author about status change
+      await db.run(
+        'UPDATE reports SET title=?, content=?, status=?, submittedAt=?, approvedAt=?, approvedBy=?, directorFeedback=?, managerFeedback=? WHERE id=?',
+        [title, content ?? null, status, submittedAt ?? null, approvedAt ?? null, approvedBy ?? null, directorFeedback ?? null, managerFeedback ?? null, req.params.id],
+      );
+      await db.run(
+        'INSERT INTO activity_logs (id, userId, action, entityId, entityType, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [randomUUID(), approvedBy || 'system', `report.${status}`, req.params.id, 'report', new Date().toISOString()],
+      );
+
+      if (existing && existing.status !== status) {
         let msg = `Báo cáo của bạn đã chuyển sang trạng thái: ${status}`;
         if (status === 'Approved') msg = 'Báo cáo của bạn đã được duyệt.';
         if (status === 'Rejected') msg = 'Báo cáo của bạn đã bị từ chối.';
-        
-        await sendNotification(db, existingReport.authorId, 'report_updated', 'Cập nhật báo cáo', msg, req.params.id);
+        await sendNotification(db, existing.authorId, 'report_updated', 'Cập nhật báo cáo', msg, req.params.id);
       }
 
       res.json({ success: true });
@@ -58,7 +62,7 @@ export function reportRoutes(prisma: PrismaClient, db: any) {
 
   router.delete('/:id', async (req, res) => {
     try {
-      await prisma.reports.delete({ where: { id: req.params.id } });
+      await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });

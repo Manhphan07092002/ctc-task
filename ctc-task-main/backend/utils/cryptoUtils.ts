@@ -1,8 +1,12 @@
 import crypto from 'crypto';
 
-// Use a secure 32-byte key. In a real app, load from process.env.MAIL_ENCRYPTION_KEY
-const ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || 'CTC-Task-Secure-Key-123456789012'; // Must be 32 bytes!
-const IV_LENGTH = 16; // For AES, this is always 16
+const DEFAULT_KEY = 'CTC-Task-Secure-Key-123456789012';
+const ENCRYPTION_KEY = process.env.MAIL_ENCRYPTION_KEY || DEFAULT_KEY;
+const IV_LENGTH = 16;
+
+if (!process.env.MAIL_ENCRYPTION_KEY && process.env.NODE_ENV === 'production') {
+  console.error('[SECURITY] MAIL_ENCRYPTION_KEY is not set. Using the default insecure key. Set this env var immediately to protect stored mail credentials.');
+}
 
 export function encrypt(text: string) {
   if (!text) return text;

@@ -3,11 +3,11 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
 import { initDb } from './db.js';
+import { initDbPostgres } from './db_pg.js';
 import { createMailer } from './mailer.js';
 
 import { authRoutes, forgotPasswordRoutes } from './routes/auth.js';
@@ -37,69 +37,58 @@ async function startServer() {
   const app = express();
   const httpServer = http.createServer(app);
   const PORT = process.env.PORT || 3000;
-  const prisma = new PrismaClient();
 
-  // Khởi tạo Socket.io
   initSocket(httpServer);
 
-  // Middleware
-  app.use(cors({
-    origin: process.env.ALLOWED_ORIGIN || '*',
-    credentials: true
-  }));
+  app.use(cors({ origin: process.env.ALLOWED_ORIGIN || '*', credentials: true }));
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Rate Limiting
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5000, // Increased to support aggressive UI polling (meetings, notifications, mail)
-    message: { error: 'Too many requests from this IP' }
+    max: 5000,
+    message: { error: 'Too many requests from this IP' },
   });
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: { error: 'Too many login attempts from this IP' }
+    message: { error: 'Too many login attempts from this IP' },
   });
 
   app.use('/api', globalLimiter);
   app.use('/api/auth/login', loginLimiter);
 
-  // Database
-  const db = await initDb();
+  // PostgreSQL only when DATABASE_URL starts with postgres:// or postgresql://
+  const isPg = /^postgre(s|sql):\/\//i.test(process.env.DATABASE_URL || '');
+  const db = isPg ? await initDbPostgres() : await initDb();
 
-  // Email helpers
   const mailer = createMailer(db);
 
-  // ===== ROUTES =====
-  app.get('/health', (req, res) => {
+  app.get('/health', (_req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date() });
   });
 
   app.use('/api/auth', authRoutes(db));
   app.use('/api/auth', forgotPasswordRoutes(db, mailer));
   app.use('/api/users', userRoutes(db, mailer));
-  app.use('/api/tasks', taskRoutes(prisma, db));
+  app.use('/api/tasks', taskRoutes(null, db));
   app.use('/api/notes', noteRoutes(db));
-  app.use('/api/meetings', meetingRoutes(prisma, db));
-  app.use('/api/reports', reportRoutes(prisma, db));
+  app.use('/api/meetings', meetingRoutes(null, db));
+  app.use('/api/reports', reportRoutes(null, db));
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
   app.use('/api/admin', adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
-  app.use('/api/activity', activityRoutes(prisma));
+  app.use('/api/activity', activityRoutes(null, db));
   app.use('/api/mail', mailRoutes(db));
 
-  // ===== SCHEDULERS =====
   scheduleFridayReminder(db);
   scheduleNoteReminders(db);
   scheduleDailyTaskReminder(db);
 
-  // ===== STATIC FRONTEND =====
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));
-
   app.use((req, res) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.join(frontendPath, 'index.html'));

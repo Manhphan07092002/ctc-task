@@ -15,6 +15,10 @@ const ChangePasswordSchema = z.object({
   newPassword: z.string().min(6, 'Mật khẩu mới phải ít nhất 6 ký tự'),
 });
 
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('[SECURITY] JWT_SECRET is not set. Using the default insecure secret. Set this env var immediately.');
+}
+
 export function authRoutes(db: any) {
   const router = Router();
   const getSecret = () => process.env.JWT_SECRET || 'ctc_default_secret_change_me';
