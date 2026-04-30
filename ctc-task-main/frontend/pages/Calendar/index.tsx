@@ -1,5 +1,6 @@
 import { apiFetch } from '../../services/api';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Task } from '../../types';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
@@ -103,11 +104,13 @@ const PRIORITY_BAR: Record<string, string> = {
 };
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, onTaskClick }) => {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null);
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [calEvents, setCalEvents] = useState<any[]>([]);
+  const [selectedEventDetail, setSelectedEventDetail] = useState<any | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const { language } = useLanguage();
   const locale = language === 'vi' ? 'vi-VN' : 'en-US';
@@ -381,8 +384,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                   {dayEvents.map(evt => (
                     <div
                       key={evt.id}
+                      onClick={(e) => { e.stopPropagation(); setSelectedEventDetail(evt); }}
                       title={evt.description || evt.title}
-                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-bold truncate"
+                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-bold truncate cursor-pointer hover:brightness-95 transition-all"
                       style={{ background: evt.color + '18', color: evt.color, borderLeftColor: evt.color }}
                     >
                       <span>{evt.type === 'holiday' ? '🎉' : evt.type === 'company' ? '🏢' : '📌'}</span>
@@ -391,7 +395,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                   ))}
                   {/* Friday recurring reminder */}
                   {isFriday && (
-                    <div className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-semibold bg-violet-50 text-violet-700 border-l-violet-500 truncate">
+                    <div 
+                      onClick={(e) => { e.stopPropagation(); navigate('/reports'); }}
+                      className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border-l-2 font-semibold bg-violet-50 text-violet-700 border-l-violet-500 truncate cursor-pointer hover:brightness-95"
+                    >
                       <AlarmClock size={10} className="flex-shrink-0"/>
                       <span>Báo cáo 16:00</span>
                     </div>
@@ -483,7 +490,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
 
           {/* Friday reminder banner */}
           {isSelFriday && (
-            <div className="flex items-center gap-2.5 px-4 py-2.5 bg-violet-50 border-b border-violet-100">
+            <div 
+              onClick={(e) => { e.stopPropagation(); navigate('/reports'); }}
+              className="flex items-center gap-2.5 px-4 py-2.5 bg-violet-50 border-b border-violet-100 cursor-pointer hover:bg-violet-100 transition-colors"
+            >
               <div className="w-7 h-7 rounded-lg bg-violet-500 flex items-center justify-center flex-shrink-0">
                 <AlarmClock size={14} className="text-white"/>
               </div>
@@ -548,6 +558,45 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
         </div>
         );
       })()}
+
+      {/* Event Detail Modal */}
+      {selectedEventDetail && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100" style={{ backgroundColor: selectedEventDetail.color ? selectedEventDetail.color + '15' : '#f3f4f6' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{selectedEventDetail.type === 'holiday' ? '🎉' : selectedEventDetail.type === 'company' ? '🏢' : '📌'}</span>
+                <h3 className="font-bold text-gray-800" style={{ color: selectedEventDetail.color || '#374151' }}>{selectedEventDetail.title}</h3>
+              </div>
+              <button onClick={() => setSelectedEventDetail(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-white/50 rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs text-gray-500 font-medium mb-1">Thời gian</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {selectedEventDetail.date && new Date(selectedEventDetail.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  {selectedEventDetail.endDate && selectedEventDetail.endDate !== selectedEventDetail.date ? ` đến ${new Date(selectedEventDetail.endDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}` : ''}
+                  {!!selectedEventDetail.isRecurringYearly && <span className="text-[10px] text-brand-600 ml-2 font-bold bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-full">Hàng năm</span>}
+                </p>
+              </div>
+              {selectedEventDetail.description && (
+                <div>
+                  <p className="text-xs text-gray-500 font-medium mb-1">Mô tả chi tiết</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedEventDetail.description}</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button onClick={() => setSelectedEventDetail(null)} className="px-5 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-xl transition-colors shadow-sm">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

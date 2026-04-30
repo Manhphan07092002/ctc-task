@@ -769,36 +769,28 @@ export function mailRoutes(db: any) {
       if (cc) mailOptions.cc = cc;
       if (bcc) mailOptions.bcc = bcc;
 
-      const info = await transporter.sendMail(mailOptions);
-
-      if (trackingId && info.messageId) {
-        await db.run('UPDATE mail_tracking SET messageId = ? WHERE id = ?', [info.messageId, trackingId]);
-      }
-
-      console.log(`[SMTP] Response: ${info.response}`);
-      console.log(`[SMTP] Accepted: ${JSON.stringify(info.accepted)}`);
-      console.log(`[SMTP] Rejected: ${JSON.stringify(info.rejected)}`);
-      console.log(`[SMTP] MessageId: ${info.messageId}`);
-
-      // Check if any recipients were rejected
-      if (info.rejected && info.rejected.length > 0) {
-        return res.status(422).json({
-          error: `Không thể gửi đến: ${info.rejected.join(', ')}. SMTP server từ chối người nhận.`,
-          rejected: info.rejected,
-          accepted: info.accepted,
-        });
-      }
-
-      // Return response immediately for better UI performance
+      // Return response immediately for instant UI feedback
       res.json({
         success: true,
-        message: `Đã gửi kèm ${mailAttachments.length} tệp.`,
-        accepted: info.accepted,
-        messageId: info.messageId,
+        message: `Đang gửi email...`,
       });
 
-      // Try to append to Sent folder via IMAP (best-effort, in background)
-      (async () => {
+      // Run SMTP send and IMAP append in background
+      transporter.sendMail(mailOptions).then(async (info: any) => {
+        if (trackingId && info.messageId) {
+          await db.run('UPDATE mail_tracking SET messageId = ? WHERE id = ?', [info.messageId, trackingId]);
+        }
+
+        console.log(`[SMTP] Response: ${info.response}`);
+        console.log(`[SMTP] Accepted: ${JSON.stringify(info.accepted)}`);
+        console.log(`[SMTP] Rejected: ${JSON.stringify(info.rejected)}`);
+        console.log(`[SMTP] MessageId: ${info.messageId}`);
+
+        if (info.rejected && info.rejected.length > 0) {
+          console.warn(`[SMTP] Partially rejected by server: ${info.rejected.join(', ')}`);
+        }
+
+        // Try to append to Sent folder via IMAP
         try {
           const client = await getImapClient(req.user.id, senderEmail);
           const sentFolderCandidates = ['Sent', 'Sent Items', 'Sent Messages', 'INBOX.Sent'];
@@ -812,22 +804,24 @@ export function mailRoutes(db: any) {
             } catch (_) { /* try next */ }
           }
 
-          // Use MailComposer to generate raw RFC2822 message with attachments
           const composer = new (MailComposer as any)(mailOptions);
           const rawMessageBuffer = await composer.compile().build();
 
           const lock = await client.getMailboxLock(sentFolder);
           try {
             await client.append(sentFolder, rawMessageBuffer, ['\\Seen']);
-            console.log(`[Mail] Appended sent message to "${sentFolder}"`);
+            console.log('[IMAP] Background appended to Sent folder');
           } finally {
             lock.release();
             await client.logout();
           }
-        } catch (appendErr: any) {
-          console.warn('[Mail] Could not append to Sent folder:', appendErr.message);
+        } catch (imapErr: any) {
+          console.error('[IMAP] Background append failed:', imapErr.message);
         }
-      })();
+      }).catch((err: any) => {
+        console.error(`[SMTP] Background send failed:`, err.message);
+      });
+
     } catch (error: any) {
       console.error('Send email error:', error);
       res.status(500).json({ error: error.message || 'Failed to send email' });
