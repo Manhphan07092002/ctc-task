@@ -6,6 +6,8 @@ import { Button, Card, Avatar } from "../../components/UI";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
+import Flatpickr from 'react-flatpickr';
+import { toLocalDateString } from '../../utils/dateUtils';
 
 export const SettingsView: React.FC = () => {
   const { t } = useLanguage();
@@ -228,10 +230,10 @@ export const SettingsView: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngày sinh</label>
-                <input
-                  type="date"
-                  value={dob}
-                  onChange={e => setDob(e.target.value)}
+                <Flatpickr
+                  value={dob ? new Date(dob) : ''}
+                  onChange={([date]) => setDob(date ? toLocalDateString(date) : '')}
+                  options={{ dateFormat: 'd/m/Y' }}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none text-sm transition-all text-gray-700"
                 />
               </div>

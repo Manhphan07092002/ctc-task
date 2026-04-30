@@ -1,6 +1,9 @@
 import { apiFetch } from '../../services/api';
 import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, CalendarDays, X, Save, PartyPopper, Building2 } from 'lucide-react';
+import Flatpickr from 'react-flatpickr';
+import { toLocalDateString } from '../../utils/dateUtils';
+import 'flatpickr/dist/flatpickr.min.css';
 
 interface CalendarEvent {
   id: string;
@@ -201,13 +204,21 @@ export default function AdminEventManagement() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Ngày bắt đầu *</label>
-                  <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                    className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  <Flatpickr
+                    value={form.date ? new Date(form.date) : ''}
+                    onChange={([date]) => setForm(f => ({ ...f, date: date ? toLocalDateString(date) : '' }))}
+                    options={{ dateFormat: 'd/m/Y' }}
+                    className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-600 uppercase tracking-wide">Ngày kết thúc</label>
-                  <input type="date" value={form.endDate || ''} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-                    className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  <Flatpickr
+                    value={form.endDate ? new Date(form.endDate) : ''}
+                    onChange={([date]) => setForm(f => ({ ...f, endDate: date ? toLocalDateString(date) : '' }))}
+                    options={{ dateFormat: 'd/m/Y' }}
+                    className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
                 </div>
               </div>
 

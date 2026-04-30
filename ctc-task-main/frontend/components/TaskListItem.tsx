@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, CheckSquare, Trash2, Lock, CheckCircle2 } from 'lucide-react';
+import { Clock, CheckSquare, Trash2, Lock, CheckCircle2, Repeat, AlertCircle } from 'lucide-react';
 import { Task, TaskStatus, User } from '../types';
 import { PRIORITY_COLORS } from '../constants';
 
@@ -17,6 +17,9 @@ interface TaskListItemProps {
 export const TaskListItem: React.FC<TaskListItemProps> = ({
   task, onClick, onCheck, onDelete, canToggle, isReadOnly, showDepartment, allUsers
 }) => {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== TaskStatus.DONE;
+  
   return (
     <div className="bg-white p-4 rounded-xl border border-gray-100 hover:shadow-md transition-all group cursor-pointer flex items-center lg:gap-4" onClick={onClick}>
       <button
@@ -45,13 +48,24 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
               {task.department}
             </span>
           )}
+          {task.recurrence && task.recurrence !== 'None' && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1" title={`Lặp lại: ${task.recurrence}`}>
+              <Repeat size={10} />
+            </span>
+          )}
         </div>
         <p className="text-sm text-gray-500 line-clamp-1 mb-2">{task.description}</p>
-        <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
-          <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md text-gray-600">
+        <div className="flex items-center gap-4 text-xs font-medium text-gray-500 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-md text-gray-600 border border-gray-100">
             <Clock size={12} className="text-brand-500" />
             {task.startDate}
           </div>
+          {task.dueDate && (
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${isOverdue ? 'bg-red-50 text-red-600 border-red-200 font-bold' : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+              {isOverdue ? <AlertCircle size={12} /> : <Clock size={12} className="text-gray-400" />}
+              {task.dueDate}
+            </div>
+          )}
           {task.subtasks && task.subtasks.length > 0 && (
             <div className="flex items-center gap-1 text-gray-500">
               <CheckSquare size={12} />

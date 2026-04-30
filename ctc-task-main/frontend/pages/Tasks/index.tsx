@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
-import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Flame, Trash2, Download } from 'lucide-react';
+import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Trash2, Download, ArrowDownUp, AlertCircle, Repeat, Flame } from 'lucide-react';
 import { Task, User, TaskStatus, TaskPriority } from '../../types';
 import { AIAssistantHandle } from '../../components/AIAssistant';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -35,6 +35,22 @@ export default function TasksPage({
 }: TasksPageProps) {
   
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [sortBy, setSortBy] = useState<'none' | 'dueDate' | 'priority'>('none');
+
+  const sortedTasks = useMemo(() => {
+    const tasks = [...filteredTasks];
+    if (sortBy === 'dueDate') {
+      tasks.sort((a, b) => {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    } else if (sortBy === 'priority') {
+      const pMap = { [TaskPriority.HIGH]: 3, [TaskPriority.MEDIUM]: 2, [TaskPriority.LOW]: 1 };
+      tasks.sort((a, b) => (pMap[b.priority] || 0) - (pMap[a.priority] || 0));
+    }
+    return tasks;
+  }, [filteredTasks, sortBy]);
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -60,11 +76,11 @@ export default function TasksPage({
 
   const columns = useMemo(() => {
     return {
-      [TaskStatus.TODO]: filteredTasks.filter(t => t.status === TaskStatus.TODO),
-      [TaskStatus.IN_PROGRESS]: filteredTasks.filter(t => t.status === TaskStatus.IN_PROGRESS),
-      [TaskStatus.DONE]: filteredTasks.filter(t => t.status === TaskStatus.DONE),
+      [TaskStatus.TODO]: sortedTasks.filter(t => t.status === TaskStatus.TODO),
+      [TaskStatus.IN_PROGRESS]: sortedTasks.filter(t => t.status === TaskStatus.IN_PROGRESS),
+      [TaskStatus.DONE]: sortedTasks.filter(t => t.status === TaskStatus.DONE),
     };
-  }, [filteredTasks]);
+  }, [sortedTasks]);
 
   const exportToExcel = () => {
     const data = filteredTasks.map(t => ({
@@ -103,6 +119,20 @@ export default function TasksPage({
           <p className="text-gray-500 text-sm mt-1">Quản lý và theo dõi công việc của bạn</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 shadow-sm text-sm">
+            <ArrowDownUp size={16} className="text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent py-1.5 pl-1 pr-2 text-gray-700 font-medium focus:outline-none"
+            >
+              <option value="none">Sắp xếp: Mặc định</option>
+              <option value="dueDate">Sắp xếp: Hạn chót</option>
+              <option value="priority">Sắp xếp: Độ ưu tiên</option>
+            </select>
+          </div>
+
           {/* View Toggle */}
           <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
             <button 
@@ -162,7 +192,7 @@ export default function TasksPage({
         {viewMode === 'list' ? (
           /* List View */
           <div className="h-full overflow-y-auto pr-2 pb-4 space-y-3 custom-scrollbar">
-            {filteredTasks.length === 0 ? (
+            {sortedTasks.length === 0 ? (
               <div className="p-12 text-center bg-white rounded-xl border border-dashed border-gray-300">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4">
                   <LayoutList size={32} className="text-gray-400" />
@@ -173,7 +203,7 @@ export default function TasksPage({
                 </p>
               </div>
             ) : (
-              filteredTasks.map(task => {
+              sortedTasks.map(task => {
                 const canEdit = checkPermission('edit', task, user);
                 const canDelete = checkPermission('delete', task, user);
                 const isAssignee = task.assignees.includes(user.id);
@@ -227,6 +257,8 @@ export default function TasksPage({
                       >
                         {columns[column.id].map((task, index) => {
                           const canDelete = checkPermission('delete', task, user);
+                          const todayStr = new Date().toISOString().slice(0, 10);
+                          const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== TaskStatus.DONE;
                           return (
                           <Draggable key={task.id} draggableId={task.id} index={index}>
                             {(provided, snapshot) => (
@@ -241,7 +273,25 @@ export default function TasksPage({
                                 style={{ ...provided.draggableProps.style }}
                               >
                                 <div className="flex items-start justify-between mb-2 gap-2">
-                                  <h4 className="font-semibold text-sm text-gray-800 line-clamp-2 leading-snug">{task.title}</h4>
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-sm text-gray-800 line-clamp-2 leading-snug mb-1.5">{task.title}</h4>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
+                                        {task.priority}
+                                      </span>
+                                      {task.recurrence && task.recurrence !== 'None' && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 flex items-center gap-0.5" title={`Lặp lại: ${task.recurrence}`}>
+                                          <Repeat size={9} />
+                                        </span>
+                                      )}
+                                      {task.dueDate && (
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 border ${isOverdue ? 'bg-red-50 text-red-600 border-red-200 font-bold' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                                          {isOverdue ? <AlertCircle size={9} /> : <Clock size={9} />}
+                                          {task.dueDate}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                   <div className="flex items-center gap-1 flex-shrink-0">
                                     {task.status === TaskStatus.DONE && <CheckCircle2 size={16} className="text-green-500" />}
                                     {canDelete && (

@@ -3,6 +3,9 @@ import { User, UserRole } from '../types';
 import { X, User as UserIcon, Mail, Shield, Briefcase, Phone, Calendar, MapPin, Info, CreditCard, Users } from 'lucide-react';
 import { Button } from './UI';
 import { useData } from '../contexts/DataContext';
+import Flatpickr from 'react-flatpickr';
+import { toLocalDateString } from '../utils/dateUtils';
+import 'flatpickr/dist/themes/light.css';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -28,6 +31,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
   const [cccd, setCccd] = useState('');
   const [gender, setGender] = useState('');
   const [bio, setBio] = useState('');
+  const [joinDate, setJoinDate] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +47,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
         setCccd(initialUser.cccd || '');
         setGender(initialUser.gender || '');
         setBio(initialUser.bio || '');
+        setJoinDate(initialUser.joinDate || '');
       } else {
         setName('');
         setEmail('');
@@ -55,6 +60,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
         setCccd('');
         setGender('');
         setBio('');
+        setJoinDate('');
       }
     }
   }, [isOpen, initialUser, roles, departments]);
@@ -73,7 +79,8 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
       hometown,
       cccd,
       gender,
-      bio
+      bio,
+      joinDate
     };
     onSave(user);
     onClose();
@@ -218,6 +225,19 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSave, i
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Ngày tham gia</label>
+                  <Flatpickr
+                    value={joinDate ? new Date(joinDate) : ''}
+                    onChange={([date]) => setJoinDate(date ? toLocalDateString(date) : '')}
+                    options={{ dateFormat: 'd/m/Y' }}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-400 outline-none text-sm transition-shadow bg-gray-50"
+                    placeholder="Chọn ngày"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Giới tính</label>
                   <div className="relative">

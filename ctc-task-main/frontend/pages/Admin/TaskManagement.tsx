@@ -5,6 +5,9 @@ import {
   Trash2, CheckCircle, Clock, Flame, Circle, Edit2,
   ChevronDown, Calendar, Building2, X, Save
 } from 'lucide-react';
+import Flatpickr from 'react-flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+import { toLocalDateString } from '../../utils/dateUtils';
 import { Task, TaskStatus, TaskPriority, User } from '../../types';
 
 const PRIORITY_STYLE: Record<string, string> = {
@@ -124,16 +127,24 @@ const TaskFormModal: React.FC<{
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Ngày bắt đầu</label>
-              <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
+              <Flatpickr
+                value={form.startDate ? new Date(form.startDate) : ''}
+                onChange={([date]) => set('startDate', date ? toLocalDateString(date) : '')}
+                options={{ dateFormat: 'd/m/Y' }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-300 outline-none"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Hạn chót</label>
-              <input type="date" value={form.dueDate} onChange={e => set('dueDate', e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-300 outline-none" />
+              <Flatpickr
+                value={form.dueDate ? new Date(form.dueDate) : ''}
+                onChange={([date]) => set('dueDate', date ? toLocalDateString(date) : '')}
+                options={{ dateFormat: 'd/m/Y' }}
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-300 outline-none"
+              />
             </div>
           </div>
           <div>

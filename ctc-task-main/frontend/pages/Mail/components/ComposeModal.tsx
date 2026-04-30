@@ -3,6 +3,9 @@ import { Edit3, ChevronDown, X, Paperclip, Send, RefreshCw, Bold, Italic, Underl
 import { apiFetch } from '../../../services/api';
 import { useNotifications } from '../../../contexts/NotificationContext';
 import { useAuth } from '../../../contexts/AuthContext';
+
+import Flatpickr from 'react-flatpickr';
+import { toLocalDatetimeString } from '../../../utils/dateUtils';
 import { avatarColor } from '../utils';
 
 interface ComposeData {
@@ -419,12 +422,12 @@ export default function ComposeModal({ initialData, onClose, onDiscard, onSendSu
               <span className="text-xs text-gray-500">Tracking</span>
             </label>
             <div className="relative flex items-center">
-              <input
-                type="datetime-local"
-                value={scheduleAt}
-                onChange={e => setScheduleAt(e.target.value)}
-                className="text-xs bg-white border border-gray-200 rounded px-2 py-1 text-gray-600 focus:outline-none focus:border-blue-500 pr-6"
-                title="Gửi theo lịch"
+              <Flatpickr
+                value={scheduleAt ? new Date(scheduleAt) : ''}
+                onChange={([date]) => setScheduleAt(date ? toLocalDatetimeString(date) : '')}
+                options={{ enableTime: true, time_24hr: true, dateFormat: 'd/m/Y H:i', minDate: 'today' }}
+                placeholder="Gửi theo lịch"
+                className="text-xs bg-white border border-gray-200 rounded px-2 py-1.5 text-gray-600 focus:outline-none focus:border-blue-500 pr-6 min-w-[140px]"
               />
               {scheduleAt && (
                 <button onClick={() => setScheduleAt('')} className="absolute right-1 text-gray-400 hover:text-red-500" title="Xóa lịch gửi">

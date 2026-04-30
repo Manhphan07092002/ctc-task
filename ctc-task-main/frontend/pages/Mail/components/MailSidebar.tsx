@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Mail, RefreshCw, MailOpen, Users, Edit3, Inbox, Send, Star, Trash2, Search, Filter, MailX } from 'lucide-react';
 import { Email, FolderKey } from '../types';
 import { groupThreads, groupEmailsByDate, Avatar, formatDate } from '../utils';
+import Flatpickr from 'react-flatpickr';
+import { toLocalDateString } from '../../../utils/dateUtils';
 
 interface MailSidebarProps {
   userEmail: string;
@@ -210,11 +212,21 @@ export default function MailSidebar(props: MailSidebarProps) {
                 <div className="space-y-2">
                   <div>
                     <label className="block text-[10px] text-gray-400 mb-1 font-medium">Từ ngày</label>
-                    <input type="date" value={filterDateFrom} onChange={e => onFilterDateFromChange(e.target.value)} max={filterDateTo || undefined} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-gray-50" />
+                    <Flatpickr
+                      value={filterDateFrom ? new Date(filterDateFrom) : ''}
+                      onChange={([date]) => onFilterDateFromChange(date ? toLocalDateString(date) : '')}
+                      options={{ dateFormat: 'd/m/Y', maxDate: filterDateTo || undefined }}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-gray-50"
+                    />
                   </div>
                   <div>
                     <label className="block text-[10px] text-gray-400 mb-1 font-medium">Đến ngày</label>
-                    <input type="date" value={filterDateTo} onChange={e => onFilterDateToChange(e.target.value)} min={filterDateFrom || undefined} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-gray-50" />
+                    <Flatpickr
+                      value={filterDateTo ? new Date(filterDateTo) : ''}
+                      onChange={([date]) => onFilterDateToChange(date ? toLocalDateString(date) : '')}
+                      options={{ dateFormat: 'd/m/Y', minDate: filterDateFrom || undefined }}
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-gray-50"
+                    />
                   </div>
                 </div>
                 <div className="mt-2.5 pt-2 border-t border-gray-100">

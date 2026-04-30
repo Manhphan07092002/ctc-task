@@ -95,6 +95,7 @@ export interface User {
   hometown?: string;
   cccd?: string;
   gender?: string;
+  joinDate?: string;
   permissions?: string[];
   isLocked?: boolean;
   preferences?: {

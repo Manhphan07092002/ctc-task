@@ -171,7 +171,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
     filterPriority === 'all' ? tasks : tasks.filter(t => t.priority === filterPriority),
   [tasks, filterPriority]);
 
-  const getTasksForDate = (dateStr: string) => filteredTasks.filter(t => t.startDate === dateStr);
+  const getTasksForDate = (dateStr: string) => filteredTasks.filter(t => {
+    // 1. Exact match with startDate
+    if (t.startDate === dateStr) return true;
+    
+    // 2. Recurrence logic
+    if (t.recurrence && t.recurrence !== 'None') {
+      if (dateStr < t.startDate) return false;
+      if (t.dueDate && dateStr > t.dueDate) return false;
+      
+      const targetDate = new Date(dateStr);
+      const startDate = new Date(t.startDate);
+      
+      if (t.recurrence === 'Daily') return true;
+      if (t.recurrence === 'Weekly') return targetDate.getDay() === startDate.getDay();
+      if (t.recurrence === 'Monthly') return targetDate.getDate() === startDate.getDate();
+    }
+
+    // 3. Multi-day task (no recurrence)
+    if ((!t.recurrence || t.recurrence === 'None') && t.dueDate) {
+      if (dateStr >= t.startDate && dateStr <= t.dueDate) return true;
+    }
+    
+    return false;
+  });
 
   // Check if a date falls within an event range (including multi-day events and yearly recurring)
   const getEventsForDate = (dateStr: string) => {

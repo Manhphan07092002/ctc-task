@@ -6,6 +6,7 @@ import { Button, Avatar } from './UI';
 import { generateSubtasksFromTitle, generateTaskDetails } from '../services/aiService';
 import { useLanguage } from '../contexts/LanguageContext';
 import Flatpickr from 'react-flatpickr';
+import { toLocalDateString } from '../utils/dateUtils';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -350,12 +351,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('startDate')}</label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input 
-                    type="date"
-                    required
+                  <Flatpickr
+                    value={startDate ? new Date(startDate) : ''}
+                    onChange={([date]) => setStartDate(date ? toLocalDateString(date) : '')}
+                    options={{ dateFormat: 'd/m/Y' }}
                     disabled={readOnly}
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>
@@ -364,11 +364,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('dueDate')}</label>
                 <div className="relative">
                   <CalendarIcon className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input 
-                    type="date"
+                  <Flatpickr
+                    value={dueDate ? new Date(dueDate) : ''}
+                    onChange={([date]) => setDueDate(date ? toLocalDateString(date) : '')}
+                    options={{ dateFormat: 'd/m/Y' }}
                     disabled={readOnly}
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>

@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   CheckCircle2, ListTodo, Timer, Flame, FileText, Video, 
-  Sun, Sunset, Moon, Plus, Clock, ChevronRight
+  Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus, TaskPriority, User, Note, Report, Meeting } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -61,17 +61,19 @@ export default function DashboardPage({
     const done = roleBasedTasks.filter(t => t.status === TaskStatus.DONE).length;
     const inProgress = roleBasedTasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length;
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    const overdue = roleBasedTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== TaskStatus.DONE).length;
+    const highPriority = roleBasedTasks.filter(t => t.priority === TaskPriority.HIGH).length;
+
     let pendingReports = 0;
     if (user.permissions?.includes('approve_dept_reports') || user.permissions?.includes('director_feedback')) {
-      // Manager or Director looking for reports to approve/feedback
       pendingReports = reports.filter(r => r.status === 'Pending').length;
     } else {
-      // Employee looking at their own pending reports
       pendingReports = reports.filter(r => r.authorId === user.id && r.status === 'Pending').length;
     }
 
-    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length };
-  }, [roleBasedTasks, reports, user, todayUpcomingMeetings]);
+    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length, overdue, highPriority, myNotes: notes.length };
+  }, [roleBasedTasks, reports, user, todayUpcomingMeetings, notes]);
 
   const todaysTasks = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -95,6 +97,26 @@ export default function DashboardPage({
     { name: t('inProgress'), value: stats.inProgress, color: '#3b82f6' },
     { name: 'Todo', value: Math.max(0, stats.total - stats.done - stats.inProgress), color: '#94a3b8' },
   ];
+
+  const overdueTasksList = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return roleBasedTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== TaskStatus.DONE)
+      .sort((a,b) => new Date(a.dueDate || '').getTime() - new Date(b.dueDate || '').getTime());
+  }, [roleBasedTasks]);
+
+  const priorityChartData = useMemo(() => {
+    const counts = { Low: 0, Medium: 0, High: 0 };
+    roleBasedTasks.forEach(t => {
+      if (counts[t.priority as keyof typeof counts] !== undefined) {
+        counts[t.priority as keyof typeof counts]++;
+      }
+    });
+    return [
+      { name: 'Thấp', value: counts.Low, fill: '#94a3b8' },
+      { name: 'Trung bình', value: counts.Medium, fill: '#3b82f6' },
+      { name: 'Cao', value: counts.High, fill: '#f59e0b' }
+    ];
+  }, [roleBasedTasks]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -128,17 +150,54 @@ export default function DashboardPage({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" />
         <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" />
-        <StatCard label="Báo cáo chờ duyệt" value={stats.pendingReports} icon={FileText} color="from-amber-500 to-amber-400" />
-        <StatCard label="Cuộc họp hôm nay" value={stats.upcomingMeetings} icon={Video} color="from-brand-500 to-brand-400" />
+        <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" />
+        <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" />
+        <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" />
+        <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Main Column */}
         <div className="xl:col-span-2 space-y-8">
           
+          {/* Overdue Tasks Alert */}
+          {overdueTasksList.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-rose-500" />
+                  Công việc trễ hạn ({overdueTasksList.length})
+                </h2>
+              </div>
+              <div className="space-y-3 bg-rose-50/50 dark:bg-rose-900/10 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/30">
+                {overdueTasksList.slice(0, 3).map(task => {
+                  const canEdit = checkPermission('edit', task, user);
+                  const isAssignee = task.assignees.includes(user.id);
+                  return (
+                    <TaskListItem
+                      key={task.id}
+                      task={task}
+                      onClick={() => openEditModal(task)}
+                      onCheck={() => handleStatusToggle(task)}
+                      canToggle={canEdit || isAssignee}
+                      isReadOnly={!canEdit}
+                      showDepartment={true}
+                      allUsers={users}
+                    />
+                  );
+                })}
+                {overdueTasksList.length > 3 && (
+                  <Button variant="outline" size="sm" onClick={() => navigate('/tasks')} className="w-full text-rose-600 border-rose-200 hover:bg-rose-50 mt-3">
+                    Xem tất cả {overdueTasksList.length} công việc trễ hạn
+                  </Button>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Today's Tasks */}
           <section>
             <div className="flex items-center justify-between mb-4">
@@ -325,6 +384,21 @@ export default function DashboardPage({
             </div>
           </Card>
 
+          {/* Priority Distribution */}
+          <Card className="p-6">
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">Mức độ ưu tiên</h3>
+            <div className="relative" style={{ height: 200 }}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={priorityChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
+                  <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
 
           {/* Team Widget */}
           <Card className="p-6">
