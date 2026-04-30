@@ -1,5 +1,6 @@
 import 'dotenv/config'; // Trigger restart
 import express from 'express';
+import crypto from 'crypto';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -25,6 +26,7 @@ import { activityRoutes } from './routes/activity.js';
 import { mailRoutes } from './routes/mail.js';
 
 import { initSocket } from './socket.js';
+import { requireAuth, requireAdmin } from './middleware/auth.js';
 
 import { scheduleFridayReminder } from './schedulers/fridayReminder.js';
 import { scheduleNoteReminders } from './schedulers/noteReminder.js';
@@ -36,6 +38,12 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = crypto.randomBytes(32).toString('hex');
+    console.warn('⚠️ CẢNH BÁO: JWT_SECRET không có trong .env. Đã tự động tạo một khóa ngẫu nhiên cho phiên này.');
+  }
+
   const httpServer = http.createServer(app);
   const PORT = process.env.PORT || 3000;
 
@@ -79,7 +87,7 @@ async function startServer() {
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
-  app.use('/api/admin', adminRoutes(db, mailer));
+  app.use('/api/admin', requireAuth, requireAdmin, adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
   app.use('/api/activity', activityRoutes(null, db));
   app.use('/api/mail', mailRoutes(db));

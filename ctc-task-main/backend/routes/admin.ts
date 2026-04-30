@@ -49,6 +49,8 @@ export function adminRoutes(db: any, mailer: any) {
   router.get('/database/table/:table', async (req, res) => {
     try {
       const { table } = req.params;
+      if (!/^[a-zA-Z0-9_]+$/.test(table)) return res.status(400).json({ error: 'Tên bảng không hợp lệ' });
+
       const limit = Math.min(Math.max(Number(req.query.limit || 20), 1), 100);
       const offset = Math.max(Number(req.query.offset || 0), 0);
       const totalRow = await db.get(`SELECT COUNT(*) as count FROM ${table}`);
@@ -59,7 +61,10 @@ export function adminRoutes(db: any, mailer: any) {
 
   router.delete('/database/table/:table/row/:id', async (req, res) => {
     try {
-      await db.run(`DELETE FROM ${req.params.table} WHERE id = ?`, [req.params.id]);
+      const { table } = req.params;
+      if (!/^[a-zA-Z0-9_]+$/.test(table)) return res.status(400).json({ error: 'Tên bảng không hợp lệ' });
+
+      await db.run(`DELETE FROM ${table} WHERE id = ?`, [req.params.id]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });

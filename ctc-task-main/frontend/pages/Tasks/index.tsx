@@ -5,7 +5,7 @@ import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle
 import { Task, User, TaskStatus, TaskPriority } from '../../types';
 import { AIAssistantHandle } from '../../components/AIAssistant';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 interface TasksPageProps {
   t: (key: string) => string;

@@ -27,7 +27,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   const token = authHeader.slice(7);
-  const secret = process.env.JWT_SECRET || 'ctc_default_secret_change_me';
+  const secret = process.env.JWT_SECRET as string;
 
   try {
     const payload = jwt.verify(token, secret) as JwtPayload;
@@ -37,4 +37,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     console.error(`[Auth] Invalid token for ${req.method} ${req.url}:`, e.message);
     return res.status(401).json({ error: 'Unauthorized: invalid or expired token' });
   }
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user || req.user.role !== 'Admin') {
+    return res.status(403).json({ error: 'Forbidden: admin access required' });
+  }
+  next();
 }

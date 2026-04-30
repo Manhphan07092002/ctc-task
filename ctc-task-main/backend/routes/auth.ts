@@ -21,7 +21,7 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
 
 export function authRoutes(db: any) {
   const router = Router();
-  const getSecret = () => process.env.JWT_SECRET || 'ctc_default_secret_change_me';
+  const getSecret = () => process.env.JWT_SECRET as string;
 
   const generateToken = (userPayload: any) => {
     return jwt.sign(userPayload, getSecret(), { expiresIn: '7d' });
