@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Globe, Search, X, Bell } from 'lucide-react';
+import { Menu, Globe, Search, X, Bell, Mail, MailOpen, CheckSquare, FileText, Clock, StickyNote, CalendarDays, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -45,30 +45,52 @@ const fmtRelative = (iso: string) => {
   return `${Math.floor(h / 24)} ngày trước`;
 };
 
-const NotificationItem: React.FC<{ n: AppNotification; onClick: () => void; onDelete: () => void }> = ({ n, onClick, onDelete }) => (
-  <div
-    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer ${!n.isRead ? 'bg-blue-50/60' : ''}`}
-    onClick={onClick}
-  >
-    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 text-blue-600 font-bold text-lg flex-shrink-0 uppercase">
-      {n.title.charAt(0)}
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className={`text-sm leading-tight ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-        {n.title}
-      </p>
-      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-      <p className="text-[10px] text-gray-400 mt-1">{fmtRelative(n.createdAt)}</p>
-    </div>
-    <button
-      onClick={e => { e.stopPropagation(); onDelete(); }}
-      className="p-1 rounded-full hover:bg-red-100 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0 mt-0.5"
-      title="Xóa thông báo"
+const getNotifIcon = (type: string, title: string) => {
+  const t = (type + title).toLowerCase();
+  if (t.includes('mail_sent') || t.includes('gửi'))    return { icon: <Send size={16}/>,       bg: 'bg-green-100',  color: 'text-green-600'  };
+  if (t.includes('mail') || t.includes('thư') || t.includes('email')) return { icon: <MailOpen size={16}/>, bg: 'bg-blue-100',   color: 'text-blue-600'   };
+  if (t.includes('report') || t.includes('báo cáo')) return { icon: <FileText size={16}/>,    bg: 'bg-amber-100',  color: 'text-amber-600'  };
+  if (t.includes('task') || t.includes('công việc')) return { icon: <CheckSquare size={16}/>, bg: 'bg-indigo-100', color: 'text-indigo-600' };
+  if (t.includes('meeting') || t.includes('họp'))    return { icon: <CalendarDays size={16}/>,bg: 'bg-purple-100', color: 'text-purple-600' };
+  if (t.includes('note') || t.includes('ghi chú'))   return { icon: <StickyNote size={16}/>,  bg: 'bg-yellow-100', color: 'text-yellow-600' };
+  return                                              { icon: <Bell size={16}/>,           bg: 'bg-gray-100',   color: 'text-gray-500'   };
+};
+
+const NotificationItem: React.FC<{ n: AppNotification; onClick: () => void; onDelete: () => void }> = ({ n, onClick, onDelete }) => {
+  const { icon, bg, color } = getNotifIcon(n.type, n.title);
+  return (
+    <div
+      className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer group ${!n.isRead ? 'bg-blue-50/50' : ''}`}
+      onClick={onClick}
     >
-      <X size={13} />
-    </button>
-  </div>
-);
+      {/* Icon */}
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${bg} ${color} flex-shrink-0 mt-0.5`}>
+        {icon}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm leading-snug ${!n.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+          {n.title}
+        </p>
+        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
+        <p className="text-[10px] text-gray-400 mt-1 font-medium">{fmtRelative(n.createdAt)}</p>
+      </div>
+
+      {/* Unread dot */}
+      {!n.isRead && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
+
+      {/* Delete */}
+      <button
+        onClick={e => { e.stopPropagation(); onDelete(); }}
+        className="p-1 rounded-full hover:bg-red-100 text-transparent group-hover:text-gray-300 hover:!text-red-500 transition-colors flex-shrink-0 mt-0.5"
+        title="Xóa thông báo"
+      >
+        <X size={12} />
+      </button>
+    </div>
+  );
+};
 
 interface TopHeaderProps {
   setIsMobileMenuOpen: (o: boolean) => void;

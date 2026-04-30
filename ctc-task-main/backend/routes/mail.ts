@@ -150,8 +150,15 @@ export function mailRoutes(db: any) {
     return client;
   };
 
-  // 3. Helper to get SMTP transporter
+  // 3. Helper to get SMTP transporter (cached per user for performance)
+  const smtpCache = new Map<string, any>();
+
   const getSmtpTransporter = async (userId: string, defaultEmail: string) => {
+    // Return cached transporter if available
+    if (smtpCache.has(userId)) {
+      return smtpCache.get(userId);
+    }
+
     const user = await db.get('SELECT mailPassword FROM users WHERE id = ?', [userId]);
     if (!user || !user.mailPassword) throw new Error('No mail credentials found');
 
@@ -170,32 +177,38 @@ export function mailRoutes(db: any) {
       // It's a raw password from old format
     }
 
-    const transporter = nodemailer.createTransport({
+    const makeTransporter = (user: string) => nodemailer.createTransport({
       host: SMTP_HOST,
       port: SMTP_PORT,
-      secure: false, // STARTTLS
-      auth: { user: email, pass: password },
-      tls: {
-        rejectUnauthorized: false
-      }
+      secure: false,
+      auth: { user, pass: password },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 60000,
+      greetingTimeout: 60000,
+      socketTimeout: 60000,
     });
 
+    let transporter = makeTransporter(email);
+
+    // Verify connection once; retry with username only if auth fails
     try {
       await transporter.verify();
     } catch (err: any) {
-      if (err.message?.includes('Invalid login') || err.message?.includes('AuthError') || err.message?.includes('535')) {
+      const msg = err.message || '';
+      if (msg.includes('Invalid login') || msg.includes('AuthError') || msg.includes('535')) {
         const usernameOnly = email.split('@')[0];
-        console.log(`[SMTP] Full email failed. Retrying with username: ${usernameOnly}`);
-        return nodemailer.createTransport({
-          host: SMTP_HOST,
-          port: SMTP_PORT,
-          secure: false,
-          auth: { user: usernameOnly, pass: password },
-          tls: { rejectUnauthorized: false }
-        });
+        console.log(`[SMTP] Retrying with username only: ${usernameOnly}`);
+        transporter = makeTransporter(usernameOnly);
+        await transporter.verify();
+      } else {
+        throw err;
       }
-      throw err;
     }
+
+    // Cache for future sends (invalidate after 10 minutes)
+    smtpCache.set(userId, transporter);
+    setTimeout(() => smtpCache.delete(userId), 10 * 60 * 1000);
+
     return transporter;
   };
 

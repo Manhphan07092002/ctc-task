@@ -36,7 +36,8 @@ interface NotificationContextType {
   deleteNotification: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
   setNotes: (notes: Note[]) => void;
-  showToast: (opts: ToastOptions) => void;
+  showToast: (opts: ToastOptions) => string;
+  dismissToastById: (id: string) => void;
   pushLocalNotification: (notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>) => void;
 }
 
@@ -86,11 +87,14 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const dismissToast = (id: string) => setToasts(curr => curr.filter(t => t.id !== id));
   const dismissSimpleToast = (id: string) => setSimpleToasts(curr => curr.filter(t => t.id !== id));
 
-  const showToast = (opts: ToastOptions) => {
+  const showToast = (opts: ToastOptions): string => {
     const id = Math.random().toString(36).slice(2);
     setSimpleToasts(prev => [...prev, { ...opts, id }]);
     setTimeout(() => dismissSimpleToast(id), opts.duration ?? 4000);
+    return id;
   };
+
+  const dismissToastById = (id: string) => dismissSimpleToast(id);
 
   const pushLocalNotification = (notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>) => {
     const n: AppNotification = {
@@ -168,21 +172,32 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
           const lastSeenUid = localStorage.getItem(`last_mail_uid_${user.id}`);
           if (!lastSeenUid || parseInt(lastSeenUid, 10) < data.uid) {
             localStorage.setItem(`last_mail_uid_${user.id}`, data.uid.toString());
+
+            // Push to bell notifications (persisted)
             pushLocalNotification({
               userId: user.id,
-              type: 'new_mail',
-              title: `📩 Email từ ${data.fromName || data.from || 'Ai đó'}`,
+              type: 'mail_received',
+              title: `📧 Email từ ${data.fromName || data.from || 'Ai đó'}`,
               message: data.subject || '(Không có tiêu đề)'
             });
+
+            // Show toast popup
+            showToast({
+              type: 'info',
+              title: `📩 Thư mới từ ${data.fromName || data.from || 'Ai đó'}`,
+              message: data.subject || '(Không có tiêu đề)',
+              duration: 6000,
+            });
+
             playSound();
           }
         }
       } catch (e) { }
     };
     
-    // Check shortly after login, then every 60s
+    // Check shortly after login, then every 30s
     const timeout = setTimeout(checkNewMail, 5000);
-    const interval = setInterval(checkNewMail, 60000);
+    const interval = setInterval(checkNewMail, 30000);
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
@@ -249,7 +264,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh, setNotes, showToast, pushLocalNotification }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, deleteNotification, refresh, setNotes, showToast, dismissToastById, pushLocalNotification }}>
       {children}
       
       {/* Toast Portal */}

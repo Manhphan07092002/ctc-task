@@ -67,7 +67,7 @@ function formatDate(dateStr: string) {
 
 export default function MailPage() {
   const { user } = useAuth();
-  const { showToast, pushLocalNotification } = useNotifications();
+  const { showToast, dismissToastById, pushLocalNotification } = useNotifications();
 
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -548,12 +548,12 @@ export default function MailPage() {
     executeBulkAction(action);
   };
 
-  // Auto-poll every 60s silently
+  // Auto-poll every 30s silently
   useEffect(() => {
     if (!isConnected) return;
     const interval = setInterval(() => {
       fetchInbox(activeFolder, true);
-    }, 60000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [isConnected, activeFolder]);
 
@@ -813,10 +813,9 @@ Email: ${user?.email || ''} &nbsp;&nbsp; Website: <a href="https://ctcdn.vn" sty
       }
     });
 
-    // After the timeout, the actual sending logic runs
+    // After 3s undo window, send immediately
     setTimeout(async () => {
       if (isUndone) return;
-      showToast({ type: 'warning', title: 'Đang gửi...', message: 'Vui lòng chờ trong giây lát...', duration: 15000 });
       try {
         const res = await apiFetch('/api/mail/send', { method: 'POST', body: formData });
         if (!res.ok) {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Bell, FileText, CheckCircle2, Clock, Trash2, CheckCircle, Search, LayoutList, CheckSquare } from 'lucide-react';
+import { Bell, FileText, CheckCircle2, Clock, Trash2, CheckCircle, Search, LayoutList, CheckSquare, MailOpen, Send, StickyNote, CalendarDays } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function NotificationsPage() {
@@ -41,13 +41,15 @@ export default function NotificationsPage() {
   }, [notifications, activeTab, searchQuery]);
 
   const getIconForType = (type: string, title: string) => {
-    const tLower = (type + title).toLowerCase();
-    if (type === 'daily_task_reminder') return <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl"><CheckSquare size={20}/></div>;
-    if (tLower.includes('report') || tLower.includes('báo cáo')) return <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><FileText size={20}/></div>;
-    if (tLower.includes('task') || tLower.includes('công việc')) return <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl"><CheckSquare size={20}/></div>;
-    if (tLower.includes('meeting') || tLower.includes('họp')) return <div className="p-2.5 bg-purple-50 text-purple-500 rounded-xl"><Clock size={20}/></div>;
-    if (tLower.includes('note') || tLower.includes('ghi chú')) return <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><Bell size={20}/></div>;
-    return <div className="p-2.5 bg-gray-50 text-gray-500 rounded-xl"><Bell size={20}/></div>;
+    const t = (type + title).toLowerCase();
+    if (t.includes('mail_sent') || t.includes('gửi'))           return <div className="p-2.5 bg-green-100 text-green-600 rounded-xl"><Send size={20}/></div>;
+    if (t.includes('mail') || t.includes('thư') || t.includes('email')) return <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl"><MailOpen size={20}/></div>;
+    if (type === 'daily_task_reminder')                          return <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl"><CheckSquare size={20}/></div>;
+    if (t.includes('report') || t.includes('báo cáo'))        return <div className="p-2.5 bg-amber-100 text-amber-600 rounded-xl"><FileText size={20}/></div>;
+    if (t.includes('task') || t.includes('công việc'))        return <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl"><CheckSquare size={20}/></div>;
+    if (t.includes('meeting') || t.includes('họp'))           return <div className="p-2.5 bg-purple-100 text-purple-600 rounded-xl"><CalendarDays size={20}/></div>;
+    if (t.includes('note') || t.includes('ghi chú'))          return <div className="p-2.5 bg-yellow-100 text-yellow-600 rounded-xl"><StickyNote size={20}/></div>;
+    return                                                       <div className="p-2.5 bg-gray-100 text-gray-500 rounded-xl"><Bell size={20}/></div>;
   };
 
   return (
