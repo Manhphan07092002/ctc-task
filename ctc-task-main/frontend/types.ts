@@ -47,6 +47,7 @@ export interface Task {
   recurrence?: RecurrenceType;
   subtasks?: Subtask[];
   comments?: Comment[];
+  contractId?: string;
 }
 
 export interface Note {

@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   CheckCircle2, ListTodo, Timer, Flame, FileText, Video, 
-  Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle
+  Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle,
+  FileSignature, Wallet
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus, TaskPriority, User, Note, Report, Meeting } from '../../types';
+import { Contract } from '../../services/contractService';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button, Card, Avatar } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
@@ -20,6 +22,7 @@ interface DashboardProps {
   users: User[];
   user: User;
   reports: Report[];
+  contracts?: Contract[];
   searchQuery: string;
   openCreateModal: (d?: string) => void;
   openEditModal: (t: Task) => void;
@@ -29,7 +32,7 @@ interface DashboardProps {
 }
 
 export default function DashboardPage({
-  roleBasedTasks, filteredTasks, filteredNotes, notes, users, user, reports = [], searchQuery,
+  roleBasedTasks, filteredTasks, filteredNotes, notes, users, user, reports = [], contracts = [], searchQuery,
   openCreateModal, openEditModal, handleStatusToggle, handleDeleteTask, checkPermission
 }: DashboardProps) {
   const { t } = useLanguage();
@@ -72,8 +75,15 @@ export default function DashboardPage({
       pendingReports = reports.filter(r => r.authorId === user.id && r.status === 'Pending').length;
     }
 
-    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length, overdue, highPriority, myNotes: notes.length };
-  }, [roleBasedTasks, reports, user, todayUpcomingMeetings, notes]);
+    const myContracts = user.permissions?.includes('view_all_reports') || user.permissions?.includes('director_feedback') || user.permissions?.includes('admin_panel')
+      ? contracts 
+      : contracts.filter(c => c.department === user.department);
+      
+    const totalContracts = myContracts.length;
+    const totalDebt = myContracts.reduce((s, c) => s + Math.max(0, (c.postTaxValue || 0) - (c.paidAmount || 0)), 0);
+
+    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length, overdue, highPriority, myNotes: notes.length, totalContracts, totalDebt };
+  }, [roleBasedTasks, reports, user, todayUpcomingMeetings, notes, contracts]);
 
   const todaysTasks = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -91,6 +101,17 @@ export default function DashboardPage({
       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 4);
   }, [reports, user]);
+
+  const recentContracts = useMemo(() => {
+    const isManagerOrDirector = user.permissions?.includes('view_all_reports') || user.permissions?.includes('director_feedback') || user.permissions?.includes('admin_panel');
+    let relevantContracts = contracts;
+    if (!isManagerOrDirector) {
+      relevantContracts = contracts.filter(c => c.department === user.department);
+    }
+    return relevantContracts
+      .sort((a,b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, 4);
+  }, [contracts, user]);
 
   const chartData = [
     { name: t('done'), value: stats.done, color: '#22c55e' },
@@ -149,14 +170,26 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" />
-        <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" />
-        <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" />
-        <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" />
-        <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" />
-        <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" />
+      {/* Task Stats Row */}
+      <div className="mb-6">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Công việc & Hoạt động</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" />
+          <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" />
+          <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" />
+          <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" />
+        </div>
+      </div>
+
+      {/* Finance & Other Stats Row */}
+      <div className="mb-8">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Tài chính & Khác</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Hợp đồng" value={stats.totalContracts} icon={FileSignature} color="from-blue-500 to-blue-400" />
+          <StatCard label="Công nợ (tr)" value={Math.round(stats.totalDebt / 1000000)} icon={Wallet} color="from-teal-500 to-teal-400" />
+          <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" />
+          <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -282,6 +315,64 @@ export default function DashboardPage({
                     </div>
                   );
                 })
+              )}
+            </div>
+          </section>
+
+          {/* Recent Contracts */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+                <FileSignature size={20} className="text-blue-500" />
+                Hợp đồng gần đây
+              </h2>
+              <button onClick={() => navigate('/contracts')} className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                Quản lý Hợp đồng <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {recentContracts.length === 0 ? (
+                <div className="col-span-1 md:col-span-2 p-8 text-center bg-white dark:bg-slate-800/60 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
+                  <p className="text-gray-500 dark:text-slate-400">Chưa có hợp đồng nào</p>
+                </div>
+              ) : (
+                recentContracts.map(contract => (
+                  <div key={contract.id} onClick={() => navigate('/contracts')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-bold">
+                          {contract.contractNumber.substring(0, 2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-800 dark:text-slate-100 truncate w-32 md:w-48">{contract.clientName}</p>
+                          <p className="text-xs text-gray-400 dark:text-slate-500">Số: {contract.contractNumber}</p>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        contract.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                        contract.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                        contract.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        contract.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {contract.status === 'completed' ? 'Hoàn thành' : 
+                         contract.status === 'in_progress' ? 'Đang thực hiện' :
+                         contract.status === 'pending' ? 'Chờ duyệt' :
+                         contract.status === 'cancelled' ? 'Đã hủy' : 'Nháp'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-end mt-3 pt-3 border-t border-gray-50">
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Giá trị</p>
+                        <p className="text-sm font-bold text-emerald-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(contract.postTaxValue || 0)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-0.5">Công nợ</p>
+                        <p className="text-sm font-bold text-rose-600">{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Math.max(0, (contract.postTaxValue || 0) - (contract.paidAmount || 0)))}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </section>

@@ -5,6 +5,7 @@ import { X, Calendar as CalendarIcon, User as UserIcon, Repeat, Send, MessageSqu
 import { Button, Avatar } from './UI';
 import { generateSubtasksFromTitle, generateTaskDetails } from '../services/aiService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useData } from '../contexts/DataContext';
 import Flatpickr from 'react-flatpickr';
 import { toLocalDateString } from '../utils/dateUtils';
 
@@ -44,6 +45,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
   const [status, setStatus] = useState<TaskStatus>(TaskStatus.TODO);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState<RecurrenceType>(RecurrenceType.NONE);
+  const [contractId, setContractId] = useState<string>('');
   
   // Enhanced Features State
   const [tags, setTags] = useState<string[]>([]);
@@ -58,6 +60,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
   const [newComment, setNewComment] = useState('');
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { contracts } = useData();
 
   // Determine assignable users based on role/permissions
   const perms = user.permissions || [];
@@ -82,6 +86,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
         setStatus(initialTask.status);
         setAssignees(initialTask.assignees);
         setRecurrence(initialTask.recurrence || RecurrenceType.NONE);
+        setContractId(initialTask.contractId || '');
         setComments(initialTask.comments || []);
         setTags(initialTask.tags || []);
         setSubtasks(initialTask.subtasks || []);
@@ -104,6 +109,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
     setStatus(TaskStatus.TODO);
     setAssignees([]);
     setRecurrence(RecurrenceType.NONE);
+    setContractId('');
     setComments([]);
     setTags([]);
     setSubtasks([]);
@@ -127,6 +133,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
       status,
       assignees,
       recurrence,
+      contractId: contractId || undefined,
       comments,
       tags,
       subtasks,
@@ -432,6 +439,24 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white appearance-none disabled:bg-gray-50 disabled:text-gray-500"
                 >
                   {Object.values(RecurrenceType).map(r => <option key={r} value={r}>{t(r)}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Contract Link */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Liên kết Hợp đồng</label>
+              <div className="relative">
+                <select 
+                  value={contractId}
+                  disabled={readOnly}
+                  onChange={(e) => setContractId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-400 outline-none bg-white disabled:bg-gray-50 disabled:text-gray-500"
+                >
+                  <option value="">Không liên kết</option>
+                  {contracts && contracts.map(c => (
+                    <option key={c.id} value={c.id}>{c.contractNumber} - {c.contractName}</option>
+                  ))}
                 </select>
               </div>
             </div>

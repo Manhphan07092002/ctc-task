@@ -12,6 +12,8 @@ const MeetingsPage = React.lazy(() => import('./pages/Meetings/index').then(modu
 const JoinMeetingPage = React.lazy(() => import('./pages/Meetings/JoinMeeting').then(module => ({ default: module.JoinMeetingPage })));
 import { SettingsView as SettingsPage } from './pages/Settings/index';
 import ReportsPage from './pages/Reports/index';
+import ContractsPage from './pages/Contracts/index';
+import RevenuePage from './pages/Revenue/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';
 import ResetPasswordPage from './pages/ResetPassword/index';
 import NotificationsPage from './pages/Notifications/index';
@@ -46,7 +48,7 @@ const getNextDate = (dateStr: string, type: RecurrenceType): string => {
 export default function CTCTaskApp() {
   const { t } = useLanguage();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { tasks, notes, users, reports, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
+  const { tasks, notes, users, reports, contracts, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
   const { setNotes, pushLocalNotification } = useNotifications();
 
   useEffect(() => {
@@ -351,7 +353,7 @@ export default function CTCTaskApp() {
               <Route path="/" element={
                  <DashboardPage
                  roleBasedTasks={roleBasedTasks} filteredTasks={filteredTasks} filteredNotes={filteredNotes} 
-                 notes={notes} users={users} user={user} reports={reports} searchQuery={searchQuery} 
+                 notes={notes} users={users} user={user} reports={reports} contracts={contracts} searchQuery={searchQuery} 
                  openCreateModal={openCreateModal} openEditModal={openEditModal} 
                  handleStatusToggle={handleStatusToggle} handleDeleteTask={handleDeleteTask} 
                  checkPermission={checkPermission}
@@ -414,6 +416,8 @@ export default function CTCTaskApp() {
               } />
 
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/contracts" element={<ContractsPage />} />
+              <Route path="/revenue" element={<RevenuePage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
 
               <Route path="/meetings" element={<React.Suspense fallback={<div className="p-8 text-center">Loading Meetings...</div>}><MeetingsPage allUsers={users} onJoinMeeting={setActiveMeeting} onCreateMeeting={() => setIsMeetingModalOpen(true)} /></React.Suspense>} />

@@ -25,6 +25,8 @@ import { eventRoutes } from './routes/events.js';
 import { activityRoutes } from './routes/activity.js';
 import { mailRoutes } from './routes/mail.js';
 import { uploadRoutes } from './routes/upload.js';
+import { contractRoutes } from './routes/contracts.js';
+import { revenueRoutes } from './routes/revenue.js';
 
 import { initSocket } from './socket.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
@@ -92,6 +94,8 @@ async function startServer() {
   app.use('/api/events', eventRoutes(db));
   app.use('/api/activity', activityRoutes(null, db));
   app.use('/api/mail', mailRoutes(db));
+  app.use('/api/contracts', requireAuth, contractRoutes(null, db));
+  app.use('/api/revenue-reports', requireAuth, revenueRoutes(null, db));
 
   scheduleFridayReminder(db);
   scheduleNoteReminders(db);

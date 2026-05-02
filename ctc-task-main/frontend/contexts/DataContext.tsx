@@ -7,6 +7,8 @@ import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDelet
 import { getReports as fetchReports, saveReport as apiSaveReport, deleteReport as apiDeleteReport, adminHardDeleteReport as apiAdminHardDeleteReport } from '../services/reportService';
 import { getRoles as fetchRoles } from '../services/roleService';
 import { getDepartments as fetchDepartments } from '../services/departmentService';
+import { getContracts as fetchContracts, saveContract as apiSaveContract, deleteContract as apiDeleteContract, Contract } from '../services/contractService';
+import { getRevenueReports as fetchRevenueReports, saveRevenueReport as apiSaveRevenueReport, deleteRevenueReport as apiDeleteRevenueReport, RevenueReport } from '../services/revenueService';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -16,6 +18,8 @@ interface DataContextType {
   reports: Report[];
   roles: Role[];
   departments: Department[];
+  contracts: Contract[];
+  revenueReports: RevenueReport[];
   isLoading: boolean;
   error: string | null;
   saveTask: (t: Task) => Promise<void>;
@@ -27,6 +31,10 @@ interface DataContextType {
   saveReport: (r: Report) => Promise<void>;
   deleteReport: (id: string) => Promise<void>;
   adminHardDeleteReport: (id: string) => Promise<void>;
+  saveContract: (c: Contract & { _isNew?: boolean }) => Promise<void>;
+  deleteContract: (id: string) => Promise<void>;
+  saveRevenueReport: (r: RevenueReport) => Promise<void>;
+  deleteRevenueReport: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -43,10 +51,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useQuery({ queryKey: ['roles'], queryFn: fetchRoles });
   const { data: departments = [], isLoading: departmentsLoading, error: deptsError } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments });
+  const { data: contracts = [], isLoading: contractsLoading, error: contractsError } = useQuery({ queryKey: ['contracts'], queryFn: fetchContracts, enabled: !!userId, retry: false });
+  const { data: revenueReports = [], isLoading: revenueLoading, error: revenueError } = useQuery({ queryKey: ['revenueReports'], queryFn: fetchRevenueReports, enabled: !!userId, retry: false });
 
-  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading;
+  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading || contractsLoading || revenueLoading;
   
-  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError;
+  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError || contractsError || revenueError;
   const error = anyError ? 'Failed to fetch data' : null;
 
   const refreshData = async () => {
@@ -123,9 +133,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
   });
 
+  const saveContractMutation = useMutation({
+    mutationFn: apiSaveContract,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+  const deleteContractMutation = useMutation({
+    mutationFn: apiDeleteContract,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contracts'] }),
+  });
+  const saveRevenueReportMutation = useMutation({
+    mutationFn: apiSaveRevenueReport,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['revenueReports'] }),
+  });
+  const deleteRevenueReportMutation = useMutation({
+    mutationFn: apiDeleteRevenueReport,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['revenueReports'] }),
+  });
+
   return (
     <DataContext.Provider value={{
-      tasks, notes, users, reports, roles, departments, isLoading, error,
+      tasks, notes, users, reports, roles, departments, contracts, revenueReports, isLoading, error,
       saveTask: async (t) => { await saveTaskMutation.mutateAsync(t); },
       deleteTask: async (id) => { await deleteTaskMutation.mutateAsync(id); },
       saveNote: async (n) => { await saveNoteMutation.mutateAsync(n); },
@@ -135,6 +165,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       saveReport: async (r) => { await saveReportMutation.mutateAsync(r); },
       deleteReport: async (id) => { await deleteReportMutation.mutateAsync(id); },
       adminHardDeleteReport: async (id) => { await adminHardDeleteReportMutation.mutateAsync(id); },
+      saveContract: async (c) => { await saveContractMutation.mutateAsync(c); },
+      deleteContract: async (id) => { await deleteContractMutation.mutateAsync(id); },
+      saveRevenueReport: async (r) => { await saveRevenueReportMutation.mutateAsync(r); },
+      deleteRevenueReport: async (id) => { await deleteRevenueReportMutation.mutateAsync(id); },
       refreshData
     }}>
       {children}

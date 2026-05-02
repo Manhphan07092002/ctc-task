@@ -13,12 +13,13 @@ import AdminDepartmentManagement from './DepartmentManagement';
 import AdminDatabaseManagement from './DatabaseManagement';
 import AdminEventManagement from './EventManagement';
 import AdminActivityLogsManagement from './ActivityLogsManagement';
+import AdminContractManagement from './ContractManagement';
 import { AdminTabGroup, TabItem } from './AdminTabGroup';
 import {
   Shield, LayoutDashboard, Users, Settings, LogOut,
   Bell, ChevronRight, Activity, Menu, X,
   CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays,
-  Layers, Settings2, List
+  Layers, Settings2, List, FileSignature
 } from 'lucide-react';
 
 const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -181,6 +182,7 @@ const OrganizationTabs: TabItem[] = [
 const OperationsTabs: TabItem[] = [
   { id: 'tasks', label: 'Quản lý Công việc', icon: CheckSquare, component: AdminTaskManagement },
   { id: 'reports', label: 'Quản lý Báo cáo', icon: FileText, component: AdminReportManagement },
+  { id: 'contracts', label: 'Quản lý Hợp đồng', icon: FileSignature, component: AdminContractManagement },
   { id: 'meetings', label: 'Quản lý Cuộc họp', icon: Video, component: AdminMeetingManagement },
   { id: 'events', label: 'Sự kiện & Ngày lễ', icon: CalendarDays, component: AdminEventManagement },
 ];
@@ -268,6 +270,7 @@ export default function AdminApp() {
             <Route path="/departments" element={<Navigate to="/admin/organization?tab=departments" replace />} />
             <Route path="/tasks" element={<Navigate to="/admin/operations?tab=tasks" replace />} />
             <Route path="/reports" element={<Navigate to="/admin/operations?tab=reports" replace />} />
+            <Route path="/contracts" element={<Navigate to="/admin/operations?tab=contracts" replace />} />
             <Route path="/meetings" element={<Navigate to="/admin/operations?tab=meetings" replace />} />
             <Route path="/events" element={<Navigate to="/admin/operations?tab=events" replace />} />
             <Route path="/settings" element={<Navigate to="/admin/system?tab=settings" replace />} />

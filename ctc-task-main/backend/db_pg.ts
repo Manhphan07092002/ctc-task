@@ -120,7 +120,7 @@ const DDL = `
     id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
     startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
     assignees TEXT, tags TEXT, createdBy TEXT, department TEXT,
-    recurrence TEXT, subtasks TEXT, comments TEXT
+    recurrence TEXT, subtasks TEXT, comments TEXT, contractId TEXT
   );
   CREATE TABLE IF NOT EXISTS task_assignees (
     taskId TEXT NOT NULL, userId TEXT NOT NULL,
@@ -303,6 +303,15 @@ export async function initDbPostgres(): Promise<PgDb> {
 
   const db = new PgDb(pool);
   await db.exec(DDL);
+  
+  // Safe migrations
+  const migrations = [
+    'ALTER TABLE tasks ADD COLUMN "contractId" TEXT;'
+  ];
+  for (const sql of migrations) {
+    try { await db.run(sql); } catch (_) { /* ignore if exists */ }
+  }
+
   await seedIfEmpty(db);
 
   console.log('[DB] Connected to PostgreSQL');

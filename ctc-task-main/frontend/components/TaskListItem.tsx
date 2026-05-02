@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, CheckSquare, Trash2, Lock, CheckCircle2, Repeat, AlertCircle } from 'lucide-react';
 import { Task, TaskStatus, User } from '../types';
 import { PRIORITY_COLORS } from '../constants';
+import { useData } from '../contexts/DataContext';
 
 interface TaskListItemProps {
   task: Task;
@@ -17,6 +18,8 @@ interface TaskListItemProps {
 export const TaskListItem: React.FC<TaskListItemProps> = ({
   task, onClick, onCheck, onDelete, canToggle, isReadOnly, showDepartment, allUsers
 }) => {
+  const { contracts } = useData();
+  const linkedContract = task.contractId ? contracts?.find(c => c.id === task.contractId) : null;
   const todayStr = new Date().toISOString().slice(0, 10);
   const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== TaskStatus.DONE;
   
@@ -51,6 +54,11 @@ export const TaskListItem: React.FC<TaskListItemProps> = ({
           {task.recurrence && task.recurrence !== 'None' && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1" title={`Lặp lại: ${task.recurrence}`}>
               <Repeat size={10} />
+            </span>
+          )}
+          {linkedContract && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center gap-1 font-bold shadow-sm" title={linkedContract.contractName}>
+              HĐ: {linkedContract.contractNumber}
             </span>
           )}
         </div>

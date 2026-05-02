@@ -123,6 +123,41 @@ export async function initDb() {
       subject TEXT NOT NULL, "to" TEXT NOT NULL, opens INTEGER NOT NULL DEFAULT 0,
       lastOpen TEXT, createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS contracts (
+      id TEXT PRIMARY KEY,
+      contractNumber TEXT NOT NULL,
+      clientName TEXT NOT NULL,
+      contractName TEXT NOT NULL,
+      preTaxValue REAL DEFAULT 0,
+      invoiceDate TEXT,
+      invoiceNumber TEXT,
+      department TEXT NOT NULL,
+      createdBy TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT,
+      isDeleted INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS revenue_reports (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      reportType TEXT NOT NULL,
+      periodStart TEXT NOT NULL,
+      periodEnd TEXT NOT NULL,
+      content TEXT,
+      totalPreTax REAL DEFAULT 0,
+      totalDelivered REAL DEFAULT 0,
+      totalCumulative REAL DEFAULT 0,
+      authorId TEXT NOT NULL,
+      department TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Draft',
+      approvedBy TEXT,
+      approvedAt TEXT,
+      managerFeedback TEXT,
+      directorFeedback TEXT,
+      createdAt TEXT NOT NULL,
+      submittedAt TEXT,
+      isDeleted INTEGER DEFAULT 0
+    );
   `);
 
   // Migrations (safe to run multiple times)
@@ -149,7 +184,14 @@ export async function initDb() {
     'ALTER TABLE users ADD COLUMN gender TEXT;',
     "UPDATE users SET phone = '0987654321', dob = '1985-06-15', hometown = 'Hà Nội', bio = 'Chuyên gia quản trị với hơn 10 năm kinh nghiệm trong lĩnh vực phát triển kinh doanh.', cccd = '001085123456', gender = 'Nam' WHERE email = 'vandat@ctcdn.vn' AND phone IS NULL;",
     "UPDATE users SET phone = '0123456789', dob = '2002-09-07', hometown = 'Đà Nẵng', bio = 'Nhân viên năng nổ, luôn nỗ lực học hỏi và hoàn thành xuất sắc các dự án được giao.', cccd = '048202012345', gender = 'Nam' WHERE email = 'xuanmanh@ctcdn.vn' AND phone IS NULL;",
-    "UPDATE users SET phone = '0912345678', dob = '1990-01-01', hometown = 'Hồ Chí Minh', bio = 'Quản trị viên hệ thống cấp cao.', cccd = '079190001111', gender = 'Khác' WHERE email = 'admin@ctcdn.vn' AND phone IS NULL;"
+    "UPDATE users SET phone = '0912345678', dob = '1990-01-01', hometown = 'Hồ Chí Minh', bio = 'Quản trị viên hệ thống cấp cao.', cccd = '079190001111', gender = 'Khác' WHERE email = 'admin@ctcdn.vn' AND phone IS NULL;",
+    "ALTER TABLE contracts ADD COLUMN status TEXT DEFAULT 'draft';",
+    "ALTER TABLE contracts ADD COLUMN attachments TEXT;",
+    "ALTER TABLE contracts ADD COLUMN products TEXT;",
+    "ALTER TABLE contracts ADD COLUMN vatRate REAL DEFAULT 10;",
+    "ALTER TABLE contracts ADD COLUMN postTaxValue REAL DEFAULT 0;",
+    "ALTER TABLE contracts ADD COLUMN paidAmount REAL DEFAULT 0;",
+    "ALTER TABLE tasks ADD COLUMN contractId TEXT;"
   ];
   for (const sql of migrations) {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }

@@ -77,10 +77,10 @@ export function taskRoutes(_prisma: any, db: any) {
     const t = req.body;
     try {
       await db.run(
-        'INSERT INTO tasks (id, title, description, startDate, dueDate, estimatedEndAt, priority, status, createdBy, department, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO tasks (id, title, description, startDate, dueDate, estimatedEndAt, priority, status, createdBy, department, recurrence, contractId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [t.id, t.title, t.description ?? null, t.startDate ?? null, t.dueDate ?? null,
           t.estimatedEndAt ?? null, t.priority ?? null, t.status ?? null,
-          t.createdBy ?? null, t.department ?? null, t.recurrence ?? null],
+          t.createdBy ?? null, t.department ?? null, t.recurrence ?? null, t.contractId ?? null],
       );
       await saveRelated(t.id, t);
 
@@ -105,10 +105,10 @@ export function taskRoutes(_prisma: any, db: any) {
     const t = req.body;
     try {
       await db.run(
-        'UPDATE tasks SET title=?, description=?, startDate=?, dueDate=?, estimatedEndAt=?, priority=?, status=?, department=?, recurrence=? WHERE id=?',
+        'UPDATE tasks SET title=?, description=?, startDate=?, dueDate=?, estimatedEndAt=?, priority=?, status=?, department=?, recurrence=?, contractId=? WHERE id=?',
         [t.title, t.description ?? null, t.startDate ?? null, t.dueDate ?? null,
           t.estimatedEndAt ?? null, t.priority ?? null, t.status ?? null,
-          t.department ?? null, t.recurrence ?? null, req.params.id],
+          t.department ?? null, t.recurrence ?? null, t.contractId ?? null, req.params.id],
       );
       await saveRelated(req.params.id, t);
 
