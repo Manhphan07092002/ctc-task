@@ -45,35 +45,42 @@ export const sendNotification = async (
         if (type.startsWith('meeting_') && prefs.meetingNotifs !== false) shouldSendEmail = true;
 
         if (shouldSendEmail) {
-          // Dynamic import of createMailer to avoid circular dependency issues
-          const { createMailer } = await import('../mailer.js');
-          const mailer = createMailer(db);
-          const { transporter, smtp } = await mailer.createTransporter();
-          
-          if (transporter && smtp.SMTP_FROM) {
-            const portalUrl = process.env.VITE_API_URL || 'http://localhost:5173';
-            await transporter.sendMail({
-              from: smtp.SMTP_FROM,
-              to: user.email,
-              subject: `CTC Task - ${title}`,
-              text: `Xin chào ${user.name},\n\n${message}\n\nTruy cập hệ thống: ${portalUrl}\n\nTrân trọng,\nCTC Task`,
-              html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;max-width:560px;margin:0 auto;padding:24px">
-                <div style="padding:18px 20px;border-radius:16px 16px 0 0;background:#111827;color:#fff;text-align:center;font-weight:800;font-size:20px">CTC Task</div>
-                <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 16px 16px">
-                  <p style="margin:0 0 16px">Xin chào <strong>${user.name}</strong>,</p>
-                  <p style="margin:0 0 16px">${message}</p>
-                  <div style="text-align:center;margin:24px 0">
-                    <a href="${portalUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">Mở hệ thống</a>
-                  </div>
-                  <p style="margin:24px 0 0;color:#6b7280;font-size:13px;border-top:1px solid #eee;padding-top:16px">
-                    Bạn nhận được email này vì bạn đang bật thông báo trong cài đặt.
-                    <br/>Để tắt thông báo, hãy vào Cài đặt &gt; Thông báo.
-                  </p>
-                </div>
-              </div>`
-            });
-            console.log(`[Notify] Sent email to ${user.email} for type: ${type}`);
-          }
+          // Fire and forget email to avoid blocking the API response
+          import('../mailer.js').then(async ({ createMailer }) => {
+            try {
+              const mailer = createMailer(db);
+              const { transporter, smtp } = await mailer.createTransporter();
+              
+              if (transporter && smtp.SMTP_FROM) {
+                const portalUrl = process.env.VITE_API_URL || 'http://localhost:5173';
+                await transporter.sendMail({
+                  from: smtp.SMTP_FROM,
+                  to: user.email,
+                  subject: `CTC Task - ${title}`,
+                  text: `Xin chào ${user.name},\n\n${message}\n\nTruy cập hệ thống: ${portalUrl}\n\nTrân trọng,\nCTC Task`,
+                  html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;max-width:560px;margin:0 auto;padding:24px">
+                    <div style="padding:18px 20px;border-radius:16px 16px 0 0;background:#111827;color:#fff;text-align:center;font-weight:800;font-size:20px">CTC Task</div>
+                    <div style="padding:24px;background:#fff;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 16px 16px">
+                      <p style="margin:0 0 16px">Xin chào <strong>${user.name}</strong>,</p>
+                      <p style="margin:0 0 16px">${message}</p>
+                      <div style="text-align:center;margin:24px 0">
+                        <a href="${portalUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold">Mở hệ thống</a>
+                      </div>
+                      <p style="margin:24px 0 0;color:#6b7280;font-size:13px;border-top:1px solid #eee;padding-top:16px">
+                        Bạn nhận được email này vì bạn đang bật thông báo trong cài đặt.
+                        <br/>Để tắt thông báo, hãy vào Cài đặt &gt; Thông báo.
+                      </p>
+                    </div>
+                  </div>`
+                });
+                console.log(`[Notify] Sent email to ${user.email} for type: ${type}`);
+              }
+            } catch (emailErr) {
+              console.error('[Notify] Async email send failed:', emailErr);
+            }
+          }).catch(err => {
+            console.error('[Notify] Failed to load mailer:', err);
+          });
         }
       }
     } catch (emailErr) {

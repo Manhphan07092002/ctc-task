@@ -47,7 +47,7 @@ export default function CTCTaskApp() {
   const { t } = useLanguage();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { tasks, notes, users, reports, isLoading: isDataLoading, saveTask, deleteTask, saveNote, deleteNote, saveUser, deleteUser } = useData();
-  const { setNotes } = useNotifications();
+  const { setNotes, pushLocalNotification } = useNotifications();
 
   useEffect(() => {
     if (setNotes && notes) {
@@ -152,21 +152,43 @@ export default function CTCTaskApp() {
       if (now.getDay() === 5 && now.getHours() >= 16 && user && user.permissions?.includes('create_report')) {
         const hasFired = localStorage.getItem(`report_reminder_${now.toLocaleDateString()}`);
         if (!hasFired) {
-          setNotification({
-            visible: true, 
-            title: "⏰ Đã đến giờ làm Báo cáo!",
-            message: "Hôm nay là Thứ 6, đã qua 16h00. Vui lòng vào mục Báo cáo để tạo và gửi báo cáo công việc tuần này nhé!", 
-            type: 'warning'
+          // Check if user already reported this week
+          const currentWeekStartStr = (() => {
+            const d = new Date();
+            const day = d.getDay();
+            const diffToMon = day === 0 ? -6 : 1 - day;
+            const mon = new Date(d);
+            mon.setDate(d.getDate() + diffToMon);
+            return mon.toISOString().split('T')[0];
+          })();
+          
+          const hasReportedThisWeek = reports.some(r => {
+            if (r.authorId !== user.id) return false;
+            try {
+              const c = JSON.parse(r.content);
+              return c.weekStart === currentWeekStartStr;
+            } catch {
+              return false;
+            }
           });
+
+          if (!hasReportedThisWeek) {
+            pushLocalNotification({
+              userId: user.id,
+              type: 'report_reminder',
+              title: "⏰ Đã đến giờ làm Báo cáo!",
+              message: "Hôm nay là Thứ 6, đã qua 16h00. Vui lòng nhấp vào đây để tạo và gửi báo cáo công việc tuần này nhé!"
+            });
+          }
+          // Mark as fired regardless, so we don't spam if they choose not to report
           localStorage.setItem(`report_reminder_${now.toLocaleDateString()}`, 'true');
-          setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 15000);
         }
       }
     };
     const interval = setInterval(checkReportTime, 60000);
     checkReportTime(); // check immediately on mount
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, reports, pushLocalNotification]);
 
   const allTags = useMemo(() => {
     const tags = new Set<string>();

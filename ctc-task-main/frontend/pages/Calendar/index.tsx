@@ -167,9 +167,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
   const changeMonth = (delta: number) =>
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + delta, 1));
 
-  const filteredTasks = useMemo(() =>
-    filterPriority === 'all' ? tasks : tasks.filter(t => t.priority === filterPriority),
-  [tasks, filterPriority]);
+  const filteredTasks = useMemo(() => {
+    const activeTasks = tasks.filter(t => t.status !== 'Done');
+    return filterPriority === 'all' ? activeTasks : activeTasks.filter(t => t.priority === filterPriority);
+  }, [tasks, filterPriority]);
 
   const getTasksForDate = (dateStr: string) => filteredTasks.filter(t => {
     // 1. Exact match with startDate

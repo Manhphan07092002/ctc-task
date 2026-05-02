@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Send, Save, CheckCircle, XCircle, Plus, Trash2,
-  CalendarDays, Building2, User, FileText, ChevronDown, GripVertical
+  CalendarDays, Building2, User, FileText, ChevronDown, GripVertical,
+  Paperclip, Image, FileUp, Download as DownloadIcon
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Button } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report, ReportStatus, Task, User as UserType, Department } from '../../types';
+import { apiFetch } from '../../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface TaskRow {
@@ -23,6 +25,14 @@ interface StructuredContent {
   nextWeekPlan: string;
   weekStart: string;
   weekEnd: string;
+  attachments?: Attachment[];
+}
+
+interface Attachment {
+  name: string;
+  url: string;
+  size: number;
+  type: string;
 }
 
 interface ReportModalProps {
@@ -116,6 +126,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const [managerFeedback, setManagerFeedback] = useState('');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showConfirmHardDelete, setShowConfirmHardDelete] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -185,9 +197,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         setNextWeekPlan(parsed.nextWeekPlan || '');
         setWeekStart(parsed.weekStart || week.start);
         setWeekEnd(parsed.weekEnd   || week.end);
+        setAttachments(parsed.attachments || []);
       } else {
         setRows([{ id: '1', content: initialReport.content || '', result: '', nextAction: '', note: '' }]);
         setNextWeekPlan('');
+        setAttachments([]);
       }
     } else {
       const w = getWeekRange();
@@ -211,6 +225,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       setRows([newRow()]);
       setNextWeekPlan('');
       setDirectorFeedback('');
+      setAttachments([]);
     }
   }, [isOpen, initialReport]);
 
@@ -284,8 +299,35 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   // ── Save ──
   const buildContent = () => {
-    const data = { tasks: rows, nextWeekPlan, weekStart, weekEnd };
+    const data: StructuredContent = { tasks: rows, nextWeekPlan, weekStart, weekEnd, attachments: attachments.length > 0 ? attachments : undefined };
     return JSON.stringify(data);
+  };
+
+  // ── File upload ──
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach(f => formData.append('files', f));
+      const res = await apiFetch('/api/upload', { method: 'POST', body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        setAttachments(prev => [...prev, ...data.files]);
+      }
+    } catch (e) {
+      console.error('Upload failed', e);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = (idx: number) => setAttachments(prev => prev.filter((_, i) => i !== idx));
+
+  const fmtSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSave = (status: ReportStatus) => {
@@ -647,6 +689,67 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── ATTACHMENTS ── */}
+          <div className="bg-gradient-to-br from-slate-50/80 to-slate-100/30 border border-slate-200/60 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><Paperclip size={16} /></span>
+              Tài liệu đính kèm
+              {attachments.length > 0 && <span className="text-xs font-medium text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">{attachments.length}</span>}
+            </h3>
+
+            {/* File list */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-white rounded-xl px-3 py-2 border border-slate-200 group">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${file.type.startsWith('image/') ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {file.type.startsWith('image/') ? <Image size={16}/> : <FileText size={16}/>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
+                      <p className="text-[11px] text-gray-400">{fmtSize(file.size)}</p>
+                    </div>
+                    {file.type.startsWith('image/') && (
+                      <img src={file.url} alt={file.name} className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+                    )}
+                    <a href={file.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors">
+                      <DownloadIcon size={14}/>
+                    </a>
+                    {!isFormReadOnly && (
+                      <button onClick={() => removeAttachment(idx)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                        <Trash2 size={14}/>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Upload area */}
+            {!isFormReadOnly && (
+              <label
+                className={`flex flex-col items-center justify-center gap-2 py-4 border-2 border-dashed rounded-xl cursor-pointer transition-all ${uploading ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50/30'}`}
+                onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50/50'); }}
+                onDragLeave={e => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/50'); }}
+                onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/50'); handleFileUpload(e.dataTransfer.files); }}
+              >
+                <input type="file" multiple className="hidden" onChange={e => handleFileUpload(e.target.files)} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
+                {uploading ? (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"/>
+                    <span className="text-sm font-medium">Đang tải lên...</span>
+                  </div>
+                ) : (
+                  <>
+                    <FileUp size={20} className="text-slate-400"/>
+                    <span className="text-sm text-slate-500">Kéo thả hoặc <span className="text-blue-600 font-semibold">chọn file</span></span>
+                    <span className="text-[11px] text-slate-400">Ảnh, PDF, Word, Excel (tối đa 10MB/file)</span>
+                  </>
+                )}
+              </label>
+            )}
           </div>
         </div>
 

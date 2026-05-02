@@ -85,7 +85,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const saveReportMutation = useMutation({
     mutationFn: apiSaveReport,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reports'] }),
+    onMutate: async (newReport) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['reports'] });
+      // Snapshot the previous value
+      const previousReports = queryClient.getQueryData<Report[]>(['reports']);
+      // Optimistically update to the new value
+      queryClient.setQueryData<Report[]>(['reports'], (old) => {
+        if (!old) return [newReport];
+        const exists = old.find((r) => r.id === newReport.id);
+        if (exists) {
+          return old.map((r) => (r.id === newReport.id ? { ...r, ...newReport } : r));
+        }
+        return [...old, newReport];
+      });
+      // Return a context object with the snapshotted value
+      return { previousReports };
+    },
+    onError: (err, newReport, context) => {
+      if (context?.previousReports) {
+        queryClient.setQueryData(['reports'], context.previousReports);
+      }
+    },
+    onSettled: () => {
+      // Background refetch, do not return the promise to avoid blocking mutateAsync
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+    },
   });
 
   const deleteReportMutation = useMutation({

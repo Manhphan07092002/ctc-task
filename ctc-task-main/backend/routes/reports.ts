@@ -7,7 +7,7 @@ export function reportRoutes(_prisma: any, db: any) {
 
   router.get('/', async (_req, res) => {
     try {
-      const reports = await db.all('SELECT * FROM reports');
+      const reports = await db.all('SELECT * FROM reports WHERE isDeleted IS NULL OR isDeleted = 0');
       res.json(reports);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch reports' }); }
   });
@@ -60,9 +60,15 @@ export function reportRoutes(_prisma: any, db: any) {
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
   });
 
+  // Soft delete – only allow deleting Draft or Rejected reports
   router.delete('/:id', async (req, res) => {
     try {
-      await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
+      const report = await db.get('SELECT status FROM reports WHERE id = ?', [req.params.id]);
+      if (!report) return res.status(404).json({ error: 'Report not found' });
+      if (report.status === 'Approved' || report.status === 'Pending') {
+        return res.status(403).json({ error: 'Cannot delete an approved or pending report' });
+      }
+      await db.run('UPDATE reports SET isDeleted = 1 WHERE id = ?', [req.params.id]);
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });

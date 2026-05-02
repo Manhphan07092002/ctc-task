@@ -24,6 +24,7 @@ import { adminRoutes } from './routes/admin.js';
 import { eventRoutes } from './routes/events.js';
 import { activityRoutes } from './routes/activity.js';
 import { mailRoutes } from './routes/mail.js';
+import { uploadRoutes } from './routes/upload.js';
 
 import { initSocket } from './socket.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
@@ -96,6 +97,12 @@ async function startServer() {
   scheduleNoteReminders(db);
   scheduleDailyTaskReminder(db);
   initMailScheduler(db);
+
+  app.use('/api/upload', requireAuth, uploadRoutes());
+
+  // Serve uploaded files
+  const uploadsPath = path.join(__dirname, '../uploads');
+  app.use('/uploads', express.static(uploadsPath));
 
   const frontendPath = path.join(__dirname, '../frontend/dist');
   app.use(express.static(frontendPath));

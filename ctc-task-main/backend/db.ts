@@ -137,6 +137,8 @@ export async function initDb() {
     'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',
     'ALTER TABLE reports ADD COLUMN managerFeedback TEXT;',
     'ALTER TABLE reports ADD COLUMN deletedAt TEXT;',
+    'ALTER TABLE reports ADD COLUMN isDeleted INTEGER DEFAULT 0;',
+    'UPDATE reports SET isDeleted = 1 WHERE deletedAt IS NOT NULL AND (isDeleted IS NULL OR isDeleted = 0);',
     'ALTER TABLE notes ADD COLUMN userId TEXT;',
     'ALTER TABLE notes ADD COLUMN reminderAt TEXT;',
     'ALTER TABLE users ADD COLUMN phone TEXT;',

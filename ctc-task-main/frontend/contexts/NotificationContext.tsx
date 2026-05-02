@@ -53,6 +53,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const isFirstLoad = useRef(true);
   const prevIds = useRef<Set<string>>(new Set());
   const firedReminders = useRef<Set<string>>(new Set()); // note ids already reminded
+  const isMailAuthFailed = useRef(false);
 
   const playSound = () => {
     try {
@@ -142,11 +143,17 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Global mail polling
   useEffect(() => {
     if (!user) return;
+    isMailAuthFailed.current = false;
 
     // Scan unread mail count on login
     const scanUnreadCount = async () => {
+      if (isMailAuthFailed.current) return;
       try {
         const res = await apiFetch('/api/mail/unread-count');
+        if (!res.ok) {
+          if (res.status === 401) isMailAuthFailed.current = true;
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           if (data.count > 0) {
@@ -164,9 +171,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     scanUnreadCount();
 
     const checkNewMail = async () => {
+      if (isMailAuthFailed.current) return;
       try {
         const res = await apiFetch('/api/mail/check-new');
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (res.status === 401) isMailAuthFailed.current = true;
+          return;
+        }
         const data = await res.json();
         if (data.uid && !data.isRead) {
           const lastSeenUid = localStorage.getItem(`last_mail_uid_${user.id}`);

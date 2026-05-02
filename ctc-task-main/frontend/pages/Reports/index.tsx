@@ -4,7 +4,7 @@ import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { Button, Card, Avatar } from '../../components/UI';
-import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, Printer, CalendarDays, Building2, Trash2, Search, Filter, PieChart, BarChart } from 'lucide-react';
+import { PlusCircle, FileText, CheckCircle, Clock, XCircle, FileEdit, Download, Printer, CalendarDays, Building2, Trash2, Search, Filter, PieChart, BarChart, History, Timer, Users } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip as ReTooltip, BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { ReportModal } from './ReportModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -15,7 +15,7 @@ export default function ReportsPage() {
   const { t } = useLanguage();
   const { reports, tasks, users, roles, departments, saveReport, deleteReport, adminHardDeleteReport } = useData();
   const { user } = useAuth();
-  const { refresh: refreshNotifications } = useNotifications();
+  const { refresh: refreshNotifications, showToast, pushLocalNotification } = useNotifications();
 
   // ── All hooks must be called before any conditional return ──
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,16 +24,50 @@ export default function ReportsPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [historyWeeksShown, setHistoryWeeksShown] = useState(4);
 
   const perms      = user?.permissions || [];
   const canApprove = perms.includes('approve_dept_reports');
   const canViewAll = perms.includes('view_all_reports');
   const canCreate  = perms.includes('create_report');
 
+  const currentWeekStartStr = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diffToMon);
+    return mon.toISOString().split('T')[0];
+  }, []);
+
+  const getReportWeekInfo = (r: Report) => {
+    try {
+      const c = JSON.parse(r.content);
+      if (c.weekStart && c.weekEnd) {
+        return { start: c.weekStart, label: `Tuần ${c.weekStart.split('-').reverse().join('/')} – ${c.weekEnd.split('-').reverse().join('/')}` };
+      }
+    } catch {}
+    const d = new Date(r.createdAt);
+    const day = d.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diffToMon);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    const fmt = (dt: Date) => dt.toISOString().split('T')[0];
+    const fmtDisp = (dt: Date) => {
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}`;
+    };
+    return { start: fmt(mon), label: `Tuần ${fmtDisp(mon)} – ${fmtDisp(sun)}` };
+  };
+
   // Initial tab: director starts on 'pending', others on 'mine'
-  const [activeTab, setActiveTab] = useState<'mine' | 'pending' | 'all' | 'weekly_summary'>(
+  const [activeTab, setActiveTab] = useState<'mine' | 'pending' | 'all' | 'weekly_summary' | 'dept_approved' | 'history'>(
     canViewAll ? 'pending' : 'mine'
   );
 
@@ -45,16 +79,23 @@ export default function ReportsPage() {
   const myReports = useMemo(() => {
     if (!user) return [];
     return reports
-      .filter(r => r.authorId === user.id)
+      .filter(r => r.authorId === user.id && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [reports, user]);
+  }, [reports, user, currentWeekStartStr]);
 
   const pendingManagerReports = useMemo(() => {
     if (!canApprove || !user) return [];
     return reports
-      .filter(r => r.department === user.department && r.status === 'Pending' && r.authorId !== user.id)
+      .filter(r => r.department === user.department && r.status === 'Pending' && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
-  }, [reports, user, canApprove]);
+  }, [reports, user, canApprove, currentWeekStartStr]);
+
+  const deptApprovedReports = useMemo(() => {
+    if (!canApprove || !user) return [];
+    return reports
+      .filter(r => r.department === user.department && r.status === 'Approved' && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
+      .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
+  }, [reports, user, canApprove, currentWeekStartStr]);
 
   // List of roles that have manager capabilities (approve_dept_reports permission)
   const managerRoleNames = useMemo(() => {
@@ -74,17 +115,26 @@ export default function ReportsPage() {
   const pendingDirectorReports = useMemo(() => {
     if (!canViewAll) return [];
     return reports
-      .filter(r => r.status === 'Pending' && managerIds.has(r.authorId))
+      .filter(r => r.status === 'Pending' && managerIds.has(r.authorId) && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
-  }, [reports, canViewAll, managerIds]);
+  }, [reports, canViewAll, managerIds, currentWeekStartStr]);
 
   const directorReports = useMemo(() => {
     if (!canViewAll) return [];
     // Director only sees Approved reports authored by department managers (Trưởng phòng)
     return reports
-      .filter(r => r.status === 'Approved' && managerIds.has(r.authorId))
+      .filter(r => r.status === 'Approved' && managerIds.has(r.authorId) && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
-  }, [reports, canViewAll, managerIds]);
+  }, [reports, canViewAll, managerIds, currentWeekStartStr]);
+
+  const historyReports = useMemo(() => {
+    if (!user) return [];
+    let list = [];
+    if (canViewAll) list = reports;
+    else if (canApprove) list = reports.filter(r => r.department === user.department);
+    else list = reports.filter(r => r.authorId === user.id);
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [reports, user, canViewAll, canApprove]);
 
   // ── Early return AFTER all hooks ──
   if (!user) return null;
@@ -114,34 +164,19 @@ export default function ReportsPage() {
       return `${parts[2]}/${parts[1]}`;
     };
 
-    // All approved employee reports for same dept + same week (include the newly approved one)
-    const weekDeptReports = [
-      ...reports.filter(r =>
-        r.id !== approvedReport.id &&
-        r.department === user.department &&
-        r.authorId !== user.id &&
-        r.status === 'Approved'
-      ),
-      approvedReport,
-    ].filter(r => {
-      try {
-        const c = JSON.parse(r.content);
-        return c.weekStart === weekStart && c.weekEnd === weekEnd;
-      } catch { return false; }
-    });
+    // Extract tasks from the newly approved report
+    let newTasks: any[] = [];
+    const authorName = users.find(u => u.id === approvedReport.authorId)?.name || 'Nhân viên';
+    try {
+      const c = JSON.parse(approvedReport.content);
+      newTasks = (Array.isArray(c.tasks) ? c.tasks : [])
+        .filter((t: any) => t.content?.trim())
+        .map((t: any) => ({ ...t, id: Math.random().toString(36).slice(2), assignee: authorName }));
+    } catch {}
 
-    // Aggregate all task rows from each employee's report
-    const aggregatedTasks = weekDeptReports.flatMap(r => {
-      const authorName = users.find(u => u.id === r.authorId)?.name || 'Nhân viên';
-      try {
-        const c = JSON.parse(r.content);
-        return (Array.isArray(c.tasks) ? c.tasks : [])
-          .filter((t: any) => t.content?.trim())
-          .map((t: any) => ({ ...t, id: Math.random().toString(36).slice(2), assignee: authorName }));
-      } catch { return []; }
-    });
+    if (newTasks.length === 0) return;
 
-    // Find existing consolidated report for this manager + week (to update instead of duplicate)
+    // Find existing consolidated report for this manager + week
     const existing = reports.find(r =>
       r.authorId === user.id &&
       r.department === user.department &&
@@ -151,20 +186,29 @@ export default function ReportsPage() {
       })()
     );
 
+    let prevTasks: any[] = [];
     let prevNextWeekPlan = '';
     if (existing) {
-      try { prevNextWeekPlan = JSON.parse(existing.content).nextWeekPlan || ''; } catch {}
+      try { 
+        const c = JSON.parse(existing.content);
+        prevTasks = Array.isArray(c.tasks) ? c.tasks : [];
+        prevNextWeekPlan = c.nextWeekPlan || ''; 
+      } catch {}
     }
+
+    // Combine tasks (append new ones to the bottom)
+    const combinedTasks = [...prevTasks, ...newTasks];
 
     const consolidated: Report = {
       id: existing?.id || Math.random().toString(36).slice(2, 9),
       title: `Báo cáo tổng hợp phòng ${user.department} · Tuần ${fmtD(weekStart)}–${fmtD(weekEnd)}`,
-      content: JSON.stringify({ tasks: aggregatedTasks, nextWeekPlan: prevNextWeekPlan, weekStart, weekEnd }),
+      content: JSON.stringify({ tasks: combinedTasks, nextWeekPlan: prevNextWeekPlan, weekStart, weekEnd }),
       authorId: user.id,
       department: user.department,
-      status: 'Pending',
+      // Create as Draft, or keep existing status (e.g. if already sent to Director, it stays Pending)
+      status: existing ? existing.status : 'Draft',
       createdAt: existing?.createdAt || new Date().toISOString(),
-      submittedAt: new Date().toISOString(),
+      submittedAt: existing?.submittedAt, // Keep existing submittedAt
       directorFeedback: existing?.directorFeedback,
       managerFeedback: existing?.managerFeedback,
     };
@@ -172,21 +216,44 @@ export default function ReportsPage() {
     await saveReport(consolidated);
   };
 
-  const exportExcel = () => {
-    const data = displayedReports.map(r => ({
-      'Tiêu đề': r.title,
-      'Phòng ban': r.department,
-      'Trạng thái': r.status === 'Approved' ? 'Đã duyệt' : r.status === 'Pending' ? 'Chờ duyệt' : r.status === 'Rejected' ? 'Từ chối' : 'Nháp',
-      'Tác giả': getUserDetails(r.authorId)?.name || r.authorId,
-      'Người duyệt': r.approvedBy ? getUserDetails(r.approvedBy)?.name : '',
-      'Ngày tạo': new Date(r.createdAt).toLocaleDateString('vi-VN'),
-      'Ngày cập nhật': new Date(r.approvedAt || r.submittedAt || r.createdAt).toLocaleDateString('vi-VN')
-    }));
+  const RESULT_LABEL: Record<string, string> = { done: 'Đã hoàn thành', in_progress: 'Đang thực hiện', pending: 'Chưa thực hiện' };
 
-    const ws = XLSX.utils.json_to_sheet(data);
+  const exportExcel = () => {
+    const rows: any[] = [];
+    const source = activeTab === 'history' ? historyReports : displayedReports;
+    source.forEach(r => {
+      let tasks: any[] = [];
+      try { const c = JSON.parse(r.content); tasks = Array.isArray(c.tasks) ? c.tasks : []; } catch {}
+      const author = getUserDetails(r.authorId)?.name || r.authorId;
+      const approver = r.approvedBy ? getUserDetails(r.approvedBy)?.name : '';
+      const status = r.status === 'Approved' ? 'Đã duyệt' : r.status === 'Pending' ? 'Chờ duyệt' : r.status === 'Rejected' ? 'Từ chối' : 'Nháp';
+      const weekLabel = getReportWeekInfo(r).label;
+      if (tasks.length === 0) {
+        rows.push({ 'Tuần': weekLabel, 'Tiêu đề': r.title, 'Phòng ban': r.department, 'Tác giả': author, 'Nội dung': '', 'Kết quả': '', 'Bước tiếp theo': '', 'Ghi chú': '', 'Trạng thái': status, 'Người duyệt': approver });
+      } else {
+        tasks.forEach((t, i) => {
+          rows.push({
+            'Tuần': i === 0 ? weekLabel : '',
+            'Tiêu đề': i === 0 ? r.title : '',
+            'Phòng ban': i === 0 ? r.department : '',
+            'Tác giả': t.assignee || author,
+            'Nội dung': t.content || '',
+            'Kết quả': RESULT_LABEL[t.result] || '',
+            'Bước tiếp theo': t.nextAction || '',
+            'Ghi chú': t.note || '',
+            'Trạng thái': i === 0 ? status : '',
+            'Người duyệt': i === 0 ? approver : '',
+          });
+        });
+      }
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Auto column widths
+    ws['!cols'] = [{ wch: 22 }, { wch: 35 }, { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 18 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reports");
-    XLSX.writeFile(wb, `CTC_Reports_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo');
+    XLSX.writeFile(wb, `CTC_BaoCao_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const pendingList = canViewAll ? pendingDirectorReports : pendingManagerReports;
@@ -195,6 +262,7 @@ export default function ReportsPage() {
   if (activeTab === 'all'     && canViewAll)  displayedReports = directorReports;
   else if (activeTab === 'pending')            displayedReports = pendingList;
   else if (activeTab === 'weekly_summary')     displayedReports = [];
+  else if (activeTab === 'dept_approved')      displayedReports = deptApprovedReports;
   else                                         displayedReports = myReports;
 
   // Apply department filter for director
@@ -246,10 +314,33 @@ export default function ReportsPage() {
   }) : [];
 
   const currentWeekStart = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff)).setHours(0,0,0,0);
+    return new Date(currentWeekStartStr + 'T00:00:00').getTime();
+  }, [currentWeekStartStr]);
+
+  // Progress bar data: how many employees submitted this week
+  const submissionProgress = useMemo(() => {
+    if (canViewAll || !canApprove || !user) return null;
+    const myDept = user.department;
+    const deptEmployees = users.filter(u => u.department === myDept && u.id !== user.id && !managerRoleNames.has(u.role) && u.role !== 'Admin');
+    const submittedIds = new Set(
+      reports.filter(r => r.department === myDept && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr).map(r => r.authorId)
+    );
+    return { total: deptEmployees.length, submitted: deptEmployees.filter(u => submittedIds.has(u.id)).length };
+  }, [canViewAll, canApprove, user, users, reports, currentWeekStartStr, managerRoleNames]);
+
+  // Countdown to Sunday 23:59 (deadline)
+  const deadlineCountdown = useMemo(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const daysUntilSun = day === 0 ? 0 : 7 - day;
+    const sun = new Date(now);
+    sun.setDate(now.getDate() + daysUntilSun);
+    sun.setHours(23, 59, 59, 999);
+    const diff = sun.getTime() - now.getTime();
+    if (diff <= 0) return null;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    return { days, hours, urgent: days === 0 };
   }, []);
 
   const unsubmittedEmployees = useMemo(() => {
@@ -272,13 +363,39 @@ export default function ReportsPage() {
     return activeDepts.filter(d => !submittedDepts.has(d));
   }, [canViewAll, departments, reports, currentWeekStart]);
 
+  // ── Logic: Chỉ báo cáo vào T6, T7, CN và mỗi tuần 1 lần ──
+  const isReportDay = [0, 5, 6].includes(new Date().getDay());
+
+
+
+  const hasReportedThisWeek = useMemo(() => {
+    return myReports.some(r => {
+      try {
+        const c = JSON.parse(r.content);
+        return c.weekStart === currentWeekStartStr;
+      } catch {
+        return false;
+      }
+    });
+  }, [myReports, currentWeekStartStr]);
+
+  const canCreateNewReport = isReportDay && !hasReportedThisWeek;
+
   return (
     <div className="space-y-5">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Quản lý Báo cáo</h2>
-          <p className="text-gray-500 text-sm mt-0.5">Gửi, theo dõi và xuất báo cáo công việc hàng tuần</p>
+          <div className="flex items-center gap-3 mt-0.5">
+            <p className="text-gray-500 text-sm">Gửi, theo dõi và xuất báo cáo công việc hàng tuần</p>
+            {!canViewAll && deadlineCountdown && (
+              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${deadlineCountdown.urgent ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-amber-50 text-amber-700'}`}>
+                <Timer size={12}/>
+                {deadlineCountdown.urgent ? `Còn ${deadlineCountdown.hours}h` : `Còn ${deadlineCountdown.days} ngày ${deadlineCountdown.hours}h`} để nộp
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={() => setShowAnalytics(!showAnalytics)} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors shadow-sm border ${showAnalytics ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
@@ -291,31 +408,66 @@ export default function ReportsPage() {
             <Download size={16}/> Xuất Excel
           </button>
           {(canCreate || canApprove) && !canViewAll && (
-            <button onClick={handleOpenCreate} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-sm">
-              <PlusCircle size={16}/>
-              {canApprove ? 'Tạo báo cáo tổng hợp phòng' : 'Tạo báo cáo tuần này'}
-            </button>
+            <div className="relative group">
+              <button 
+                onClick={handleOpenCreate} 
+                disabled={!canCreateNewReport}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm ${canCreateNewReport ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed opacity-80'}`}
+              >
+                <PlusCircle size={16}/>
+                {canApprove ? 'Tạo báo cáo tổng hợp phòng' : 'Tạo báo cáo tuần này'}
+              </button>
+              {!canCreateNewReport && (
+                <div className="absolute top-full mt-2 right-0 w-64 p-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg text-center">
+                  {!isReportDay ? 'Hệ thống chỉ mở tính năng báo cáo vào Thứ 6, Thứ 7 và Chủ nhật.' : 'Bạn đã có báo cáo trong tuần này rồi.'}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
 
       {/* STATS CARDS (non-director) */}
       {!canViewAll && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Tổng báo cáo', value: myStats.total,    bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100',   icon: <FileText size={22}/> },
-            { label: 'Chờ duyệt',    value: myStats.pending,  bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', icon: <Clock size={22}/> },
-            { label: 'Đã duyệt',     value: myStats.approved, bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100',  icon: <CheckCircle size={22}/> },
-            { label: 'Từ chối',      value: myStats.rejected, bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-100',    icon: <XCircle size={22}/> },
-          ].map(s => (
-            <div key={s.label} className={`rounded-2xl border ${s.bg} ${s.border} p-4 flex items-center gap-3`}>
-              <div className={`${s.text} opacity-80`}>{s.icon}</div>
-              <div>
-                <p className={`text-2xl font-bold ${s.text}`}>{s.value}</p>
-                <p className="text-xs font-medium text-gray-500 mt-0.5">{s.label}</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Tổng báo cáo', value: myStats.total,    bg: 'bg-blue-50',   text: 'text-blue-600',   border: 'border-blue-100',   icon: <FileText size={22}/> },
+              { label: 'Chờ duyệt',    value: myStats.pending,  bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', icon: <Clock size={22}/> },
+              { label: 'Đã duyệt',     value: myStats.approved, bg: 'bg-green-50',  text: 'text-green-600',  border: 'border-green-100',  icon: <CheckCircle size={22}/> },
+              { label: 'Từ chối',      value: myStats.rejected, bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-100',    icon: <XCircle size={22}/> },
+            ].map(s => (
+              <div key={s.label} className={`rounded-2xl border ${s.bg} ${s.border} p-4 flex items-center gap-3`}>
+                <div className={`${s.text} opacity-80`}>{s.icon}</div>
+                <div>
+                  <p className={`text-2xl font-bold ${s.text}`}>{s.value}</p>
+                  <p className="text-xs font-medium text-gray-500 mt-0.5">{s.label}</p>
+                </div>
               </div>
+            ))}
+          </div>
+          {/* PROGRESS BAR for manager */}
+          {canApprove && submissionProgress && submissionProgress.total > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <Users size={16} className="text-blue-500"/> Tiến trình nộp báo cáo tuần này
+                </span>
+                <span className={`text-sm font-bold ${submissionProgress.submitted === submissionProgress.total ? 'text-green-600' : 'text-amber-600'}`}>
+                  {submissionProgress.submitted}/{submissionProgress.total} nhân viên
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ease-out ${submissionProgress.submitted === submissionProgress.total ? 'bg-gradient-to-r from-green-400 to-green-500' : 'bg-gradient-to-r from-blue-400 to-blue-500'}`}
+                  style={{ width: `${Math.round((submissionProgress.submitted / submissionProgress.total) * 100)}%` }}
+                />
+              </div>
+              {submissionProgress.submitted === submissionProgress.total && (
+                <p className="text-xs text-green-600 font-medium mt-1.5 flex items-center gap-1"><CheckCircle size={12}/> Tất cả nhân viên đã nộp báo cáo!</p>
+              )}
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -418,13 +570,22 @@ export default function ReportsPage() {
           </button>
         )}
         {!canViewAll && canApprove && (
-          <button
-            className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='pending'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
-            onClick={() => setActiveTab('pending')}
-          >
-            <Clock size={15}/> Cần duyệt
-            {pendingList.length > 0 && <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingList.length}</span>}
-          </button>
+          <>
+            <button
+              className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='pending'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('pending')}
+            >
+              <Clock size={15}/> Cần duyệt
+              {pendingList.length > 0 && <span className="bg-red-500 text-white text-[11px] px-1.5 py-0.5 rounded-full animate-pulse">{pendingList.length}</span>}
+            </button>
+            <button
+              className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='dept_approved'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('dept_approved')}
+            >
+              <CheckCircle size={15}/> Đã duyệt
+              {deptApprovedReports.length > 0 && <span className="bg-green-100 text-green-700 text-[11px] px-1.5 py-0.5 rounded-full">{deptApprovedReports.length}</span>}
+            </button>
+          </>
         )}
         {canViewAll && (
           <>
@@ -441,10 +602,32 @@ export default function ReportsPage() {
             </button>
           </>
         )}
+        <button
+          className={`py-3 px-5 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${activeTab==='history'?'border-blue-600 text-blue-600':'border-transparent text-gray-500 hover:text-gray-700'}`}
+          onClick={() => setActiveTab('history')}
+        >
+          <History size={15}/> Lịch sử
+        </button>
       </div>
 
+      {/* HISTORY SEARCH */}
+      {activeTab === 'history' && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm trong lịch sử..."
+              value={historySearch}
+              onChange={(e) => { setHistorySearch(e.target.value); setHistoryWeeksShown(4); }}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-gray-50/50 hover:bg-white focus:bg-white"
+            />
+          </div>
+        </div>
+      )}
+
       {/* FILTERS & SEARCH */}
-      {activeTab !== 'weekly_summary' && (
+      {activeTab !== 'weekly_summary' && activeTab !== 'history' && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -488,6 +671,140 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {/* HISTORY TAB */}
+      {activeTab === 'history' && (() => {
+        const hq = historySearch.toLowerCase();
+        const filteredHistory = hq
+          ? historyReports.filter(r => r.title.toLowerCase().includes(hq) || (getUserDetails(r.authorId)?.name || '').toLowerCase().includes(hq) || r.department.toLowerCase().includes(hq))
+          : historyReports;
+
+        // Group by week
+        const weekGroups = Object.entries(
+          filteredHistory.reduce((acc, r) => {
+            const week = getReportWeekInfo(r).label;
+            if (!acc[week]) acc[week] = [];
+            acc[week].push(r);
+            return acc;
+          }, {} as Record<string, Report[]>)
+        ).sort((a, b) => b[0].localeCompare(a[0]));
+
+        const totalWeeks = weekGroups.length;
+        const visibleWeeks = weekGroups.slice(0, historyWeeksShown);
+        const hasMore = historyWeeksShown < totalWeeks;
+
+        // Week comparison data (all weeks, max 8 for chart)
+        const comparisonData = weekGroups.slice(0, 8).reverse().map(([week, rpts]) => {
+          const shortLabel = week.replace('Tuần ', '').split(' – ')[0];
+          const done = rpts.filter(r => r.status === 'Approved').length;
+          const pending = rpts.filter(r => r.status === 'Pending').length;
+          return { week: shortLabel, total: rpts.length, done, pending };
+        });
+        const maxTotal = Math.max(...comparisonData.map(d => d.total), 1);
+
+        return (
+        <div className="space-y-6">
+          {/* WEEK COMPARISON CHART */}
+          {comparisonData.length >= 2 && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                <BarChart size={16} className="text-blue-500"/> So sánh theo tuần
+              </h3>
+              <div className="flex items-end gap-2 h-28">
+                {comparisonData.map((d, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
+                    <div className="relative w-full flex flex-col items-center" style={{ height: '80px' }}>
+                      {/* Bar */}
+                      <div className="w-full max-w-[40px] rounded-t-lg overflow-hidden flex flex-col justify-end absolute bottom-0" style={{ height: `${Math.max((d.total / maxTotal) * 100, 8)}%` }}>
+                        <div className="bg-green-400 transition-all duration-500" style={{ height: d.total > 0 ? `${(d.done / d.total) * 100}%` : '0%' }}/>
+                        <div className="bg-amber-400 transition-all duration-500" style={{ height: d.total > 0 ? `${(d.pending / d.total) * 100}%` : '0%' }}/>
+                        <div className="bg-gray-200 flex-1"/>
+                      </div>
+                      {/* Tooltip */}
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                        {d.total} báo cáo ({d.done} duyệt)
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-medium truncate w-full text-center">{d.week}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-center gap-4 mt-3 text-[11px] text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-400"/>Đã duyệt</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400"/>Chờ duyệt</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-gray-200"/>Khác</span>
+              </div>
+            </div>
+          )}
+
+          {/* WEEK GROUPS */}
+          {visibleWeeks.map(([week, rpts]) => (
+            <div key={week} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-bold text-gray-700 flex items-center gap-2"><CalendarDays size={16}/>{week}</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{rpts.filter(r=>r.status==='Approved').length} duyệt</span>
+                  <span className="text-xs font-medium text-gray-500 bg-white px-2.5 py-1 rounded-full border border-gray-200">{rpts.length} báo cáo</span>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {rpts.map(report => {
+                  const author=getUserDetails(report.authorId);
+                  let approver=report.approvedBy?getUserDetails(report.approvedBy):null;
+                  if(!approver&&report.status==='Pending'){const dept=departments.find(d=>d.name===report.department);if(dept?.managerId)approver=getUserDetails(dept.managerId);}
+                  const lColor=report.status==='Approved'?'border-l-green-400':report.status==='Pending'?'border-l-yellow-400':report.status==='Rejected'?'border-l-red-400':'border-l-gray-200';
+                  const iColor=report.status==='Approved'?'bg-green-100 text-green-600':report.status==='Pending'?'bg-yellow-100 text-yellow-600':report.status==='Rejected'?'bg-red-100 text-red-500':'bg-gray-100 text-gray-400';
+                  const d=new Date(report.approvedAt||report.submittedAt||report.createdAt);
+                  return (
+                    <div key={report.id} onClick={()=>handleOpenView(report)}
+                      className={`px-5 py-4 grid grid-cols-12 gap-3 items-center hover:bg-blue-50/40 transition-colors cursor-pointer group border-l-4 ${lColor}`}>
+                      <div className="col-span-6 md:col-span-5 flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${iColor}`}><FileText size={18}/></div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800 truncate text-sm group-hover:text-blue-600 transition-colors">{report.title}</p>
+                          {(canViewAll||canApprove)&&author&&(
+                            <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                              <Avatar src={author.avatar} alt={author.name} size={4}/>{author.name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="col-span-3 hidden md:flex items-center justify-center">
+                        {approver?(<div className="flex items-center gap-2"><Avatar src={approver.avatar} alt={approver.name} size={6}/><span className="truncate max-w-[90px] text-xs text-gray-600">{approver.name}</span></div>):<span className="text-gray-300">—</span>}
+                      </div>
+                      <div className="col-span-2 flex justify-center">{renderStatusBadge(report.status)}</div>
+                      <div className="col-span-6 md:col-span-2 flex items-center justify-end gap-2">
+                        <div className="text-right">
+                          <p className="text-xs font-medium text-gray-700">{d.toLocaleDateString('vi-VN')}</p>
+                          <p className="text-[11px] text-gray-400">{d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* LOAD MORE */}
+          {hasMore && (
+            <div className="text-center">
+              <button onClick={() => setHistoryWeeksShown(prev => prev + 4)}
+                className="px-6 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors border border-blue-200 shadow-sm">
+                Xem thêm ({totalWeeks - historyWeeksShown} tuần còn lại)
+              </button>
+            </div>
+          )}
+
+          {filteredHistory.length === 0 && (
+            <div className="py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-200">
+              <History size={44} className="mx-auto mb-3 opacity-20"/>
+              <p className="font-medium">{hq ? 'Không tìm thấy kết quả' : 'Chưa có lịch sử báo cáo'}</p>
+            </div>
+          )}
+        </div>
+        );
+      })()}
+
       {/* WEEKLY SUMMARY */}
       {activeTab==='weekly_summary'&&canViewAll?(
         <div className="space-y-5">
@@ -529,7 +846,7 @@ export default function ReportsPage() {
             </div>
           )}
         </div>
-      ):(
+      ) : activeTab !== 'history' && (
         /* REPORT LIST */
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-gray-50 px-5 py-3 border-b border-gray-100 grid grid-cols-12 gap-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -575,7 +892,7 @@ export default function ReportsPage() {
                       <p className="text-xs font-medium text-gray-700">{d.toLocaleDateString('vi-VN')}</p>
                       <p className="text-[11px] text-gray-400">{d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}</p>
                     </div>
-                    {report.authorId===user.id&&(
+                    {report.authorId===user.id&&['Draft','Rejected'].includes(report.status)&&(
                       <button onClick={e=>{e.stopPropagation();setDeleteConfirmId(report.id);}} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0">
                         <Trash2 size={14}/>
                       </button>
@@ -593,6 +910,29 @@ export default function ReportsPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={async (r) => {
           await saveReport(r);
+          
+          if (!selectedReport) {
+            showToast({ type: 'success', title: 'Thêm báo cáo thành công' });
+            if (user) {
+              pushLocalNotification({
+                userId: user.id,
+                type: 'report_created',
+                title: '✅ Thêm báo cáo thành công',
+                message: `Báo cáo "${r.title}" đã được tạo.`
+              });
+            }
+          } else {
+            showToast({ type: 'success', title: 'Cập nhật báo cáo thành công' });
+            if (user) {
+              pushLocalNotification({
+                userId: user.id,
+                type: 'report_updated',
+                title: '🔄 Cập nhật báo cáo thành công',
+                message: `Báo cáo "${r.title}" đã được cập nhật.`
+              });
+            }
+          }
+
           // If manager just approved an employee's report: auto-create/update consolidated dept report
           if (
             r.status === 'Approved' &&
@@ -603,11 +943,38 @@ export default function ReportsPage() {
           ) {
             await autoConsolidateForManager(r);
           }
+
           // Refresh notifications so badge updates immediately
           setTimeout(refreshNotifications, 800);
         }}
-        onDelete={(id) => { deleteReport(id); setIsModalOpen(false); }}
-        onAdminHardDelete={(id) => { adminHardDeleteReport(id); setIsModalOpen(false); }}
+        onDelete={(id) => { 
+          const rpt = reports.find(r => r.id === id);
+          deleteReport(id); 
+          setIsModalOpen(false); 
+          if (rpt && user) {
+            showToast({ type: 'success', title: 'Đã xóa báo cáo thành công' });
+            pushLocalNotification({
+              userId: user.id,
+              type: 'report_deleted',
+              title: '🗑️ Báo cáo đã bị xóa',
+              message: `Báo cáo "${rpt.title}" đã được xóa khỏi hệ thống.`
+            });
+          }
+        }}
+        onAdminHardDelete={(id) => { 
+          const rpt = reports.find(r => r.id === id);
+          adminHardDeleteReport(id); 
+          setIsModalOpen(false); 
+          if (rpt && user) {
+            showToast({ type: 'success', title: 'Đã xóa vĩnh viễn báo cáo' });
+            pushLocalNotification({
+              userId: user.id,
+              type: 'report_deleted',
+              title: '🗑️ Xóa vĩnh viễn báo cáo',
+              message: `Báo cáo "${rpt.title}" đã bị xóa vĩnh viễn bởi Admin.`
+            });
+          }
+        }}
         initialReport={selectedReport}
         currentUser={user}
         tasks={tasks}
@@ -626,8 +993,18 @@ export default function ReportsPage() {
         type="danger"
         onConfirm={() => {
           if (deleteConfirmId) {
+            const rpt = reports.find(r => r.id === deleteConfirmId);
             deleteReport(deleteConfirmId);
             setDeleteConfirmId(null);
+            if (rpt && user) {
+              showToast({ type: 'success', title: 'Đã xóa báo cáo thành công' });
+              pushLocalNotification({
+                userId: user.id,
+                type: 'report_deleted',
+                title: '🗑️ Báo cáo đã bị xóa',
+                message: `Báo cáo "${rpt.title}" đã được xóa khỏi hệ thống.`
+              });
+            }
           }
         }}
         onCancel={() => setDeleteConfirmId(null)}
