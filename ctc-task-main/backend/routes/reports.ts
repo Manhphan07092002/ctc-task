@@ -60,15 +60,23 @@ export function reportRoutes(_prisma: any, db: any) {
     } catch (e) { res.status(500).json({ error: 'Failed to update report' }); }
   });
 
-  // Soft delete – only allow deleting Draft or Rejected reports
+  // Soft delete – only allow deleting Draft or Rejected reports, unless user is Admin or Giám đốc
   router.delete('/:id', async (req, res) => {
     try {
       const report = await db.get('SELECT status FROM reports WHERE id = ?', [req.params.id]);
       if (!report) return res.status(404).json({ error: 'Report not found' });
-      if (report.status === 'Approved' || report.status === 'Pending') {
+      
+      const isSuperUser = req.user?.role === 'Admin' || req.user?.role === 'Giám đốc';
+      
+      if (!isSuperUser && (report.status === 'Approved' || report.status === 'Pending')) {
         return res.status(403).json({ error: 'Cannot delete an approved or pending report' });
       }
-      await db.run('UPDATE reports SET isDeleted = 1 WHERE id = ?', [req.params.id]);
+      
+      if (isSuperUser) {
+        await db.run('DELETE FROM reports WHERE id = ?', [req.params.id]);
+      } else {
+        await db.run('UPDATE reports SET isDeleted = 1 WHERE id = ?', [req.params.id]);
+      }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete report' }); }
   });

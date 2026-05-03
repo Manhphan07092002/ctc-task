@@ -29,7 +29,7 @@ export const deleteReport = async (id: string): Promise<void> => {
 
 // Admin only: permanently remove a report from DB
 export const adminHardDeleteReport = async (id: string): Promise<void> => {
-  const response = await apiFetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
+  const response = await apiFetch(`/api/reports/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to hard-delete report');
 };
 

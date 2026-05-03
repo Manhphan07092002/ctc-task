@@ -31,7 +31,7 @@ export const getRevenueReports = async (): Promise<RevenueReport[]> => {
 };
 
 export const saveRevenueReport = async (report: RevenueReport & { _isNew?: boolean }): Promise<void> => {
-  const isNew = report._isNew !== false && !report.submittedAt && !report.approvedAt;
+  const isNew = report._isNew !== undefined ? report._isNew : (!report.submittedAt && !report.approvedAt);
   const res = await apiFetch(isNew ? API_URL : `${API_URL}/${report.id}`, {
     method: isNew ? 'POST' : 'PUT',
     body: JSON.stringify(report),

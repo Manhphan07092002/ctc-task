@@ -41,7 +41,7 @@ const NAV_GROUPS = [
   {
     label: 'Kinh doanh',
     items: [
-      { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_dept_reports', 'view_all_reports', 'director_feedback'] },
+      { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_revenue_reports', 'view_all_reports', 'director_feedback'] },
     ],
   },
   {

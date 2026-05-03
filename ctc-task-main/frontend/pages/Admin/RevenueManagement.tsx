@@ -1,22 +1,26 @@
 import { apiFetch } from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  FileText, Search, RefreshCw, AlertCircle, CheckCircle, Clock,
+  DollarSign, Search, RefreshCw, AlertCircle, CheckCircle, Clock,
   XCircle, FileEdit, Trash2, ChevronDown, Filter, Eye,
-  ThumbsUp, ThumbsDown, MessageSquare, Building2, X, Save
+  ThumbsUp, ThumbsDown, MessageSquare, Building2, X, ShieldCheck
 } from 'lucide-react';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { Report, User } from '../../types';
+import { User } from '../../types';
+import { RevenueReport } from '../../services/revenueService';
+
+const fmtMoney = (v: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v);
 
 const STATUS_META: Record<string, { cls: string; label: string; icon: React.ReactNode }> = {
   Draft: { cls: 'bg-gray-100 text-gray-600 border-gray-200', label: 'Nháp', icon: <FileEdit size={11} /> },
-  Pending: { cls: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Chờ duyệt', icon: <Clock size={11} /> },
+  'Pending Manager': { cls: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Chờ TP duyệt', icon: <Clock size={11} /> },
+  'Pending Director': { cls: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Chờ GĐ duyệt', icon: <Clock size={11} /> },
   Approved: { cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Đã duyệt', icon: <CheckCircle size={11} /> },
   Rejected: { cls: 'bg-red-100 text-red-600 border-red-200', label: 'Từ chối', icon: <XCircle size={11} /> },
 };
 
 const RejectModal: React.FC<{
-  report: Report; onClose: () => void; onConfirm: (reason: string) => Promise<void>;
+  report: RevenueReport; onClose: () => void; onConfirm: (reason: string) => Promise<void>;
 }> = ({ report, onClose, onConfirm }) => {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,8 +54,9 @@ const RejectModal: React.FC<{
   );
 };
 
-export default function AdminReportManagement() {
-  const [reports, setReports] = useState<Report[]>([]);
+export default function AdminRevenueManagement() {
+  const navigate = useNavigate();
+  const [reports, setReports] = useState<RevenueReport[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +64,8 @@ export default function AdminReportManagement() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [detailReport, setDetailReport] = useState<Report | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<Report | null>(null);
+  const [detailReport, setDetailReport] = useState<RevenueReport | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<RevenueReport | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -70,8 +75,8 @@ export default function AdminReportManagement() {
   const fetchAll = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const [rr, ur] = await Promise.all([apiFetch('/api/reports'), apiFetch('/api/users')]);
-      const list: Report[] = await rr.json();
+      const [rr, ur] = await Promise.all([apiFetch('/api/revenue-reports'), apiFetch('/api/users')]);
+      const list: RevenueReport[] = await rr.json();
       setReports(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
       setUsers(await ur.json());
     } catch { setError('Không thể tải dữ liệu'); }
@@ -80,25 +85,29 @@ export default function AdminReportManagement() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const patchReport = async (r: Report, patch: Partial<Report>) => {
+  const patchReport = async (r: RevenueReport, patch: Partial<RevenueReport>) => {
     const updated = { ...r, ...patch };
-    const res = await apiFetch(`/api/reports/${r.id}`, {
+    const res = await apiFetch(`/api/revenue-reports/${r.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated),
     });
     if (!res.ok) throw new Error('Lỗi cập nhật');
-    return updated as Report;
+    return updated as RevenueReport;
   };
 
-  const handleApprove = async (r: Report) => {
+  const handleApprove = async (r: RevenueReport) => {
     try {
-      const updated = await patchReport(r, { status: 'Approved', approvedAt: new Date().toISOString() });
-      showToast('Đã phê duyệt báo cáo!');
+      const nextStatus = r.status === 'Pending Manager' ? 'Pending Director' : 'Approved';
+      const payload: any = { status: nextStatus };
+      if (nextStatus === 'Approved') payload.approvedAt = new Date().toISOString();
+      
+      const updated = await patchReport(r, payload);
+      showToast(nextStatus === 'Approved' ? 'Đã phê duyệt báo cáo doanh thu!' : 'Đã duyệt và chuyển cho Giám đốc!');
       await fetchAll();
       if (detailReport?.id === r.id) setDetailReport(updated);
     } catch { showToast('Lỗi phê duyệt', 'error'); }
   };
 
-  const handleReject = async (r: Report, reason: string) => {
+  const handleReject = async (r: RevenueReport, reason: string) => {
     try {
       const updated = await patchReport(r, { status: 'Rejected', directorFeedback: reason });
       showToast('Đã từ chối báo cáo');
@@ -108,20 +117,20 @@ export default function AdminReportManagement() {
     } catch { showToast('Lỗi xử lý', 'error'); }
   };
 
-  const handleSetPending = async (r: Report) => {
+  const handleSetPending = async (r: RevenueReport) => {
     try {
-      const updated = await patchReport(r, { status: 'Pending' });
+      const updated = await patchReport(r, { status: 'Pending Director' });
       showToast('Đã chuyển về Chờ duyệt');
       await fetchAll();
       if (detailReport?.id === r.id) setDetailReport(updated);
     } catch { showToast('Lỗi', 'error'); }
   };
 
-  const handleDelete = async (r: Report) => {
-    if (!confirm(`Xóa báo cáo "${r.title}"?`)) return;
+  const handleDelete = async (r: RevenueReport) => {
+    if (!confirm(`Xóa báo cáo doanh thu "${r.title}"?`)) return;
     setDeletingId(r.id);
     try {
-      await apiFetch(`/api/reports/${r.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/revenue-reports/${r.id}`, { method: 'DELETE' });
       showToast(`Đã xóa: ${r.title}`);
       if (detailReport?.id === r.id) setDetailReport(null);
       await fetchAll();
@@ -153,27 +162,32 @@ export default function AdminReportManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl shadow-lg shadow-orange-200">
-            <FileText size={22} className="text-white" />
+          <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg shadow-green-200">
+            <DollarSign size={22} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-gray-900">Quản lý Báo cáo</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Tổng cộng <strong className="text-gray-700">{reports.length}</strong> báo cáo</p>
+            <h1 className="text-2xl font-black text-gray-900">Quản lý Doanh thu</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Tổng cộng <strong className="text-gray-700">{reports.length}</strong> báo cáo doanh thu</p>
           </div>
         </div>
-        <button onClick={fetchAll} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 shadow-sm"><RefreshCw size={16} /></button>
+        <div className="flex items-center gap-2">
+           <button onClick={() => navigate('/admin/organization?tab=roles')} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 font-semibold text-sm flex items-center gap-2 transition-colors">
+              <ShieldCheck size={16} /> Phân quyền
+           </button>
+           <button onClick={fetchAll} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 shadow-sm"><RefreshCw size={16} /></button>
+        </div>
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {Object.entries(STATUS_META).map(([status, s]) => (
           <button key={status} onClick={() => setFilterStatus(filterStatus === status ? '' : status)}
-            className={`rounded-xl p-4 flex items-center gap-3 border transition-all cursor-pointer
+            className={`rounded-xl p-3 flex items-center gap-3 border transition-all cursor-pointer
               ${filterStatus === status ? s.cls + ' ring-2 ring-offset-1 ring-current shadow-md' : s.cls + ' hover:opacity-80'}`}>
-            <span>{s.icon}</span>
-            <div className="text-left">
-              <p className="text-2xl font-black leading-none">{statusCounts[status] || 0}</p>
-              <p className="text-xs opacity-70 mt-0.5">{s.label}</p>
+            <span className="flex-shrink-0">{s.icon}</span>
+            <div className="text-left min-w-0">
+              <p className="text-xl font-black leading-none">{statusCounts[status] || 0}</p>
+              <p className="text-[10px] opacity-70 mt-0.5 truncate">{s.label}</p>
             </div>
           </button>
         ))}
@@ -185,12 +199,12 @@ export default function AdminReportManagement() {
           <Search className="absolute left-3.5 top-3 text-gray-400" size={15} />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Tìm theo tiêu đề, phòng ban..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-orange-200 outline-none text-sm shadow-sm" />
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-200 outline-none text-sm shadow-sm" />
         </div>
         <div className="relative">
           <Filter className="absolute left-3 top-3 text-gray-400 pointer-events-none" size={14} />
           <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-            className="pl-9 pr-8 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-orange-200 outline-none shadow-sm appearance-none">
+            className="pl-9 pr-8 py-2.5 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-emerald-200 outline-none shadow-sm appearance-none">
             <option value="">Tất cả phòng ban</option>
             {departments.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
@@ -198,7 +212,7 @@ export default function AdminReportManagement() {
         </div>
         {(filterStatus || filterDept || search) && (
           <button onClick={() => { setSearch(''); setFilterStatus(''); setFilterDept(''); }}
-            className="px-3 py-2.5 text-xs text-orange-600 border border-orange-200 rounded-xl hover:bg-orange-50">Xóa bộ lọc</button>
+            className="px-3 py-2.5 text-xs text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50">Xóa bộ lọc</button>
         )}
       </div>
 
@@ -207,7 +221,7 @@ export default function AdminReportManagement() {
         <div className={`bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden ${detailReport ? 'xl:flex-1' : 'flex-1'}`}>
           {loading ? (
             <div className="flex flex-col items-center py-24 gap-3">
-              <div className="w-10 h-10 border-4 border-orange-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin" />
               <p className="text-gray-400 text-sm">Đang tải...</p>
             </div>
           ) : error ? (
@@ -216,8 +230,8 @@ export default function AdminReportManagement() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-24 text-center text-gray-400">
-              <FileText size={40} className="mx-auto mb-3 opacity-30" strokeWidth={1.5} />
-              <p>Không có báo cáo nào</p>
+              <DollarSign size={40} className="mx-auto mb-3 opacity-30" strokeWidth={1.5} />
+              <p>Không có báo cáo doanh thu nào</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -225,25 +239,25 @@ export default function AdminReportManagement() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left py-3 px-5 text-xs font-bold text-gray-500 uppercase tracking-wider">Báo cáo</th>
-                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tác giả</th>
+                    <th className="text-right py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Lũy kế</th>
                     <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Ngày tạo</th>
+                    <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Người gửi</th>
                     <th className="text-right py-3 px-5 text-xs font-bold text-gray-500 uppercase tracking-wider">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map(r => {
                     const author = getUser(r.authorId);
-                    const s = STATUS_META[r.status];
+                    const s = STATUS_META[r.status] || { cls: 'bg-gray-100', label: r.status };
                     const isActive = detailReport?.id === r.id;
                     return (
                       <tr key={r.id}
-                        className={`transition-colors cursor-pointer group ${isActive ? 'bg-orange-50' : 'hover:bg-gray-50/70'}`}
+                        className={`transition-colors cursor-pointer group ${isActive ? 'bg-emerald-50' : 'hover:bg-gray-50/70'}`}
                         onClick={() => setDetailReport(isActive ? null : r)}>
                         <td className="py-3.5 px-5">
                           <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
-                              <FileText size={16} />
+                            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                              <DollarSign size={16} />
                             </div>
                             <div>
                               <p className="font-semibold text-gray-800 truncate max-w-[220px]">{r.title}</p>
@@ -251,31 +265,34 @@ export default function AdminReportManagement() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 hidden md:table-cell">
+                        <td className="py-3.5 px-4 hidden md:table-cell text-right">
+                          <span className="font-bold text-emerald-600">{fmtMoney(r.totalCumulative || 0)}</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${s.cls}`}>
+                            {s.icon} {s.label}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 hidden lg:table-cell">
                           {author && (
                             <div className="flex items-center gap-2">
                               {author.avatar ? (
                                 <img src={author.avatar} alt={author.name} className="w-6 h-6 rounded-full object-cover" />
                               ) : (
-                                <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-bold">
+                                <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold">
                                   {author.name?.charAt(0)}
                                 </div>
                               )}
-                              <span className="text-xs text-gray-600 truncate max-w-[100px]">{author.name}</span>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-700 font-medium truncate max-w-[100px]">{author.name}</span>
+                                <span className="text-[10px] text-gray-400">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</span>
+                              </div>
                             </div>
                           )}
                         </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${s?.cls}`}>
-                            {s?.icon} {s?.label}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 hidden lg:table-cell text-xs text-gray-500">
-                          {new Date(r.createdAt).toLocaleDateString('vi-VN')}
-                        </td>
                         <td className="py-3.5 px-5" onClick={e => e.stopPropagation()}>
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {r.status === 'Pending' && (<>
+                            {r.status.startsWith('Pending') && (<>
                               <button onClick={() => handleApprove(r)} title="Phê duyệt"
                                 className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg"><ThumbsUp size={13} /></button>
                               <button onClick={() => setRejectTarget(r)} title="Từ chối"
@@ -306,29 +323,49 @@ export default function AdminReportManagement() {
         {detailReport && (() => {
           const author = getUser(detailReport.authorId);
           const approver = getUser(detailReport.approvedBy);
-          const s = STATUS_META[detailReport.status];
+          const s = STATUS_META[detailReport.status] || { cls: 'bg-gray-100', label: detailReport.status };
+          
+          let rows: any[] = [];
+          try { rows = JSON.parse(detailReport.content || '[]'); } catch {}
+
           return (
             <div className="xl:w-96 bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-gray-800">Chi tiết báo cáo</h3>
+                <h3 className="font-bold text-gray-800">Chi tiết doanh thu</h3>
                 <button onClick={() => setDetailReport(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
               </div>
               <div className="h-px bg-gray-100" />
               <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Tiêu đề</p><p className="font-bold text-gray-800">{detailReport.title}</p></div>
               <div className="grid grid-cols-2 gap-3">
-                <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Phòng ban</p><p className="text-sm font-semibold">{detailReport.department}</p></div>
+                <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Kỳ báo cáo</p><p className="text-sm font-semibold">{detailReport.reportType === 'monthly' ? 'Tháng' : 'Tuần'}</p></div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Trạng thái</p>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${s?.cls}`}>{s?.icon} {s?.label}</span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${s.cls}`}>{s.icon} {s.label}</span>
                 </div>
               </div>
+
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 space-y-2">
+                 <div className="flex justify-between items-center">
+                    <span className="text-xs text-emerald-800">Tổng doanh thu kỳ:</span>
+                    <span className="font-bold text-emerald-700">{fmtMoney(detailReport.totalDelivered || 0)}</span>
+                 </div>
+                 <div className="flex justify-between items-center">
+                    <span className="text-xs text-emerald-800">Lũy kế:</span>
+                    <span className="font-bold text-emerald-700">{fmtMoney(detailReport.totalCumulative || 0)}</span>
+                 </div>
+                 <div className="flex justify-between items-center pt-2 border-t border-emerald-200/50">
+                    <span className="text-xs font-bold text-emerald-900">Tổng HĐ (sau VAT):</span>
+                    <span className="font-black text-emerald-700">{fmtMoney((detailReport.totalPreTax || 0) * 1.1)}</span>
+                 </div>
+              </div>
+
               {author && (
-                <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Tác giả</p>
+                <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Người lập</p>
                   <div className="flex items-center gap-2">
                     {author.avatar ? (
                       <img src={author.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
                     ) : (
-                      <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
+                      <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">
                         {author.name?.charAt(0)}
                       </div>
                     )}
@@ -336,35 +373,37 @@ export default function AdminReportManagement() {
                   </div>
                 </div>
               )}
-              {approver && (
-                <div><p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Người duyệt</p>
-                  <div className="flex items-center gap-2">
-                    {approver.avatar ? (
-                      <img src={approver.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold">
-                        {approver.name?.charAt(0)}
-                      </div>
-                    )}
-                    <span className="text-sm font-semibold text-gray-700">{approver.name}</span>
-                  </div>
-                </div>
-              )}
+              
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Nội dung</p>
-                <div className="bg-gray-50 rounded-xl px-4 py-3 text-sm text-gray-700 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
-                  {detailReport.content || 'Không có nội dung.'}
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Chi tiết Hợp đồng ({rows.length})</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                  {rows.map((r, i) => (
+                    <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg p-2 text-xs">
+                      <div className="font-bold text-gray-700">{r.contractNumber}</div>
+                      <div className="text-gray-500 truncate">{r.contractName}</div>
+                      <div className="mt-1 text-emerald-600 font-semibold text-right">Doanh thu kỳ: {fmtMoney(r.deliveredMonth)}</div>
+                    </div>
+                  ))}
+                  {rows.length === 0 && <p className="text-xs text-gray-400">Không có dữ liệu hợp đồng.</p>}
                 </div>
               </div>
+
+              {detailReport.managerFeedback && (
+                 <div>
+                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1"><MessageSquare size={10} /> Phản hồi Trưởng phòng</p>
+                   <div className="bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-800 leading-relaxed whitespace-pre-wrap">{detailReport.managerFeedback}</div>
+                 </div>
+              )}
               {detailReport.directorFeedback && (
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1"><MessageSquare size={10} /> Phản hồi</p>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1"><MessageSquare size={10} /> Phản hồi Giám đốc</p>
                   <div className="bg-red-50 rounded-xl px-4 py-3 text-sm text-red-700 leading-relaxed whitespace-pre-wrap">{detailReport.directorFeedback}</div>
                 </div>
               )}
+
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-2 border-t border-gray-100">
-                {detailReport.status === 'Pending' && (<>
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                {detailReport.status.startsWith('Pending') && (<>
                   <button onClick={() => handleApprove(detailReport)}
                     className="flex-1 py-2 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-600 transition-colors">
                     <ThumbsUp size={13} />Phê duyệt
@@ -376,7 +415,7 @@ export default function AdminReportManagement() {
                 </>)}
                 {(detailReport.status === 'Approved' || detailReport.status === 'Rejected') && (
                   <button onClick={() => handleSetPending(detailReport)}
-                    className="flex-1 py-2 bg-yellow-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-yellow-600 transition-colors">
+                    className="flex-1 py-2 bg-yellow-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-yellow-600 transition-colors min-w-full">
                     <Clock size={13} />Đặt lại chờ duyệt
                   </button>
                 )}

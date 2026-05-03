@@ -232,6 +232,15 @@ export default function AdminContractManagement() {
     inProgress: contracts.filter(c => c.status === 'in_progress').length,
   };
 
+  const formatCompactVND = (val: number) => {
+    if (val >= 1_000_000_000) {
+      return (val / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ';
+    } else if (val >= 1_000_000) {
+      return (val / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' tr';
+    }
+    return new Intl.NumberFormat('vi-VN').format(val);
+  };
+
   return (
     <div className="space-y-6 pb-8">
       {toast && (
@@ -260,10 +269,10 @@ export default function AdminContractManagement() {
       {/* Mini Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Tổng số lượng', value: stats.total, color: 'bg-blue-50 text-blue-700', icon: FileSignature },
-          { label: 'Đang thực hiện', value: stats.inProgress, color: 'bg-indigo-50 text-indigo-700', icon: RefreshCw },
-          { label: 'Tổng giá trị (tr)', value: Math.round(stats.totalValue / 1000000), color: 'bg-emerald-50 text-emerald-700', icon: CheckCircle },
-          { label: 'Tổng công nợ (tr)', value: Math.round(stats.totalDebt / 1000000), color: 'bg-rose-50 text-rose-700', icon: Wallet },
+          { label: 'Tổng số lượng', value: stats.total.toString(), color: 'bg-blue-50 text-blue-700', icon: FileSignature },
+          { label: 'Đang thực hiện', value: stats.inProgress.toString(), color: 'bg-indigo-50 text-indigo-700', icon: RefreshCw },
+          { label: 'Tổng giá trị', value: formatCompactVND(stats.totalValue), color: 'bg-emerald-50 text-emerald-700', icon: CheckCircle },
+          { label: 'Tổng công nợ', value: formatCompactVND(stats.totalDebt), color: 'bg-rose-50 text-rose-700', icon: Wallet },
         ].map(s => (
           <div key={s.label} className={`${s.color} rounded-xl p-4 flex items-center gap-3`}>
             <s.icon size={20} /><div><p className="text-2xl font-black">{s.value}</p><p className="text-xs opacity-70">{s.label}</p></div>

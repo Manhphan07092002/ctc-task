@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { PlusCircle, Search, FileText, Trash2, X, Save, Send, CheckCircle, XCircle, DollarSign, CalendarDays, Clock, Download } from 'lucide-react';
+import { PlusCircle, Search, FileText, Trash2, X, Save, Send, CheckCircle, XCircle, DollarSign, CalendarDays, Clock, Download, Building2 } from 'lucide-react';
 import { RevenueReport } from '../../services/revenueService';
 import { Contract } from '../../services/contractService';
 
@@ -19,13 +20,21 @@ interface RevenueRow {
   deliveredCumulative: number;
   invoiceDate: string;
   invoiceNumber: string;
+  assignee?: string;
 }
 
 const RevenuePage: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const { contracts, revenueReports, users, departments, saveRevenueReport, deleteRevenueReport } = useData();
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (location.state && (location.state as any).action === 'create') {
+      setActiveTab('create');
+    }
+  }, [location.state]);
   const [editingReport, setEditingReport] = useState<RevenueReport | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewReport, setViewReport] = useState<RevenueReport | null>(null);
@@ -39,10 +48,10 @@ const RevenuePage: React.FC = () => {
   const [directorFeedback, setDirectorFeedback] = useState('');
 
   const perms = user?.permissions || [];
-  const canCreate = perms.includes('create_revenue_report');
-  const canApprove = perms.includes('approve_dept_reports');
-  const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback');
-  const isDirector = perms.includes('director_feedback');
+  const canCreate = perms.includes('create_revenue_report') || user?.role === 'Admin';
+  const canApprove = perms.includes('approve_revenue_reports') || user?.role === 'Admin';
+  const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || user?.role === 'Admin';
+  const isDirector = perms.includes('director_feedback') || user?.role === 'Admin';
   const userDept = user?.department || '';
 
   const visibleReports = useMemo(() => {
@@ -74,6 +83,7 @@ const RevenuePage: React.FC = () => {
       contractId: c.id, contractNumber: c.contractNumber, clientName: c.clientName,
       contractName: c.contractName, preTaxValue: c.preTaxValue, deliveredMonth: 0,
       deliveredCumulative: 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '',
+      assignee: getUserName(c.createdBy || '') || undefined,
     }]);
   };
 
@@ -110,7 +120,8 @@ const RevenuePage: React.FC = () => {
       report.approvedBy = user?.id;
       report.approvedAt = now;
     }
-    await saveRevenueReport(report);
+    const isNewReport = !editingReport;
+    await saveRevenueReport({ ...report, _isNew: isNewReport });
     setActiveTab('list');
     setEditingReport(null);
   };
@@ -136,9 +147,24 @@ const RevenuePage: React.FC = () => {
   const isAuthor = editingReport?.authorId === user?.id;
   const isManagerReview = canApprove && editingReport?.status === 'Pending Manager' && editingReport?.authorId !== user?.id;
   const isDirectorReview = isDirector && editingReport?.status === 'Pending Director';
-  const isReadOnly = editingReport && !isAuthor && !isManagerReview && !isDirectorReview;
+  const isReadOnly = editingReport && !(isAuthor && ['Draft', 'Rejected'].includes(editingReport.status)) && !isManagerReview && !isDirectorReview;
+
+const formatCompactVND = (val: number) => {
+  if (val >= 1_000_000_000) return (val / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + ' tỷ';
+  if (val >= 1_000_000) return (val / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' tr';
+  return new Intl.NumberFormat('vi-VN').format(val) + ' ₫';
+};
 
   const getUserName = (id: string) => users.find(u => u.id === id)?.name || id;
+
+  const getAssignees = (r: RevenueReport) => {
+    try {
+      const rows: any[] = JSON.parse(r.content || '[]');
+      return [...new Set(rows.map(row => row.assignee).filter(Boolean))] as string[];
+    } catch {
+      return [];
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -154,45 +180,134 @@ const RevenuePage: React.FC = () => {
           <p className="text-sm text-gray-500 mt-1">Theo dõi doanh thu theo tuần và tháng</p>
         </div>
         <div className="flex gap-2">
-          <Button variant={activeTab === 'list' ? 'primary' : 'secondary'} onClick={() => setActiveTab('list')} size="sm">Danh sách</Button>
-          {canCreate && <Button variant={activeTab === 'create' ? 'primary' : 'secondary'} onClick={openCreate} size="sm" className="gap-1"><PlusCircle size={14}/> Tạo mới</Button>}
+          {activeTab === 'create' && (
+             <Button variant="secondary" onClick={() => setActiveTab('list')} size="sm">← Danh sách</Button>
+          )}
         </div>
       </div>
 
       {/* LIST TAB */}
       {activeTab === 'list' && (
-        <div className="space-y-4">
-          <div className="relative max-w-md">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-            <input type="text" placeholder="Tìm kiếm báo cáo..." value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white shadow-sm"/>
+        <div className="space-y-6">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Tổng Doanh Thu</p>
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><DollarSign size={16}/></div>
+              </div>
+              <h3 className="text-2xl font-black text-gray-800">{formatCompactVND(visibleReports.reduce((s, r) => s + r.totalDelivered, 0))}</h3>
+              <p className="text-xs text-emerald-600 font-medium mt-1">Từ {visibleReports.length} báo cáo</p>
+            </div>
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Chờ Phê Duyệt</p>
+                <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><Clock size={16}/></div>
+              </div>
+              <h3 className="text-2xl font-black text-gray-800">{visibleReports.filter(r => r.status.startsWith('Pending')).length}</h3>
+              <p className="text-xs text-gray-400 mt-1">Báo cáo đang chờ</p>
+            </div>
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Đã Phê Duyệt</p>
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><CheckCircle size={16}/></div>
+              </div>
+              <h3 className="text-2xl font-black text-gray-800">{visibleReports.filter(r => r.status === 'Approved').length}</h3>
+              <p className="text-xs text-gray-400 mt-1">Báo cáo hoàn tất</p>
+            </div>
+            {canCreate && (
+              <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-3xl p-5 shadow-lg shadow-orange-200 text-white flex flex-col justify-center items-center cursor-pointer hover:shadow-orange-300 transition-all hover:-translate-y-1" onClick={openCreate}>
+                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-2"><PlusCircle size={20}/></div>
+                <span className="font-bold text-sm">Tạo báo cáo mới</span>
+              </div>
+            )}
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="divide-y divide-gray-100">
+          <div className="flex items-center justify-between">
+             <div className="relative w-full max-w-md">
+               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+               <input type="text" placeholder="Tìm kiếm báo cáo..." value={search} onChange={e => setSearch(e.target.value)}
+                 className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white shadow-sm"/>
+             </div>
+          </div>
+
+          {visibleReports.length === 0 ? (
+            <div className="py-24 text-center text-gray-400 bg-white rounded-3xl border border-gray-100 shadow-sm">
+              <DollarSign size={44} className="mx-auto mb-3 opacity-20"/>
+              <p className="font-medium">Chưa có báo cáo doanh thu nào</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {visibleReports.map(r => (
-                <div key={r.id} onClick={() => openEdit(r)} className="px-5 py-4 flex items-center gap-4 hover:bg-orange-50/30 cursor-pointer transition-colors group">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${r.status === 'Approved' ? 'bg-green-100 text-green-600' : r.status === 'Rejected' ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-600'}`}>
-                    <DollarSign size={18}/>
+                <div key={r.id} onClick={() => openEdit(r)} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-orange-100 hover:border-orange-200 transition-all cursor-pointer p-5 group flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-4">
+                     <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${r.status === 'Approved' ? 'bg-green-100 text-green-600' : r.status === 'Rejected' ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-600'}`}>
+                          <FileText size={18}/>
+                       </div>
+                       <div className="min-w-0">
+                         <p className="font-bold text-gray-800 text-sm group-hover:text-orange-600 transition-colors truncate">{r.title}</p>
+                         <p className="text-xs text-gray-400 flex items-center gap-2 mt-1">
+                           <span className="flex items-center gap-1"><CalendarDays size={10} /> {new Date(r.createdAt).toLocaleDateString('vi-VN')}</span>
+                           <span className="opacity-40">•</span>
+                           <span className="flex items-center gap-1"><Building2 size={10} /> {r.department || 'Chưa phân phòng'}</span>
+                         </p>
+                       </div>
+                     </div>
+                     <div className="flex-shrink-0">{statusBadge(r.status)}</div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 truncate text-sm group-hover:text-orange-600 transition-colors">{r.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{getUserName(r.authorId)} · {r.reportType === 'monthly' ? 'Tháng' : 'Tuần'} · {new Date(r.createdAt).toLocaleDateString('vi-VN')}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-emerald-700">{fmtMoney(r.totalDelivered)}</p>
-                    {statusBadge(r.status)}
+                  
+                  <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-end">
+                     <div>
+                       <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1 font-bold">Người TH</p>
+                       <div className="flex items-center gap-1.5">
+                         {(() => {
+                           const assignees = getAssignees(r);
+                           if (assignees.length === 0) {
+                             return (
+                               <>
+                                 {users.find(u => u.id === r.authorId)?.avatar ? (
+                                    <img src={users.find(u => u.id === r.authorId)!.avatar} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                 ) : (
+                                    <div className="w-6 h-6 rounded-full bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center text-[10px] font-bold">
+                                      {getUserName(r.authorId).charAt(0)}
+                                    </div>
+                                 )}
+                                 <span className="text-xs font-semibold text-gray-700">{getUserName(r.authorId)}</span>
+                               </>
+                             );
+                           }
+                           return (
+                             <div className="flex items-center gap-2">
+                               <div className="flex -space-x-2">
+                                 {assignees.slice(0, 3).map((name, i) => {
+                                   const u = users.find(user => user.name === name);
+                                   return u?.avatar ? (
+                                     <img key={i} src={u.avatar} className="w-6 h-6 rounded-full object-cover border border-white relative z-10 shadow-sm" alt="" />
+                                   ) : (
+                                     <div key={i} className="w-6 h-6 rounded-full bg-orange-50 text-orange-600 border border-white shadow-sm flex items-center justify-center text-[10px] font-bold relative z-10">
+                                       {name.charAt(0)}
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                               <span className="text-xs font-semibold text-gray-700 truncate max-w-[120px]" title={assignees.join(', ')}>
+                                 {assignees.length > 1 ? `${assignees[0]} +${assignees.length - 1}` : assignees[0]}
+                               </span>
+                             </div>
+                           );
+                         })()}
+                       </div>
+                     </div>
+                     <div className="text-right">
+                       <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5 font-bold">Doanh thu kỳ</p>
+                       <p className="text-lg font-black text-emerald-600">{formatCompactVND(r.totalDelivered)}</p>
+                     </div>
                   </div>
                 </div>
               ))}
-              {visibleReports.length === 0 && (
-                <div className="py-16 text-center text-gray-400">
-                  <DollarSign size={44} className="mx-auto mb-3 opacity-20"/>
-                  <p className="font-medium">Chưa có báo cáo doanh thu</p>
-                </div>
-              )}
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -330,8 +445,13 @@ const RevenuePage: React.FC = () => {
             <div className="flex gap-2">
               {(isAuthor || !editingReport) && !isReadOnly && (
                 <>
+                  {editingReport && editingReport.status === 'Draft' && (
+                    <button onClick={() => setDeleteId(editingReport.id)} className="px-4 py-2 text-sm font-semibold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition-colors flex items-center gap-1.5 mr-auto">
+                      <Trash2 size={14}/> Xóa báo cáo
+                    </button>
+                  )}
                   <button onClick={() => handleSave('Draft')} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-1.5"><Save size={14}/> Lưu nháp</button>
-                  <button onClick={() => handleSave('Pending Manager')} disabled={rows.length === 0} className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-1.5"><Send size={14}/> Gửi duyệt</button>
+                  <button onClick={() => handleSave(canApprove ? 'Pending Director' : 'Pending Manager')} disabled={rows.length === 0} className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-1.5"><Send size={14}/> {canApprove ? 'Gửi Giám đốc duyệt' : 'Gửi TP duyệt'}</button>
                 </>
               )}
               {isManagerReview && (

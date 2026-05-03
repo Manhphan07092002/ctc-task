@@ -33,7 +33,7 @@ interface DataContextType {
   adminHardDeleteReport: (id: string) => Promise<void>;
   saveContract: (c: Contract & { _isNew?: boolean }) => Promise<void>;
   deleteContract: (id: string) => Promise<void>;
-  saveRevenueReport: (r: RevenueReport) => Promise<void>;
+  saveRevenueReport: (r: RevenueReport & { _isNew?: boolean }) => Promise<void>;
   deleteRevenueReport: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }

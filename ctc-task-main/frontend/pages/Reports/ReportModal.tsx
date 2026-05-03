@@ -145,10 +145,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const canViewAll   = perms.includes('view_all_reports');
   const canDirectorF = perms.includes('director_feedback');
 
+  const isAuthor = initialReport?.authorId === currentUser.id;
   const isReadOnly = !!(
     initialReport &&
-    initialReport.status !== 'Draft' &&
-    initialReport.authorId !== currentUser.id
+    (isAuthor ? !['Draft', 'Rejected'].includes(initialReport.status) : initialReport.status !== 'Draft')
   );
 
   // Manager reviewing a PENDING report from same dept (not own) — checked FIRST
@@ -793,9 +793,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 <Send size={16} className="mr-2" /> {canApprove ? 'Gửi Giám Đốc' : 'Gửi duyệt'}
               </Button>
             )}
-            {!isReadOnly && initialReport?.authorId === currentUser.id && ['Draft', 'Rejected'].includes(initialReport.status) && (
+            {!isReadOnly && initialReport?.authorId === currentUser.id && ['Draft', 'Pending', 'Pending Manager', 'Pending Director', 'Rejected'].includes(initialReport.status) && (
               <Button onClick={() => handleSave('Pending')} className="!rounded-xl shadow-md hover:shadow-lg bg-blue-600 hover:bg-blue-700">
-                <Send size={16} className="mr-2" /> Gửi lại
+                <Send size={16} className="mr-2" /> {initialReport.status.startsWith('Pending') ? 'Cập nhật' : 'Gửi lại'}
               </Button>
             )}
 

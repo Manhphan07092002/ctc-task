@@ -71,15 +71,23 @@ export function revenueRoutes(_prisma: any, db: any) {
     } catch (e) { res.status(500).json({ error: 'Failed to update revenue report' }); }
   });
 
-  // SOFT DELETE (only Draft/Rejected)
+  // SOFT DELETE (only Draft/Rejected, unless Admin/Giám đốc)
   router.delete('/:id', async (req, res) => {
     try {
       const report = await db.get('SELECT status FROM revenue_reports WHERE id = ?', [req.params.id]);
       if (!report) return res.status(404).json({ error: 'Not found' });
-      if (report.status === 'Approved' || report.status.startsWith('Pending')) {
+      
+      const isSuperUser = req.user?.role === 'Admin' || req.user?.role === 'Giám đốc';
+      
+      if (!isSuperUser && (report.status === 'Approved' || report.status.startsWith('Pending'))) {
         return res.status(403).json({ error: 'Cannot delete approved or pending report' });
       }
-      await db.run('UPDATE revenue_reports SET isDeleted = 1 WHERE id = ?', [req.params.id]);
+      
+      if (isSuperUser) {
+        await db.run('DELETE FROM revenue_reports WHERE id = ?', [req.params.id]);
+      } else {
+        await db.run('UPDATE revenue_reports SET isDeleted = 1 WHERE id = ?', [req.params.id]);
+      }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete revenue report' }); }
   });

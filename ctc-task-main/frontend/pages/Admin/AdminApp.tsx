@@ -14,12 +14,13 @@ import AdminDatabaseManagement from './DatabaseManagement';
 import AdminEventManagement from './EventManagement';
 import AdminActivityLogsManagement from './ActivityLogsManagement';
 import AdminContractManagement from './ContractManagement';
+import AdminRevenueManagement from './RevenueManagement';
 import { AdminTabGroup, TabItem } from './AdminTabGroup';
 import {
   Shield, LayoutDashboard, Users, Settings, LogOut,
   Bell, ChevronRight, Activity, Menu, X,
   CheckSquare, FileText, Video, ShieldCheck, Building2, Database, CalendarDays,
-  Layers, Settings2, List, FileSignature
+  Layers, Settings2, List, FileSignature, DollarSign
 } from 'lucide-react';
 
 const AdminSidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -182,6 +183,7 @@ const OrganizationTabs: TabItem[] = [
 const OperationsTabs: TabItem[] = [
   { id: 'tasks', label: 'Quản lý Công việc', icon: CheckSquare, component: AdminTaskManagement },
   { id: 'reports', label: 'Quản lý Báo cáo', icon: FileText, component: AdminReportManagement },
+  { id: 'revenue', label: 'Quản lý Doanh thu', icon: DollarSign, component: AdminRevenueManagement },
   { id: 'contracts', label: 'Quản lý Hợp đồng', icon: FileSignature, component: AdminContractManagement },
   { id: 'meetings', label: 'Quản lý Cuộc họp', icon: Video, component: AdminMeetingManagement },
   { id: 'events', label: 'Sự kiện & Ngày lễ', icon: CalendarDays, component: AdminEventManagement },

@@ -11,7 +11,7 @@ import { CalendarView as CalendarPage } from './pages/Calendar/index';
 const MeetingsPage = React.lazy(() => import('./pages/Meetings/index').then(module => ({ default: module.MeetingView })));
 const JoinMeetingPage = React.lazy(() => import('./pages/Meetings/JoinMeeting').then(module => ({ default: module.JoinMeetingPage })));
 import { SettingsView as SettingsPage } from './pages/Settings/index';
-import ReportsPage from './pages/Reports/index';
+import ReportsPage from './pages/Reports/TaskReports';
 import ContractsPage from './pages/Contracts/index';
 import RevenuePage from './pages/Revenue/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';

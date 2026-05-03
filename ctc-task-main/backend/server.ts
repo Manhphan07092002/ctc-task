@@ -86,7 +86,7 @@ async function startServer() {
   app.use('/api/tasks', taskRoutes(null, db));
   app.use('/api/notes', noteRoutes(db));
   app.use('/api/meetings', meetingRoutes(null, db));
-  app.use('/api/reports', reportRoutes(null, db));
+  app.use('/api/reports', requireAuth, reportRoutes(null, db));
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));

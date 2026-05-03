@@ -19,6 +19,8 @@ const ALL_PERMISSIONS = [
   { id: 'create_report',        label: 'Tạo báo cáo tuần',                 group: 'Báo cáo' },
   { id: 'view_dept_users',      label: 'Xem danh sách nhân viên phòng ban', group: 'Nhân sự' },
   { id: 'join_meetings',        label: 'Tham gia cuộc họp',                group: 'Cuộc họp' },
+  { id: 'create_revenue_report',label: 'Tạo báo cáo doanh thu',            group: 'Kinh doanh' },
+  { id: 'approve_revenue_reports',label: 'Duyệt báo cáo doanh thu',          group: 'Kinh doanh' },
 ];
 
 const PERM_GROUPS = [...new Set(ALL_PERMISSIONS.map(p => p.group))];
@@ -45,7 +47,7 @@ const ROLE_PRESETS = [
     name: 'Admin',
     color: '#ef4444',
     desc: 'Toàn quyền hệ thống: quản trị, cấu hình, và xem mọi dữ liệu.',
-    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings']
+    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings', 'create_revenue_report', 'approve_revenue_reports']
   },
   {
     label: 'Giám đốc',
@@ -65,15 +67,15 @@ const ROLE_PRESETS = [
     label: 'Trưởng phòng',
     name: 'Trưởng phòng',
     color: '#f59e0b',
-    desc: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban.',
-    perms: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'create_report', 'view_own_tasks', 'join_meetings']
+    desc: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban và doanh thu.',
+    perms: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'create_report', 'view_own_tasks', 'join_meetings', 'approve_revenue_reports']
   },
   {
     label: 'Nhân viên',
     name: 'Nhân viên',
     color: '#10b981',
-    desc: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần của bản thân.',
-    perms: ['view_own_tasks', 'create_report', 'join_meetings']
+    desc: 'Xem và thực hiện công việc được giao, tạo báo cáo tuần và doanh thu của bản thân.',
+    perms: ['view_own_tasks', 'create_report', 'join_meetings', 'create_revenue_report']
   }
 ];
 
