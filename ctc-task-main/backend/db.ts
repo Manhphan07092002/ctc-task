@@ -158,6 +158,12 @@ export async function initDb() {
       submittedAt TEXT,
       isDeleted INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      region TEXT,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   // Migrations (safe to run multiple times)
@@ -344,6 +350,50 @@ export async function initDb() {
         'INSERT INTO events (id, title, date, endDate, type, color, description, isRecurringYearly) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [h.id, h.title, h.date, h.endDate || null, h.type, h.color, h.description, h.isRecurringYearly]
       );
+    }
+  }
+
+  // Seed Clients
+  const clientCount = await db.get('SELECT COUNT(*) as count FROM clients');
+  if (clientCount.count === 0) {
+    const vnpts = [
+      { id: 'client-1', name: 'VNPT Hà Nội', region: 'Hà Nội' },
+      { id: 'client-2', name: 'VNPT Cao Bằng', region: 'Cao Bằng' },
+      { id: 'client-3', name: 'VNPT Tuyên Quang', region: 'Tuyên Quang + Hà Giang' },
+      { id: 'client-4', name: 'VNPT Lào Cai', region: 'Lào Cai + Yên Bái' },
+      { id: 'client-5', name: 'VNPT Lai Châu', region: 'Lai Châu' },
+      { id: 'client-6', name: 'VNPT Điện Biên', region: 'Điện Biên' },
+      { id: 'client-7', name: 'VNPT Sơn La', region: 'Sơn La' },
+      { id: 'client-8', name: 'VNPT Thái Nguyên', region: 'Thái Nguyên + Bắc Kạn' },
+      { id: 'client-9', name: 'VNPT Lạng Sơn', region: 'Lạng Sơn' },
+      { id: 'client-10', name: 'VNPT Quảng Ninh', region: 'Quảng Ninh' },
+      { id: 'client-11', name: 'VNPT Phú Thọ', region: 'Phú Thọ + Vĩnh Phúc + Hòa Bình' },
+      { id: 'client-12', name: 'VNPT Bắc Ninh', region: 'Bắc Ninh + Bắc Giang' },
+      { id: 'client-13', name: 'VNPT Hải Phòng', region: 'Hải Phòng + Hải Dương' },
+      { id: 'client-14', name: 'VNPT Hưng Yên', region: 'Hưng Yên + Thái Bình' },
+      { id: 'client-15', name: 'VNPT Ninh Bình', region: 'Ninh Bình + Nam Định + Hà Nam' },
+      { id: 'client-16', name: 'VNPT Thanh Hóa', region: 'Thanh Hóa' },
+      { id: 'client-17', name: 'VNPT Nghệ An', region: 'Nghệ An' },
+      { id: 'client-18', name: 'VNPT Hà Tĩnh', region: 'Hà Tĩnh' },
+      { id: 'client-19', name: 'VNPT Quảng Trị', region: 'Quảng Trị + Quảng Bình' },
+      { id: 'client-20', name: 'VNPT Huế', region: 'Thành phố Huế' },
+      { id: 'client-21', name: 'VNPT Đà Nẵng', region: 'Đà Nẵng + Quảng Nam' },
+      { id: 'client-22', name: 'VNPT Quảng Ngãi', region: 'Quảng Ngãi + Kon Tum' },
+      { id: 'client-23', name: 'VNPT Gia Lai', region: 'Gia Lai + Bình Định' },
+      { id: 'client-24', name: 'VNPT Khánh Hòa', region: 'Khánh Hòa + Ninh Thuận' },
+      { id: 'client-25', name: 'VNPT Lâm Đồng', region: 'Lâm Đồng + Đắk Nông + Bình Thuận' },
+      { id: 'client-26', name: 'VNPT Đắk Lắk', region: 'Đắk Lắk + Phú Yên' },
+      { id: 'client-27', name: 'VNPT TP. Hồ Chí Minh', region: 'TP.HCM + Bình Dương + Bà Rịa - Vũng Tàu' },
+      { id: 'client-28', name: 'VNPT Đồng Nai', region: 'Đồng Nai + Bình Phước' },
+      { id: 'client-29', name: 'VNPT Tây Ninh', region: 'Tây Ninh + Long An' },
+      { id: 'client-30', name: 'VNPT Cần Thơ', region: 'Cần Thơ + Hậu Giang + Sóc Trăng' },
+      { id: 'client-31', name: 'VNPT Vĩnh Long', region: 'Vĩnh Long + Bến Tre + Trà Vinh' },
+      { id: 'client-32', name: 'VNPT Đồng Tháp', region: 'Đồng Tháp + Tiền Giang' },
+      { id: 'client-33', name: 'VNPT Cà Mau', region: 'Cà Mau + Bạc Liêu' },
+      { id: 'client-34', name: 'VNPT An Giang', region: 'An Giang + Kiên Giang' },
+    ];
+    for (const c of vnpts) {
+      await db.run('INSERT INTO clients (id, name, region, createdAt) VALUES (?, ?, ?, ?)', [c.id, c.name, c.region, new Date().toISOString()]);
     }
   }
 

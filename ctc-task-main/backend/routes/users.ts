@@ -18,9 +18,10 @@ export function userRoutes(db: any, mailer: any) {
       await db.run(`ALTER TABLE users ADD COLUMN hometown TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN cccd TEXT DEFAULT ''`).catch(() => {});
       await db.run(`ALTER TABLE users ADD COLUMN gender TEXT DEFAULT ''`).catch(() => {});
+      await db.run(`ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'`).catch(() => {});
       const users = await db.all(`SELECT u.id, u.name, u.email, u.role, u.department, u.avatar, u.bio, u.phone, u.dob, u.hometown, u.cccd, u.gender, u.preferences, u.isLocked, r.permissions FROM users u LEFT JOIN roles r ON u.role = r.name`);
       res.json(users.map((u: any) => ({ ...u, isLocked: Boolean(u.isLocked), permissions: u.permissions ? JSON.parse(u.permissions) : [], preferences: u.preferences ? JSON.parse(u.preferences) : {} })));
-    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+    } catch (e) { console.error('GET /api/users error:', e); res.status(500).json({ error: 'Failed' }); }
   });
 
   router.post('/', async (req, res) => {

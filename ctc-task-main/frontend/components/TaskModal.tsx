@@ -577,7 +577,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({ isOpen, onClose, onSave, i
                         : 'opacity-60 hover:opacity-100'
                     } ${(readOnly || (!isAdminOrDirector && !isManager)) ? 'cursor-default' : ''}`}
                   >
-                    <img src={u.avatar} alt={u.name} className="w-10 h-10 rounded-full" />
+                    <img src={u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=random`} alt={u.name} className="w-10 h-10 rounded-full" />
                     {assignees.includes(u.id) && (
                       <div className="absolute -bottom-1 -right-1 bg-brand-500 text-white rounded-full p-0.5 border border-white">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>

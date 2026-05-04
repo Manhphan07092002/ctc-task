@@ -9,6 +9,7 @@ import { getRoles as fetchRoles } from '../services/roleService';
 import { getDepartments as fetchDepartments } from '../services/departmentService';
 import { getContracts as fetchContracts, saveContract as apiSaveContract, deleteContract as apiDeleteContract, Contract } from '../services/contractService';
 import { getRevenueReports as fetchRevenueReports, saveRevenueReport as apiSaveRevenueReport, deleteRevenueReport as apiDeleteRevenueReport, RevenueReport } from '../services/revenueService';
+import { getClients, Client } from '../services/clientService';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -20,6 +21,7 @@ interface DataContextType {
   departments: Department[];
   contracts: Contract[];
   revenueReports: RevenueReport[];
+  clients: Client[];
   isLoading: boolean;
   error: string | null;
   saveTask: (t: Task) => Promise<void>;
@@ -48,15 +50,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { data: tasks = [], isLoading: tasksLoading, error: tasksError } = useQuery({ queryKey: ['tasks'], queryFn: fetchTasks });
   const { data: notes = [], isLoading: notesLoading, error: notesError } = useQuery({ queryKey: ['notes', userId], queryFn: () => fetchNotes(userId), enabled: !!userId });
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
-  const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({ queryKey: ['reports'], queryFn: fetchReports });
+  const { data: reports = [], isLoading: reportsLoading, error: reportsError } = useQuery({ queryKey: ['reports'], queryFn: fetchReports, enabled: !!userId });
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useQuery({ queryKey: ['roles'], queryFn: fetchRoles });
   const { data: departments = [], isLoading: departmentsLoading, error: deptsError } = useQuery({ queryKey: ['departments'], queryFn: fetchDepartments });
   const { data: contracts = [], isLoading: contractsLoading, error: contractsError } = useQuery({ queryKey: ['contracts'], queryFn: fetchContracts, enabled: !!userId, retry: false });
   const { data: revenueReports = [], isLoading: revenueLoading, error: revenueError } = useQuery({ queryKey: ['revenueReports'], queryFn: fetchRevenueReports, enabled: !!userId, retry: false });
+  const { data: clients = [], isLoading: clientsLoading, error: clientsError } = useQuery({ queryKey: ['clients'], queryFn: getClients, enabled: !!userId, retry: false });
 
-  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading || contractsLoading || revenueLoading;
+  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading || contractsLoading || revenueLoading || clientsLoading;
   
-  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError || contractsError || revenueError;
+  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError || contractsError || revenueError || clientsError;
   const error = anyError ? 'Failed to fetch data' : null;
 
   const refreshData = async () => {
@@ -155,7 +158,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return (
     <DataContext.Provider value={{
-      tasks, notes, users, reports, roles, departments, contracts, revenueReports, isLoading, error,
+      tasks, notes, users, reports, roles, departments, contracts, revenueReports, clients, isLoading, error,
       saveTask: async (t) => { await saveTaskMutation.mutateAsync(t); },
       deleteTask: async (id) => { await deleteTaskMutation.mutateAsync(id); },
       saveNote: async (n) => { await saveNoteMutation.mutateAsync(n); },

@@ -58,7 +58,7 @@ const getStatusBadge = (status: string = 'draft') => {
 
 const ContractsPage: React.FC = () => {
   const { user } = useAuth();
-  const { contracts, users, departments, tasks, saveContract, deleteContract } = useData();
+  const { contracts, clients, users, departments, tasks, saveContract, deleteContract } = useData();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDebt, setFilterDebt] = useState('all');
@@ -67,6 +67,7 @@ const ContractsPage: React.FC = () => {
   const [paymentContract, setPaymentContract] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
+  const [editingProductIdx, setEditingProductIdx] = useState<number | null>(null);
   const [hasInvoice, setHasInvoice] = useState(false);
 
   // Form state
@@ -119,6 +120,7 @@ const ContractsPage: React.FC = () => {
     setEditingContract(null);
     setForm({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
+    setEditingProductIdx(null);
     setHasInvoice(false);
     setActiveTab('create');
   };
@@ -127,8 +129,15 @@ const ContractsPage: React.FC = () => {
     setEditingContract(c);
     setForm({ contractNumber: c.contractNumber, clientName: c.clientName, contractName: c.contractName, preTaxValue: c.preTaxValue, vatRate: c.vatRate || 10, postTaxValue: c.postTaxValue || 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '', products: c.products || [], status: c.status || 'draft', attachments: c.attachments || [], paidAmount: c.paidAmount || 0 });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
+    setEditingProductIdx(null);
     setHasInvoice(!!c.invoiceDate || !!c.invoiceNumber);
     setActiveTab('create');
+  };
+
+  const handleEditProduct = (idx: number) => {
+    const p = form.products[idx];
+    setNewProduct({ name: p.name, unit: p.unit || '', quantity: String(p.quantity), origin: p.origin || '', unitPrice: String(p.unitPrice) });
+    setEditingProductIdx(idx);
   };
 
   const handleAddProduct = () => {
@@ -138,15 +147,19 @@ const ContractsPage: React.FC = () => {
     const total = unitPrice * qty;
     
     setForm(f => {
-      const newPreTax = f.preTaxValue + total;
-      return {
-        ...f,
-        products: [...f.products, { name: newProduct.name, unit: newProduct.unit, quantity: qty, origin: newProduct.origin, unitPrice, total }],
-        preTaxValue: newPreTax,
-        postTaxValue: newPreTax + (newPreTax * f.vatRate / 100)
-      };
+      const newList = [...f.products];
+      if (editingProductIdx !== null) {
+        const oldTotal = newList[editingProductIdx].total;
+        newList[editingProductIdx] = { name: newProduct.name, unit: newProduct.unit, quantity: qty, origin: newProduct.origin, unitPrice, total };
+        const newPreTax = f.preTaxValue - oldTotal + total;
+        return { ...f, products: newList, preTaxValue: newPreTax, postTaxValue: newPreTax + (newPreTax * f.vatRate / 100) };
+      } else {
+        const newPreTax = f.preTaxValue + total;
+        return { ...f, products: [...newList, { name: newProduct.name, unit: newProduct.unit, quantity: qty, origin: newProduct.origin, unitPrice, total }], preTaxValue: newPreTax, postTaxValue: newPreTax + (newPreTax * f.vatRate / 100) };
+      }
     });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
+    setEditingProductIdx(null);
   };
 
   const handleRemoveProduct = (idx: number) => {
@@ -618,21 +631,54 @@ const ContractsPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Số hợp đồng *</label>
-                <input value={form.contractNumber} onChange={e => setForm({...form, contractNumber: e.target.value})} placeholder="VD: HD 02-2026/VTKH-CTC"
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"/>
+                <input 
+                  list="contract-number-suggestions"
+                  value={form.contractNumber} 
+                  onChange={e => setForm({...form, contractNumber: e.target.value})} 
+                  placeholder="VD: HD 02-2026/VTKH-CTC"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
+                />
+                <datalist id="contract-number-suggestions">
+                  {Array.from(new Set(contracts.map(c => c.contractNumber?.trim()).filter(Boolean))).sort().map(num => (
+                    <option key={num} value={num} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Chủ đầu tư *</label>
-                <input value={form.clientName} onChange={e => setForm({...form, clientName: e.target.value})} placeholder="VD: Viễn thông Khánh Hòa"
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"/>
+                <input 
+                  list="client-suggestions"
+                  value={form.clientName} 
+                  onChange={e => setForm({...form, clientName: e.target.value})} 
+                  placeholder="VD: Viễn thông Khánh Hòa"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
+                />
+                <datalist id="client-suggestions">
+                  {Array.from(new Set([
+                    ...clients.map(c => c.name),
+                    ...contracts.map(c => c.clientName?.trim())
+                  ].filter(Boolean))).sort().map(client => (
+                    <option key={client} value={client} />
+                  ))}
+                </datalist>
               </div>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Tên hợp đồng / Mô tả chung *</label>
-                <input value={form.contractName} onChange={e => setForm({...form, contractName: e.target.value})} placeholder="VD: Cung cấp thiết bị mạng"
-                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"/>
+                <input 
+                  list="contract-name-suggestions"
+                  value={form.contractName} 
+                  onChange={e => setForm({...form, contractName: e.target.value})} 
+                  placeholder="VD: Cung cấp thiết bị mạng"
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
+                />
+                <datalist id="contract-name-suggestions">
+                  {Array.from(new Set(contracts.map(c => c.contractName?.trim()).filter(Boolean))).sort().map(name => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Trạng thái *</label>
@@ -675,9 +721,14 @@ const ContractsPage: React.FC = () => {
                         <td className="p-3 text-sm font-medium text-gray-600 text-right">{p.unitPrice.toLocaleString('vi-VN')}</td>
                         <td className="p-3 text-sm font-bold text-emerald-600 text-right">{p.total.toLocaleString('vi-VN')}</td>
                         <td className="p-3 text-center">
-                          <button onClick={() => handleRemoveProduct(idx)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                            <Trash2 size={16}/>
-                          </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => handleEditProduct(idx)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Sửa">
+                              <Pencil size={16}/>
+                            </button>
+                            <button onClick={() => handleRemoveProduct(idx)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
+                              <Trash2 size={16}/>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -693,16 +744,52 @@ const ContractsPage: React.FC = () => {
                     <tr>
                       <td className="p-2 text-center text-xs font-bold text-emerald-600">*</td>
                       <td className="p-2">
-                        <input value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} placeholder="Nhập tên SP..."
+                        <input value={newProduct.name} onChange={e => {
+                          const val = e.target.value;
+                          const updates: any = { name: val };
+                          if (val) {
+                            const match = contracts.flatMap(c => c.products || []).find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
+                            if (match) {
+                              if (!newProduct.unit) updates.unit = match.unit || '';
+                              if (!newProduct.origin) updates.origin = match.origin || '';
+                              if (!newProduct.unitPrice) updates.unitPrice = String(match.unitPrice);
+                            }
+                          }
+                          setNewProduct({...newProduct, ...updates});
+                        }} placeholder="Nhập tên SP..."
+                          list="product-name-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
+                        <datalist id="product-name-suggestions">
+                          {Array.from(new Set(contracts.flatMap(c => c.products || []).map(p => p.name?.trim()).filter(Boolean))).sort().map(val => (
+                            <option key={val} value={val} />
+                          ))}
+                        </datalist>
                       </td>
                       <td className="p-2">
                         <input value={newProduct.unit} onChange={e => setNewProduct({...newProduct, unit: e.target.value})} placeholder="VD: Cái"
+                          list="product-unit-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
+                        <datalist id="product-unit-suggestions">
+                          {Array.from(new Set(contracts.flatMap(c => c.products || [])
+                            .filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase())
+                            .map(p => p.unit?.trim()).filter(Boolean)
+                          )).sort().map(val => (
+                            <option key={val} value={val} />
+                          ))}
+                        </datalist>
                       </td>
                       <td className="p-2">
                         <input value={newProduct.origin} onChange={e => setNewProduct({...newProduct, origin: e.target.value})} placeholder="VD: VN"
+                          list="product-origin-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
+                        <datalist id="product-origin-suggestions">
+                          {Array.from(new Set(contracts.flatMap(c => c.products || [])
+                            .filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase())
+                            .map(p => p.origin?.trim()).filter(Boolean)
+                          )).sort().map(val => (
+                            <option key={val} value={val} />
+                          ))}
+                        </datalist>
                       </td>
                       <td className="p-2">
                         <input type="number" min="1" value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: e.target.value})} placeholder="1"
@@ -711,7 +798,16 @@ const ContractsPage: React.FC = () => {
                       <td className="p-2">
                         <input type="text" value={newProduct.unitPrice ? Number(newProduct.unitPrice.replace(/\D/g, '')).toLocaleString('vi-VN') : ''} 
                           onChange={e => setNewProduct({...newProduct, unitPrice: e.target.value})} placeholder="1.000.000"
+                          list="product-price-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white text-right"/>
+                        <datalist id="product-price-suggestions">
+                          {Array.from(new Set(contracts.flatMap(c => c.products || [])
+                            .filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase())
+                            .map(p => Number(p.unitPrice)).filter(v => !isNaN(v) && v > 0)
+                          )).sort((a, b) => a - b).map(val => (
+                            <option key={val} value={val.toLocaleString('vi-VN')} />
+                          ))}
+                        </datalist>
                       </td>
                       <td className="p-2">
                         <input type="text" readOnly disabled
@@ -719,10 +815,23 @@ const ContractsPage: React.FC = () => {
                           className="w-full px-2 py-1.5 text-sm border border-transparent rounded-md bg-emerald-100 font-bold text-emerald-800 text-right cursor-not-allowed"/>
                       </td>
                       <td className="p-2 text-center">
-                        <button onClick={handleAddProduct} disabled={!newProduct.name || !newProduct.unitPrice}
-                          className="w-full py-1.5 text-sm font-bold text-white bg-emerald-500 rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-1 shadow-sm">
-                          <PlusCircle size={14}/> Thêm
-                        </button>
+                        {editingProductIdx !== null ? (
+                          <div className="flex gap-1">
+                            <button onClick={handleAddProduct} disabled={!newProduct.name || !newProduct.unitPrice}
+                              className="flex-1 py-1.5 text-sm font-bold text-white bg-blue-500 rounded-md hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center justify-center shadow-sm" title="Cập nhật">
+                              Lưu
+                            </button>
+                            <button onClick={() => { setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' }); setEditingProductIdx(null); }}
+                              className="py-1.5 px-2 text-sm font-bold text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors flex items-center justify-center shadow-sm" title="Hủy">
+                              <X size={14}/>
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={handleAddProduct} disabled={!newProduct.name || !newProduct.unitPrice}
+                            className="w-full py-1.5 text-sm font-bold text-white bg-emerald-500 rounded-md hover:bg-emerald-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-1 shadow-sm">
+                            <PlusCircle size={14}/> Thêm
+                          </button>
+                        )}
                       </td>
                     </tr>
                   </tbody>

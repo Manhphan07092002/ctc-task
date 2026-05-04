@@ -17,6 +17,18 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
       localStorage.removeItem('ctc_token');
       localStorage.removeItem('ctc_user');
       localStorage.removeItem('orange_task_user_id');
+      window.location.href = '/';
+    } else {
+      // If it's a mail endpoint, check if it's actually a JWT expiry by cloning the response
+      try {
+        const clone = response.clone();
+        const data = await clone.json();
+        if (data && data.error && (data.error.includes('token') || data.error.includes('Unauthorized'))) {
+          localStorage.removeItem('ctc_token');
+          localStorage.removeItem('ctc_user');
+          window.location.href = '/';
+        }
+      } catch (e) {}
     }
   }
   
