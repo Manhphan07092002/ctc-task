@@ -185,35 +185,7 @@ export const LoginView: React.FC = () => {
                 </button>
               </form>
 
-              {/* Quick access */}
-              {users && users.length > 0 && (
-                <div className="mt-5">
-                  <div className="relative flex items-center mb-3">
-                    <div className="flex-1 border-t border-gray-100" />
-                    <span className="px-3 text-[10px] font-bold text-gray-300 uppercase tracking-widest">Truy cập nhanh</span>
-                    <div className="flex-1 border-t border-gray-100" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                    {users.map((u: User) => (
-                      <button
-                        key={u.id} type="button"
-                        onClick={() => handleQuickAccess(u)}
-                        disabled={quickLoading === u.id}
-                        className="flex items-center gap-2.5 p-2.5 bg-gray-50 hover:bg-white border border-gray-100 hover:border-blue-200 hover:shadow-sm rounded-xl transition-all text-left group disabled:opacity-50"
-                      >
-                        {quickLoading === u.id
-                          ? <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
-                          : <img src={u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`} alt="" className="w-8 h-8 rounded-full border border-gray-100 flex-shrink-0 object-cover" />
-                        }
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-800 truncate leading-tight">{u.name}</p>
-                          <p className="text-[10px] text-gray-400 group-hover:text-blue-500 transition-colors truncate">{u.role}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             <p className="text-center text-[11px] text-gray-400 mt-3">

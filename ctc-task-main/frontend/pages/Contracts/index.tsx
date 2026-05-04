@@ -1,13 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, Button, Avatar } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { PlusCircle, Search, FileText, Pencil, Trash2, X, Save, Building2, DollarSign, Hash, Calendar as CalendarIcon, Filter, Upload, Paperclip, Download, Briefcase, WalletCards, TrendingUp, AlertCircle, Wallet } from 'lucide-react';
+import { PlusCircle, Search, FileText, Pencil, Trash2, X, Save, Building2, DollarSign, Hash, Calendar as CalendarIcon, Filter, Upload, Paperclip, Download, Briefcase, WalletCards, TrendingUp, AlertCircle, Wallet, Printer } from 'lucide-react';
 import { Contract, ContractProduct } from '../../services/contractService';
 import { apiFetch } from '../../services/api';
 import * as XLSX from 'xlsx-js-style';
+import * as productService from '../../services/productService';
 import { PaymentModal } from './PaymentModal';
+import { useReactToPrint } from 'react-to-print';
+import { PrintableQuote } from './PrintableQuote';
 
 const fmtMoney = (v: number) => v.toLocaleString('vi-VN') + ' ₫';
 
@@ -73,6 +76,17 @@ const ContractsPage: React.FC = () => {
   // Form state
   const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
   const [uploading, setUploading] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<productService.Product[]>([]);
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Bao_Gia_${form.clientName || 'Khach_Hang'}`,
+  });
+
+  useEffect(() => {
+    productService.getProducts().then(setCatalogProducts).catch(console.error);
+  }, []);
 
   const perms = user?.permissions || [];
   const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || perms.includes('admin_panel');
@@ -81,9 +95,6 @@ const ContractsPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     let list = contracts;
-    if (!canViewAll) {
-      list = list.filter(c => c.department === userDept);
-    }
 
     if (activeTab === 'list' || activeTab === 'create') {
       if (filterStatus !== 'all') {
@@ -591,6 +602,11 @@ const ContractsPage: React.FC = () => {
         <div className="print-area bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in duration-300">
           <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
             <h2 className="text-lg font-bold">{editingContract ? 'Sửa hợp đồng' : 'Thêm hợp đồng mới'}</h2>
+            <div className="flex gap-2">
+              <button onClick={() => handlePrint()} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg font-medium transition-colors text-sm">
+                <Printer size={16} /> In báo giá
+              </button>
+            </div>
           </div>
           <div className="p-6 space-y-5">
             {editingContract && tasks && (
@@ -748,11 +764,14 @@ const ContractsPage: React.FC = () => {
                           const val = e.target.value;
                           const updates: any = { name: val };
                           if (val) {
-                            const match = contracts.flatMap(c => c.products || []).find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
+                            const catalogMatch = catalogProducts.find(p => p.name.trim().toLowerCase() === val.trim().toLowerCase());
+                            const historyMatch = contracts.flatMap(c => c.products || []).find(p => p.name?.trim().toLowerCase() === val.trim().toLowerCase());
+                            const match = catalogMatch || historyMatch;
                             if (match) {
                               if (!newProduct.unit) updates.unit = match.unit || '';
                               if (!newProduct.origin) updates.origin = match.origin || '';
-                              if (!newProduct.unitPrice) updates.unitPrice = String(match.unitPrice);
+                              if (!newProduct.unitPrice && 'defaultPrice' in match && match.defaultPrice !== undefined) updates.unitPrice = String(match.defaultPrice);
+                              else if (!newProduct.unitPrice && 'unitPrice' in match) updates.unitPrice = String(match.unitPrice);
                             }
                           }
                           setNewProduct({...newProduct, ...updates});
@@ -760,7 +779,10 @@ const ContractsPage: React.FC = () => {
                           list="product-name-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
                         <datalist id="product-name-suggestions">
-                          {Array.from(new Set(contracts.flatMap(c => c.products || []).map(p => p.name?.trim()).filter(Boolean))).sort().map(val => (
+                          {Array.from(new Set([
+                            ...catalogProducts.map(p => p.name.trim()),
+                            ...contracts.flatMap(c => c.products || []).map(p => p.name?.trim())
+                          ].filter(Boolean))).sort().map(val => (
                             <option key={val} value={val} />
                           ))}
                         </datalist>
@@ -770,10 +792,10 @@ const ContractsPage: React.FC = () => {
                           list="product-unit-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
                         <datalist id="product-unit-suggestions">
-                          {Array.from(new Set(contracts.flatMap(c => c.products || [])
-                            .filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase())
-                            .map(p => p.unit?.trim()).filter(Boolean)
-                          )).sort().map(val => (
+                          {Array.from(new Set([
+                            ...catalogProducts.filter(p => !newProduct.name || p.name.trim().toLowerCase() === newProduct.name.trim().toLowerCase()).map(p => p.unit?.trim()),
+                            ...contracts.flatMap(c => c.products || []).filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase()).map(p => p.unit?.trim())
+                          ].filter(Boolean))).sort().map(val => (
                             <option key={val} value={val} />
                           ))}
                         </datalist>
@@ -783,10 +805,10 @@ const ContractsPage: React.FC = () => {
                           list="product-origin-suggestions"
                           className="w-full px-2 py-1.5 text-sm border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"/>
                         <datalist id="product-origin-suggestions">
-                          {Array.from(new Set(contracts.flatMap(c => c.products || [])
-                            .filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase())
-                            .map(p => p.origin?.trim()).filter(Boolean)
-                          )).sort().map(val => (
+                          {Array.from(new Set([
+                            ...catalogProducts.filter(p => !newProduct.name || p.name.trim().toLowerCase() === newProduct.name.trim().toLowerCase()).map(p => p.origin?.trim()),
+                            ...contracts.flatMap(c => c.products || []).filter(p => !newProduct.name || p.name?.trim().toLowerCase() === newProduct.name.trim().toLowerCase()).map(p => p.origin?.trim())
+                          ].filter(Boolean))).sort().map(val => (
                             <option key={val} value={val} />
                           ))}
                         </datalist>
@@ -980,6 +1002,8 @@ const ContractsPage: React.FC = () => {
         onClose={() => setPaymentContract(null)} 
         onSave={handlePaymentSave} 
       />
+
+      <PrintableQuote ref={printRef} contract={form} user={user} />
     </div>
   );
 };

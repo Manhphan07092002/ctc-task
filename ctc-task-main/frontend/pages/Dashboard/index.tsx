@@ -81,8 +81,10 @@ export default function DashboardPage({
       
     const totalContracts = myContracts.length;
     const totalDebt = myContracts.reduce((s, c) => s + Math.max(0, (c.postTaxValue || 0) - (c.paidAmount || 0)), 0);
+    const totalPaid = myContracts.reduce((s, c) => s + (c.paidAmount || 0), 0);
+    const totalPostTax = myContracts.reduce((s, c) => s + (c.postTaxValue || 0), 0);
 
-    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length, overdue, highPriority, myNotes: notes.length, totalContracts, totalDebt };
+    return { total, done, inProgress, pendingReports, upcomingMeetings: todayUpcomingMeetings.length, overdue, highPriority, myNotes: notes.length, totalContracts, totalDebt, totalPaid, totalPostTax };
   }, [roleBasedTasks, reports, user, todayUpcomingMeetings, notes, contracts]);
 
   const todaysTasks = useMemo(() => {
@@ -138,6 +140,14 @@ export default function DashboardPage({
       { name: 'Cao', value: counts.High, fill: '#f59e0b' }
     ];
   }, [roleBasedTasks]);
+
+  const financeChartData = useMemo(() => {
+    return [
+      { name: 'Doanh thu', value: stats.totalPostTax, fill: '#10b981' },
+      { name: 'Thực thu', value: stats.totalPaid, fill: '#3b82f6' },
+      { name: 'Công nợ', value: stats.totalDebt, fill: '#f43f5e' }
+    ];
+  }, [stats]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -488,6 +498,34 @@ export default function DashboardPage({
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* Finance Analytics */}
+          <Card className="p-6">
+            <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+              <DollarSign size={18} className="text-emerald-500" /> Tình hình tài chính
+            </h3>
+            <div className="relative" style={{ height: 200 }}>
+              {stats.totalPostTax === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
+                  Chưa có dữ liệu tài chính
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={financeChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `${(val / 1000000).toFixed(0)}tr`} tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <RechartsTooltip 
+                      cursor={{ fill: '#f1f5f9' }} 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                      formatter={(value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)}
+                    />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </Card>
 

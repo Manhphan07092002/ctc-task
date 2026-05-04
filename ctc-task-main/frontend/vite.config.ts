@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       host: '0.0.0.0',
+      allowedHosts: ['tasks.ctcdn.vn'],
       port: parseInt(env.VITE_PORT || '5173'),
       proxy: {
         '/api': {

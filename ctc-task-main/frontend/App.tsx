@@ -14,6 +14,7 @@ import { SettingsView as SettingsPage } from './pages/Settings/index';
 import ReportsPage from './pages/Reports/TaskReports';
 import ContractsPage from './pages/Contracts/index';
 import RevenuePage from './pages/Revenue/index';
+import ProductsPage from './pages/Products/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';
 import ResetPasswordPage from './pages/ResetPassword/index';
 import NotificationsPage from './pages/Notifications/index';
@@ -417,6 +418,7 @@ export default function CTCTaskApp() {
 
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
+              <Route path="/products" element={<ProductsPage />} />
               <Route path="/revenue" element={<RevenuePage />} />
               <Route path="/notifications" element={<NotificationsPage />} />
 

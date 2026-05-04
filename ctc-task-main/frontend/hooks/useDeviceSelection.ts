@@ -17,6 +17,10 @@ export const useDeviceSelection = () => {
 
   const fetchDevices = async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.warn("mediaDevices API not available. This is usually because the site is not served over HTTPS or localhost.");
+        return;
+      }
       // Must request permissions first to get labels
       const devices = await navigator.mediaDevices.enumerateDevices();
       
@@ -40,10 +44,12 @@ export const useDeviceSelection = () => {
 
   useEffect(() => {
     fetchDevices();
-    navigator.mediaDevices.addEventListener('devicechange', fetchDevices);
-    return () => {
-      navigator.mediaDevices.removeEventListener('devicechange', fetchDevices);
-    };
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', fetchDevices);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', fetchDevices);
+      };
+    }
   }, []);
 
   return {

@@ -164,6 +164,14 @@ export async function initDb() {
       region TEXT,
       createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      unit TEXT,
+      origin TEXT,
+      defaultPrice REAL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
   `);
 
   // Migrations (safe to run multiple times)

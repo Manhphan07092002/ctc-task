@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote, Users, Settings, Video, FileText, Bell, Shield, Mail, DollarSign, Briefcase } from 'lucide-react';
+import { PlusCircle, LogOut, LayoutDashboard, CheckSquare, Calendar, StickyNote, Users, Settings, Video, FileText, Bell, Shield, Mail, DollarSign, Briefcase, Package } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Button, Avatar } from '../UI';
@@ -26,7 +26,6 @@ const NAV_GROUPS = [
       { id: 'tasks',    icon: CheckSquare, path: '/tasks',    permission: ['view_all_tasks', 'manage_dept_tasks', 'view_own_tasks'] },
       { id: 'calendar', icon: Calendar,    path: '/calendar', permission: ['view_all_tasks', 'manage_dept_tasks', 'view_own_tasks'] },
       { id: 'reports',  icon: FileText,    path: '/reports',  permission: ['view_all_reports', 'approve_dept_reports', 'create_report', 'director_feedback'] },
-      { id: 'contracts', icon: Briefcase, path: '/contracts', permission: null },
     ],
   },
   {
@@ -41,6 +40,8 @@ const NAV_GROUPS = [
   {
     label: 'Kinh doanh',
     items: [
+      { id: 'contracts', icon: Briefcase, path: '/contracts', permission: null },
+      { id: 'products', icon: Package, path: '/products', permission: null },
       { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_revenue_reports', 'view_all_reports', 'director_feedback'] },
     ],
   },
@@ -59,6 +60,7 @@ const NAV_LABELS: Record<string, string> = {
   calendar:      'Lịch',
   reports:       'Báo cáo',
   contracts:     'Hợp đồng',
+  products:      'Sản phẩm',
   revenue:       'Doanh thu',
   mail:          'Hộp thư',
   meetings:      'Cuộc họp',

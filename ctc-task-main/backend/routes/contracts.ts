@@ -4,10 +4,37 @@ import { randomUUID } from 'crypto';
 export function contractRoutes(_prisma: any, db: any) {
   const router = Router();
 
+  async function logActivity(userId: string, action: string, entityId: string, metadata: any) {
+    const id = randomUUID();
+    await db.run(
+      'INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, userId, action, entityId, 'contract', JSON.stringify(metadata), new Date().toISOString()]
+    );
+  }
+
   // GET all contracts (not deleted)
-  router.get('/', async (_req, res) => {
+  router.get('/', async (req, res) => {
     try {
-      const rows = await db.all('SELECT * FROM contracts WHERE isDeleted IS NULL OR isDeleted = 0 ORDER BY createdAt DESC');
+      const user = req.user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+      const perms = user.permissions || [];
+      const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || perms.includes('admin_panel') || perms.includes('view_all_tasks');
+
+      let query = 'SELECT * FROM contracts WHERE (isDeleted IS NULL OR isDeleted = 0)';
+      const params: any[] = [];
+
+      if (!canViewAll) {
+        // Tạm thời mở quyền cho mọi người xem HĐ phòng ban do tính chất công việc hiện tại
+        // Nếu muốn siết chặt "Nhân viên chỉ xem của mình", có thể đổi điều kiện ở đây.
+        // Tuy nhiên theo request: "chỉ được xem và sửa hợp đồng của chính mình" (đề xuất 6)
+        query += ' AND createdBy = ?';
+        params.push(user.id);
+      }
+      
+      query += ' ORDER BY createdAt DESC';
+
+      const rows = await db.all(query, params);
       const mapped = rows.map((r: any) => ({
         ...r,
         products: r.products ? JSON.parse(r.products) : [],
@@ -39,6 +66,8 @@ export function contractRoutes(_prisma: any, db: any) {
         await db.run('INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)', [taskId, createdBy]);
       }
 
+      await logActivity(req.user?.id || 'system', 'Tạo Hợp đồng', contractId, { contractNumber, contractName });
+
       res.status(201).json({ id: contractId });
     } catch (e: any) { res.status(500).json({ error: 'Failed to create contract', detail: e.message }); }
   });
@@ -51,6 +80,9 @@ export function contractRoutes(_prisma: any, db: any) {
         `UPDATE contracts SET contractNumber=?, clientName=?, contractName=?, products=?, preTaxValue=?, vatRate=?, postTaxValue=?, invoiceDate=?, invoiceNumber=?, status=?, attachments=?, paidAmount=?, updatedAt=? WHERE id=?`,
         [contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, new Date().toISOString(), req.params.id]
       );
+
+      await logActivity(req.user?.id || 'system', 'Cập nhật Hợp đồng', req.params.id, { contractNumber, status, preTaxValue, paidAmount });
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update contract' }); }
   });
@@ -59,6 +91,9 @@ export function contractRoutes(_prisma: any, db: any) {
   router.delete('/:id', async (req, res) => {
     try {
       await db.run('UPDATE contracts SET isDeleted = 1 WHERE id = ?', [req.params.id]);
+      
+      await logActivity(req.user?.id || 'system', 'Xóa Hợp đồng', req.params.id, {});
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to delete contract' }); }
   });

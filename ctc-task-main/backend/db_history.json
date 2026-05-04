@@ -1,5 +1,13 @@
 [
   {
+    "id": "8626j7qa3svmoqveye5",
+    "action": "export",
+    "filename": "database.sqlite",
+    "performedBy": "u1",
+    "note": "Xuất toàn bộ database",
+    "createdAt": "2026-05-04T07:21:12.605Z"
+  },
+  {
     "id": "9d8jim6d7nlmoli88tr",
     "action": "import",
     "filename": "ctc-database-2026-04-30.sqlite",

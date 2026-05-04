@@ -6,10 +6,11 @@ interface ActivityLog {
   id: string;
   userId: string;
   action: string;
-  entityId?: string;
-  entityType?: string;
-  metadata?: string;
+  entityId: string;
+  entityType: string;
+  metadata: string;
   createdAt: string;
+  user?: { name: string; avatar: string; department: string };
 }
 
 export default function AdminActivityLogsManagement() {
@@ -23,10 +24,10 @@ export default function AdminActivityLogsManagement() {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch('/api/admin/database/table/activity_logs?limit=500');
+      const res = await apiFetch('/api/activity?limit=500');
       if (!res.ok) throw new Error('Không thể tải log hệ thống');
       const data = await res.json();
-      setLogs(data.rows || []);
+      setLogs(data || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -42,8 +43,8 @@ export default function AdminActivityLogsManagement() {
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = 
-      (log.userId && log.userId.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (log.metadata && log.metadata.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (log.user?.name || log.userId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.entityType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.action && log.action.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesAction = filterAction === 'all' || log.action === filterAction;
@@ -124,30 +125,55 @@ export default function AdminActivityLogsManagement() {
               <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-4 rounded-tl-xl">Thời gian</th>
-                  <th className="px-6 py-4">User ID</th>
+                  <th className="px-6 py-4">Người dùng</th>
                   <th className="px-6 py-4">Hành động</th>
+                  <th className="px-6 py-4">Đối tượng</th>
                   <th className="px-6 py-4 rounded-tr-xl">Chi tiết</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredLogs.map(log => {
                   const isLogin = log.action.toLowerCase().includes('đăng nhập');
+                  const isCreate = log.action.toLowerCase().includes('tạo');
+                  const isDelete = log.action.toLowerCase().includes('xóa');
+                  let colorClass = 'bg-gray-100 text-gray-600';
+                  if (isLogin) colorClass = 'bg-blue-50 text-blue-600 border border-blue-100';
+                  if (isCreate) colorClass = 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+                  if (isDelete) colorClass = 'bg-rose-50 text-rose-600 border border-rose-100';
+
+                  let metaObj: any = {};
+                  try { metaObj = JSON.parse(log.metadata || '{}'); } catch(e){}
+
                   return (
                     <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString('vi-VN')}
                       </td>
-                      <td className="px-6 py-4 font-mono text-xs text-gray-600">
-                        {log.userId || '-'}
+                      <td className="px-6 py-4">
+                        {log.user ? (
+                          <div>
+                            <p className="font-bold text-gray-800">{log.user.name}</p>
+                            <p className="text-xs text-gray-500">{log.user.department}</p>
+                          </div>
+                        ) : (
+                          <span className="font-mono text-xs text-gray-600">{log.userId || '-'}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${isLogin ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-gray-100 text-gray-600'}`}>
-                          {isLogin && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${colorClass}`}>
+                          {isLogin && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />}
                           {log.action}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600 max-w-md truncate" title={log.metadata}>
-                        {log.metadata || '-'}
+                      <td className="px-6 py-4 text-gray-700 font-medium">
+                        <span className="uppercase text-xs font-bold text-gray-500">{log.entityType}</span>
+                        <br/>
+                        <span className="text-xs text-gray-400 font-mono" title={log.entityId}>{log.entityId?.slice(0,8)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-gray-500 max-w-xs font-mono">
+                         {Object.keys(metaObj).length > 0 ? (
+                           <pre className="whitespace-pre-wrap">{JSON.stringify(metaObj, null, 2)}</pre>
+                         ) : '-'}
                       </td>
                     </tr>
                   );
