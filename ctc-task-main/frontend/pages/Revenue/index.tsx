@@ -49,7 +49,7 @@ const RevenuePage: React.FC = () => {
 
   const perms = user?.permissions || [];
   const canCreate = perms.includes('create_revenue_report') || user?.role === 'Admin';
-  const canApprove = perms.includes('approve_revenue_reports') || user?.role === 'Admin';
+  const canApprove = perms.includes('approve_revenue_reports') || perms.includes('approve_dept_reports') || user?.role === 'Admin';
   const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || user?.role === 'Admin';
   const isDirector = perms.includes('director_feedback') || user?.role === 'Admin';
   const userDept = user?.department || '';
@@ -145,7 +145,7 @@ const RevenuePage: React.FC = () => {
   };
 
   const isAuthor = editingReport?.authorId === user?.id;
-  const isManagerReview = canApprove && editingReport?.status === 'Pending Manager' && editingReport?.authorId !== user?.id;
+  const isManagerReview = canApprove && editingReport?.status === 'Pending Manager' && editingReport?.authorId !== user?.id && (user?.role === 'Admin' || editingReport?.department === user?.department);
   const isDirectorReview = isDirector && editingReport?.status === 'Pending Director';
   const isReadOnly = editingReport && !(isAuthor && ['Draft', 'Rejected'].includes(editingReport.status)) && !isManagerReview && !isDirectorReview;
 
@@ -204,7 +204,7 @@ const formatCompactVND = (val: number) => {
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Chờ Phê Duyệt</p>
                 <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><Clock size={16}/></div>
               </div>
-              <h3 className="text-2xl font-black text-gray-800">{visibleReports.filter(r => r.status.startsWith('Pending')).length}</h3>
+              <h3 className="text-2xl font-black text-gray-800">{visibleReports.filter(r => r.status.startsWith('Pending') || r.status === 'MgrApproved').length}</h3>
               <p className="text-xs text-gray-400 mt-1">Báo cáo đang chờ</p>
             </div>
             <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-sm">
@@ -242,7 +242,7 @@ const formatCompactVND = (val: number) => {
                 <div key={r.id} onClick={() => openEdit(r)} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-orange-100 hover:border-orange-200 transition-all cursor-pointer p-5 group flex flex-col h-full">
                   <div className="flex justify-between items-start mb-4">
                      <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${r.status === 'Approved' ? 'bg-green-100 text-green-600' : r.status === 'Rejected' ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-600'}`}>
+                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${r.status === 'Approved' ? 'bg-green-100 text-green-600' : r.status === 'Rejected' ? 'bg-red-100 text-red-500' : r.status === 'MgrApproved' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
                           <FileText size={18}/>
                        </div>
                        <div className="min-w-0">

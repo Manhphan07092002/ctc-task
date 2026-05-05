@@ -92,7 +92,7 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
 
   const isPendingMgrReview = !!(
     report &&
-    report.status === 'Pending' &&
+    report.status === 'Pending Manager' &&
     canApprove &&
     user?.department === report.department &&
     report.authorId !== user?.id
@@ -100,7 +100,7 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
 
   const isPendingDirReview = !!(
     report &&
-    report.status === 'Pending' &&
+    (report.status === 'Pending Manager' || report.status === 'Pending Director') &&
     canViewAll &&
     report.authorId !== user?.id &&
     !isPendingMgrReview
@@ -127,7 +127,7 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
       department: report ? report.department : (user.department || ''),
       status: finalStatus,
       createdAt: report ? report.createdAt : now,
-      submittedAt: finalStatus === 'Pending' && !report?.submittedAt ? now : report?.submittedAt,
+      submittedAt: (finalStatus === 'Pending Manager' || finalStatus === 'Pending Director') && !report?.submittedAt ? now : report?.submittedAt,
       approvedAt: finalStatus === 'Approved' ? now : report?.approvedAt,
       approvedBy: finalStatus === 'Approved' ? user.id : report?.approvedBy,
       managerFeedback: isManagerReview ? managerFeedback : report?.managerFeedback,
@@ -314,26 +314,26 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
                 <button onClick={() => handleSave('Draft')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2">
                   <Save size={16} /> Lưu nháp
                 </button>
-                <button onClick={() => handleSave('Pending')} disabled={isSubmitting || rows.length === 0} className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2">
-                  <Send size={16} /> {report?.status?.startsWith('Pending') ? 'Cập nhật' : 'Gửi duyệt'}
+                <button onClick={() => handleSave(canApprove ? 'Pending Director' : 'Pending Manager')} disabled={isSubmitting || rows.length === 0} className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2">
+                  <Send size={16} /> {report?.status?.startsWith('Pending') ? 'Cập nhật' : (canApprove ? 'Gửi GĐ duyệt' : 'Gửi TP duyệt')}
                 </button>
               </>
             )}
 
             {/* Manager Actions */}
-            {isManagerReview && report?.status === 'Pending' && (
+            {isManagerReview && report?.status === 'Pending Manager' && (
               <>
                 <button onClick={() => handleSave('Rejected')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors">
                   Từ chối
                 </button>
-                <button onClick={() => handleSave('Approved')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors">
+                <button onClick={() => handleSave('Pending Director')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">
                   Duyệt (Gửi GĐ)
                 </button>
               </>
             )}
 
             {/* Director Actions */}
-            {isDirectorPendingReview && report?.status === 'Pending' && (
+            {isDirectorPendingReview && (report?.status === 'Pending Manager' || report?.status === 'Pending Director') && (
               <>
                 <button onClick={() => handleSave('Rejected')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors">
                   Từ chối
