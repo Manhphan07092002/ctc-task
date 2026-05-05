@@ -2,13 +2,12 @@ module.exports = {
   apps: [
     {
       name: 'ctc-task',
-      cwd: '/root/.openclaw/workspace/ctc-task/ctc-task-main',
+      cwd: './backend',
       script: 'npm',
-      args: 'run start:prod',
+      args: 'start',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
-        DB_PATH: '/root/.openclaw/workspace/ctc-task/ctc-task-main/backend/database.sqlite'
+        PORT: 3000
       }
     }
   ]
