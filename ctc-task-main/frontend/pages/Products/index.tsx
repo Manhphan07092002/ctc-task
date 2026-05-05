@@ -202,7 +202,7 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <ConfirmDialog isOpen={!!deleteId} title="Xóa sản phẩm" message="Bạn có chắc chắn muốn xóa sản phẩm này khỏi danh mục?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} isDanger />
+      <ConfirmDialog isOpen={!!deleteId} title="Xóa sản phẩm" message="Bạn có chắc chắn muốn xóa sản phẩm này khỏi danh mục?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} type="danger" />
     </div>
   );
 }
