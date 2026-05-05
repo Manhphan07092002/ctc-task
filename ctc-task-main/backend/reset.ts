@@ -18,6 +18,11 @@ async function reset() {
     const user = await db.get('SELECT * FROM users WHERE lower(email) = lower(?)', [email]);
     if (!user) {
       console.log(`Không tìm thấy user với email: ${email}`);
+      const allUsers = await db.all('SELECT email, name, role FROM users');
+      console.log('--- DANH SÁCH CÁC TÀI KHOẢN HIỆN CÓ ---');
+      allUsers.forEach((u: any) => console.log(`- Email: ${u.email} | Tên: ${u.name} | Quyền: ${u.role}`));
+      console.log('-----------------------------------------');
+      console.log('Vui lòng chạy lại lệnh với một trong các email trên.');
       process.exit(1);
     }
     

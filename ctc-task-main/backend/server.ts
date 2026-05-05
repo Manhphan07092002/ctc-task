@@ -48,8 +48,8 @@ async function startServer() {
   app.set('trust proxy', 1);
 
   if (!process.env.JWT_SECRET) {
-    process.env.JWT_SECRET = crypto.randomBytes(32).toString('hex');
-    console.warn('⚠️ CẢNH BÁO: JWT_SECRET không có trong .env. Đã tự động tạo một khóa ngẫu nhiên cho phiên này.');
+    process.env.JWT_SECRET = 'ctc_task_default_secret_key_2026_do_not_use_in_prod';
+    console.warn('⚠️ CẢNH BÁO: JWT_SECRET không có trong .env. Đã sử dụng khóa mặc định.');
   }
 
   const httpServer = http.createServer(app);

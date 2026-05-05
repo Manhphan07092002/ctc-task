@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { 
   CheckCircle2, ListTodo, Timer, Flame, FileText, Video, 
   Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle,
-  FileSignature, Wallet
+  FileSignature, Wallet, DollarSign
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -520,7 +520,7 @@ export default function DashboardPage({
                     <RechartsTooltip 
                       cursor={{ fill: '#f1f5f9' }} 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
-                      formatter={(value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value)}
+                      formatter={(value: any) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value))}
                     />
                     <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32} />
                   </BarChart>
