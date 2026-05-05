@@ -105,7 +105,7 @@ export default function ReportsPage() {
     if (!canApprove || !user) return [];
     const all = [...reports, ...revenueReports];
     return all
-      .filter(r => r.department === user.department && r.status === 'Pending' && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
+      .filter(r => r.department === user.department && (r.status === 'Pending' || r.status === 'Pending Manager') && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, revenueReports, user, canApprove, currentWeekStartStr]);
 
@@ -113,7 +113,7 @@ export default function ReportsPage() {
     if (!canApprove || !user) return [];
     const all = [...reports, ...revenueReports];
     return all
-      .filter(r => r.department === user.department && r.status === 'Approved' && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
+      .filter(r => r.department === user.department && (r.status === 'Approved' || r.status === 'Pending Director') && r.authorId !== user.id && getReportWeekInfo(r).start === currentWeekStartStr)
       .sort((a, b) => new Date(b.approvedAt || b.createdAt).getTime() - new Date(a.approvedAt || a.createdAt).getTime());
   }, [reports, revenueReports, user, canApprove, currentWeekStartStr]);
 
@@ -136,7 +136,12 @@ export default function ReportsPage() {
     if (!canViewAll) return [];
     const all = [...reports, ...revenueReports];
     return all
-      .filter(r => r.status === 'Pending' && managerIds.has(r.authorId) && getReportWeekInfo(r).start === currentWeekStartStr)
+      .filter(r => {
+        if (r.status === 'Pending Director') return getReportWeekInfo(r).start === currentWeekStartStr; // Revenue reports that reached Director
+        if (r.status === 'Pending Manager' && canViewAll && user?.role === 'Admin') return getReportWeekInfo(r).start === currentWeekStartStr; // Admin can see all
+        if (r.status === 'Pending' || r.status === 'Pending Manager') return managerIds.has(r.authorId) && getReportWeekInfo(r).start === currentWeekStartStr;
+        return false;
+      })
       .sort((a, b) => new Date(b.submittedAt || b.createdAt).getTime() - new Date(a.submittedAt || a.createdAt).getTime());
   }, [reports, revenueReports, canViewAll, managerIds, currentWeekStartStr]);
 
@@ -372,7 +377,7 @@ export default function ReportsPage() {
     );
   }
   if (statusFilter !== 'all') {
-    displayedReports = displayedReports.filter(r => r.status === statusFilter);
+    displayedReports = displayedReports.filter(r => r.status.toLowerCase().startsWith(statusFilter.toLowerCase()));
   }
 
   const renderStatusBadge = (status: string) => {
@@ -387,7 +392,7 @@ export default function ReportsPage() {
 
   const myStats = {
     total: myReports.length,
-    pending: myReports.filter(r => r.status === 'Pending').length,
+    pending: myReports.filter(r => r.status === 'Pending' || r.status === 'Pending Manager' || r.status === 'Pending Director').length,
     approved: myReports.filter(r => r.status === 'Approved').length,
     rejected: myReports.filter(r => r.status === 'Rejected').length,
   };
