@@ -43,6 +43,9 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  
+  // Trust the first proxy to correctly extract client IP for rate limiting
+  app.set('trust proxy', 1);
 
   if (!process.env.JWT_SECRET) {
     process.env.JWT_SECRET = crypto.randomBytes(32).toString('hex');
