@@ -35,7 +35,7 @@ export default function ReportsPage() {
   const [devMode, setDevMode] = useState(false);
 
   const perms = user?.permissions || [];
-  const canApprove = perms.includes('approve_dept_reports') || perms.includes('approve_revenue_reports');
+  const canApprove = perms.includes('approve_dept_reports') || perms.includes('approve_dept_revenue') || perms.includes('approve_all_revenue');
   const canViewAll = perms.includes('view_all_reports');
   const canCreate = perms.includes('create_report');
 
@@ -121,7 +121,7 @@ export default function ReportsPage() {
   const managerRoleNames = useMemo(() => {
     return new Set(
       roles
-        .filter(r => Array.isArray(r.permissions) && (r.permissions.includes('approve_dept_reports') || r.permissions.includes('approve_revenue_reports')))
+        .filter(r => Array.isArray(r.permissions) && (r.permissions.includes('approve_dept_reports') || r.permissions.includes('approve_dept_revenue') || r.permissions.includes('approve_all_revenue')))
         .map(r => r.name)
     );
   }, [roles]);
@@ -504,7 +504,7 @@ export default function ReportsPage() {
           <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-white border border-green-200 rounded-xl hover:bg-green-50 transition-colors shadow-sm no-print">
             <Download size={16} /> Xuất Excel
           </button>
-          {(perms.includes('create_revenue_report') || perms.includes('approve_revenue_reports') || user?.role?.toLowerCase() === 'admin') && (
+          {(perms.includes('create_revenue_report') || perms.includes('approve_dept_revenue') || perms.includes('approve_all_revenue') || user?.role?.toLowerCase() === 'admin') && (
             <button onClick={() => { setSelectedRevenueReport(null); setIsRevenueModalOpen(true); }} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors shadow-sm">
               <DollarSign size={16} /> Báo cáo Doanh thu
             </button>

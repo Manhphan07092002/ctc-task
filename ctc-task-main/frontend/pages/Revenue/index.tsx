@@ -49,9 +49,9 @@ const RevenuePage: React.FC = () => {
 
   const perms = user?.permissions || [];
   const canCreate = perms.includes('create_revenue_report') || user?.role === 'Admin';
-  const canApprove = perms.includes('approve_revenue_reports') || perms.includes('approve_dept_reports') || user?.role === 'Admin';
-  const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || user?.role === 'Admin';
-  const isDirector = perms.includes('director_feedback') || user?.role === 'Admin';
+  const canApprove = perms.includes('approve_dept_revenue') || perms.includes('approve_all_revenue') || user?.role === 'Admin';
+  const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || perms.includes('approve_all_revenue') || user?.role === 'Admin';
+  const isDirector = perms.includes('approve_all_revenue') || perms.includes('director_feedback') || user?.role === 'Admin';
   const userDept = user?.department || '';
 
   const visibleReports = useMemo(() => {

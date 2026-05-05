@@ -42,7 +42,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'contracts', icon: Briefcase, path: '/contracts', permission: null },
       { id: 'products', icon: Package, path: '/products', permission: null },
-      { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_revenue_reports', 'view_all_reports', 'director_feedback'] },
+      { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_dept_revenue', 'approve_all_revenue', 'view_all_reports', 'director_feedback'] },
     ],
   },
   {

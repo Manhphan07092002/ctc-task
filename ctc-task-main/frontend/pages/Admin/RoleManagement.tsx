@@ -20,7 +20,8 @@ const ALL_PERMISSIONS = [
   { id: 'view_dept_users',      label: 'Xem danh sách nhân viên phòng ban', group: 'Nhân sự' },
   { id: 'join_meetings',        label: 'Tham gia cuộc họp',                group: 'Cuộc họp' },
   { id: 'create_revenue_report',label: 'Tạo báo cáo doanh thu',            group: 'Kinh doanh' },
-  { id: 'approve_revenue_reports',label: 'Duyệt báo cáo doanh thu',          group: 'Kinh doanh' },
+  { id: 'approve_dept_revenue', label: 'Duyệt báo cáo doanh thu phòng ban', group: 'Kinh doanh' },
+  { id: 'approve_all_revenue',  label: 'Duyệt tất cả báo cáo doanh thu',    group: 'Kinh doanh' },
 ];
 
 const PERM_GROUPS = [...new Set(ALL_PERMISSIONS.map(p => p.group))];
@@ -47,14 +48,14 @@ const ROLE_PRESETS = [
     name: 'Admin',
     color: '#ef4444',
     desc: 'Toàn quyền hệ thống: quản trị, cấu hình, và xem mọi dữ liệu.',
-    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings', 'create_revenue_report', 'approve_revenue_reports']
+    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings', 'create_revenue_report', 'approve_dept_revenue', 'approve_all_revenue']
   },
   {
     label: 'Giám đốc',
     name: 'Giám đốc',
     color: '#8b5cf6',
     desc: 'Xem toàn bộ báo cáo, cung cấp phản hồi Giám đốc. Xem tiến độ công việc.',
-    perms: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings']
+    perms: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings', 'approve_all_revenue']
   },
   {
     label: 'Phó giám đốc',
@@ -68,7 +69,7 @@ const ROLE_PRESETS = [
     name: 'Trưởng phòng',
     color: '#f59e0b',
     desc: 'Quản lý nhân viên trong phòng ban, giao việc, duyệt báo cáo phòng ban và doanh thu.',
-    perms: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'create_report', 'view_own_tasks', 'join_meetings', 'approve_revenue_reports']
+    perms: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'create_report', 'view_own_tasks', 'join_meetings', 'approve_dept_revenue']
   },
   {
     label: 'Nhân viên',

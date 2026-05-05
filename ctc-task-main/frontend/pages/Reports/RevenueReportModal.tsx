@@ -87,8 +87,8 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
 
   // ── Permissions ──
   const perms = user?.permissions || [];
-  const canApprove = perms.includes('approve_dept_reports') || perms.includes('approve_revenue_reports');
-  const canViewAll = perms.includes('view_all_reports') || user?.role === 'Admin';
+  const canApprove = perms.includes('approve_dept_revenue') || perms.includes('approve_all_revenue');
+  const canViewAll = perms.includes('view_all_reports') || perms.includes('approve_all_revenue') || user?.role === 'Admin';
 
   const isPendingMgrReview = !!(
     report &&
