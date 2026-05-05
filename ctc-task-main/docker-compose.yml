@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: ctc_task_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/db:/app/data
+      - ./data/uploads:/app/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/database.sqlite
+      # Thêm các biến môi trường khác (SMTP, JWT_SECRET...) vào đây nếu cần thiết
