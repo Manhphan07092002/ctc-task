@@ -3,7 +3,7 @@ import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, Button, Avatar } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { PlusCircle, Search, FileText, Pencil, Trash2, X, Save, Building2, DollarSign, Hash, Calendar as CalendarIcon, Filter, Upload, Paperclip, Download, Briefcase, WalletCards, TrendingUp, AlertCircle, Wallet, Printer } from 'lucide-react';
+import { PlusCircle, Search, FileText, Pencil, Trash2, X, Save, Building2, DollarSign, Hash, Calendar as CalendarIcon, Filter, Upload, Paperclip, Download, Briefcase, WalletCards, TrendingUp, AlertCircle, Wallet, Printer, PackageMinus } from 'lucide-react';
 import { Contract, ContractProduct } from '../../services/contractService';
 import { apiFetch } from '../../services/api';
 import * as XLSX from 'xlsx-js-style';
@@ -11,6 +11,8 @@ import * as productService from '../../services/productService';
 import { PaymentModal } from './PaymentModal';
 import { useReactToPrint } from 'react-to-print';
 import { PrintableQuote } from './PrintableQuote';
+import { ExportStockModal } from './ExportStockModal';
+import { ExportInvoiceModal } from './ExportInvoiceModal';
 
 const fmtMoney = (v: number) => v.toLocaleString('vi-VN') + ' ₫';
 
@@ -72,6 +74,8 @@ const ContractsPage: React.FC = () => {
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
   const [editingProductIdx, setEditingProductIdx] = useState<number | null>(null);
   const [hasInvoice, setHasInvoice] = useState(false);
+  const [exportStockContract, setExportStockContract] = useState<Contract | null>(null);
+  const [exportInvoiceContract, setExportInvoiceContract] = useState<Contract | null>(null);
 
   // Form state
   const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
@@ -299,6 +303,26 @@ const ContractsPage: React.FC = () => {
     XLSX.writeFile(wb, `Danh_Sach_Hop_Dong_${new Date().getTime()}.xlsx`);
   };
 
+  const handleSaveExportStock = async (contractId: string, updatedProducts: ContractProduct[]) => {
+    const targetContract = contracts.find(c => c.id === contractId);
+    if (!targetContract) return;
+    const newContract = { ...targetContract, products: updatedProducts };
+    await saveContract(newContract);
+  };
+
+  const handleSaveExportInvoice = async (contractId: string, updatedProducts: ContractProduct[], invNumber: string, invDate: string) => {
+    const targetContract = contracts.find(c => c.id === contractId);
+    if (!targetContract) return;
+    const newContract = { 
+      ...targetContract, 
+      products: updatedProducts, 
+      invoiceNumber: invNumber, 
+      invoiceDate: invDate,
+      status: targetContract.status === 'draft' ? 'pending' : targetContract.status
+    };
+    await saveContract(newContract);
+  };
+
   const handlePaymentSave = async (contractId: string, additionalAmount: number) => {
     const contract = contracts.find(c => c.id === contractId);
     if (!contract) return;
@@ -517,8 +541,10 @@ const ContractsPage: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-5">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Chỉnh sửa"><Pencil size={14}/></button>
-                        <button onClick={() => setDeleteId(c.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); setExportStockContract(c); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Xuất kho"><PackageMinus size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); setExportInvoiceContract(c); }} className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Xuất hóa đơn"><FileText size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Chỉnh sửa"><Pencil size={14}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteId(c.id); }} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa"><Trash2 size={14}/></button>
                       </div>
                     </td>
                   </tr>
@@ -770,7 +796,8 @@ const ContractsPage: React.FC = () => {
                             if (match) {
                               if (!newProduct.unit) updates.unit = match.unit || '';
                               if (!newProduct.origin) updates.origin = match.origin || '';
-                              if (!newProduct.unitPrice && 'defaultPrice' in match && match.defaultPrice !== undefined) updates.unitPrice = String(match.defaultPrice);
+                              if (!newProduct.unitPrice && 'salePrice' in match && match.salePrice) updates.unitPrice = String(match.salePrice);
+                              else if (!newProduct.unitPrice && 'defaultPrice' in match && match.defaultPrice !== undefined) updates.unitPrice = String(match.defaultPrice);
                               else if (!newProduct.unitPrice && 'unitPrice' in match) updates.unitPrice = String(match.unitPrice);
                             }
                           }
@@ -1001,6 +1028,18 @@ const ContractsPage: React.FC = () => {
         contract={paymentContract} 
         onClose={() => setPaymentContract(null)} 
         onSave={handlePaymentSave} 
+      />
+
+      <ExportStockModal 
+        contract={exportStockContract}
+        onClose={() => setExportStockContract(null)}
+        onSave={handleSaveExportStock}
+      />
+
+      <ExportInvoiceModal 
+        contract={exportInvoiceContract}
+        onClose={() => setExportInvoiceContract(null)}
+        onSave={handleSaveExportInvoice}
       />
 
       <PrintableQuote ref={printRef} contract={form} user={user} />

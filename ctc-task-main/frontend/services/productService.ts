@@ -3,9 +3,15 @@ import { apiFetch } from './api';
 export interface Product {
   id: string;
   name: string;
+  category?: string;
   unit?: string;
   origin?: string;
-  defaultPrice?: number;
+  defaultPrice?: number; // legacy
+  importQuantity?: number;
+  remainingQuantity?: number;
+  importPrice?: number;
+  salePrice?: number;
+  importCode?: string;
   createdAt: string;
 }
 

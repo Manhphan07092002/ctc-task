@@ -205,7 +205,13 @@ export async function initDb() {
     "ALTER TABLE contracts ADD COLUMN vatRate REAL DEFAULT 10;",
     "ALTER TABLE contracts ADD COLUMN postTaxValue REAL DEFAULT 0;",
     "ALTER TABLE contracts ADD COLUMN paidAmount REAL DEFAULT 0;",
-    "ALTER TABLE tasks ADD COLUMN contractId TEXT;"
+    "ALTER TABLE tasks ADD COLUMN contractId TEXT;",
+    "ALTER TABLE products ADD COLUMN category TEXT;",
+    "ALTER TABLE products ADD COLUMN importQuantity INTEGER DEFAULT 0;",
+    "ALTER TABLE products ADD COLUMN remainingQuantity INTEGER DEFAULT 0;",
+    "ALTER TABLE products ADD COLUMN importPrice REAL DEFAULT 0;",
+    "ALTER TABLE products ADD COLUMN salePrice REAL DEFAULT 0;",
+    "ALTER TABLE products ADD COLUMN importCode TEXT;"
   ];
   for (const sql of migrations) {
     try { await db.exec(sql); } catch (_) { /* column already exists */ }

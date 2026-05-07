@@ -16,15 +16,15 @@ export const productRoutes = (db: any) => {
   // Thêm sản phẩm mới
   router.post('/', async (req, res) => {
     try {
-      const { name, unit, origin, defaultPrice } = req.body;
+      const { name, unit, origin, defaultPrice, category, importQuantity, remainingQuantity, importPrice, salePrice, importCode } = req.body;
       if (!name) return res.status(400).json({ error: 'Tên sản phẩm là bắt buộc' });
 
       const id = 'prod-' + Math.random().toString(36).substr(2, 9);
       const createdAt = new Date().toISOString();
 
       await db.run(
-        'INSERT INTO products (id, name, unit, origin, defaultPrice, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [id, name, unit, origin, defaultPrice || 0, createdAt]
+        'INSERT INTO products (id, name, unit, origin, defaultPrice, category, importQuantity, remainingQuantity, importPrice, salePrice, importCode, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, unit, origin, defaultPrice || 0, category || '', importQuantity || 0, remainingQuantity || 0, importPrice || 0, salePrice || defaultPrice || 0, importCode || '', createdAt]
       );
 
       const product = await db.get('SELECT * FROM products WHERE id = ?', [id]);
@@ -41,13 +41,13 @@ export const productRoutes = (db: any) => {
   router.put('/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, unit, origin, defaultPrice } = req.body;
+      const { name, unit, origin, defaultPrice, category, importQuantity, remainingQuantity, importPrice, salePrice, importCode } = req.body;
       
       if (!name) return res.status(400).json({ error: 'Tên sản phẩm là bắt buộc' });
 
       await db.run(
-        'UPDATE products SET name = ?, unit = ?, origin = ?, defaultPrice = ? WHERE id = ?',
-        [name, unit, origin, defaultPrice || 0, id]
+        'UPDATE products SET name = ?, unit = ?, origin = ?, defaultPrice = ?, category = ?, importQuantity = ?, remainingQuantity = ?, importPrice = ?, salePrice = ?, importCode = ? WHERE id = ?',
+        [name, unit, origin, defaultPrice || 0, category || '', importQuantity || 0, remainingQuantity || 0, importPrice || 0, salePrice || defaultPrice || 0, importCode || '', id]
       );
 
       const product = await db.get('SELECT * FROM products WHERE id = ?', [id]);

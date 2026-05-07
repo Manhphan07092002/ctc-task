@@ -60,7 +60,7 @@ const NAV_LABELS: Record<string, string> = {
   calendar:      'Lịch',
   reports:       'Báo cáo',
   contracts:     'Hợp đồng',
-  products:      'Sản phẩm',
+  products:      'Kho hàng',
   revenue:       'Doanh thu',
   mail:          'Hộp thư',
   meetings:      'Cuộc họp',

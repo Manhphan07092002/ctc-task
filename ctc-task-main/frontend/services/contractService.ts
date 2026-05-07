@@ -9,6 +9,8 @@ export interface ContractProduct {
   origin: string;
   unitPrice: number;
   total: number;
+  exportedQuantity?: number;
+  invoicedQuantity?: number;
 }
 
 export interface Contract {
