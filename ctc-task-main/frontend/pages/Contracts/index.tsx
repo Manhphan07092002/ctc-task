@@ -13,7 +13,7 @@ import { useReactToPrint } from 'react-to-print';
 import { PrintableQuote } from './PrintableQuote';
 import { ExportStockModal } from './ExportStockModal';
 import { ExportInvoiceModal } from './ExportInvoiceModal';
-
+import { Pagination } from '../../components/Pagination';
 const fmtMoney = (v: number) => v.toLocaleString('vi-VN') + ' ₫';
 
 const readGroup = (group: number): string => {
@@ -76,6 +76,12 @@ const ContractsPage: React.FC = () => {
   const [hasInvoice, setHasInvoice] = useState(false);
   const [exportStockContract, setExportStockContract] = useState<Contract | null>(null);
   const [exportInvoiceContract, setExportInvoiceContract] = useState<Contract | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterStatus, filterDebt, activeTab]);
 
   // Form state
   const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
@@ -477,7 +483,13 @@ const ContractsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map(c => {
+              {(() => {
+                const totalItems = filtered.length;
+                const totalPages = Math.ceil(totalItems / itemsPerPage);
+                const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                return (
+                  <>
+                    {currentData.map(c => {
                 const debt = Math.max(0, (c.postTaxValue || 0) - (c.paidAmount || 0));
                 return (
                   <tr key={c.id} className="hover:bg-emerald-50/30 transition-colors group">
@@ -558,6 +570,13 @@ const ContractsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+          {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+              <Pagination currentPage={currentPage} totalPages={Math.ceil(filtered.length / itemsPerPage)} onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+            </div>
+          )}
+          </>
+          );})()}
           )}
 
           {activeTab === 'debts' && (
@@ -574,7 +593,13 @@ const ContractsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((c, idx) => {
+                {(() => {
+                  const totalItems = filtered.length;
+                  const totalPages = Math.ceil(totalItems / itemsPerPage);
+                  const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                  return (
+                    <>
+                      {currentData.map((c, idx) => {
                   const pTax = c.postTaxValue || 0;
                   const paid = c.paidAmount || 0;
                   const debt = Math.max(0, pTax - paid);
@@ -608,7 +633,7 @@ const ContractsPage: React.FC = () => {
               {filtered.length > 0 && (
                 <tfoot>
                   <tr className="bg-rose-50 border-t-2 border-rose-200">
-                    <td colSpan={3} className="px-4 py-3 text-right font-bold text-rose-800 text-sm">Tổng cộng:</td>
+                    <td colSpan={3} className="px-4 py-3 text-right font-bold text-rose-800 text-sm">Tổng cộng (Theo bộ lọc):</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-700 text-base">{fmtMoney(totalPostTax)}</td>
                     <td className="px-4 py-3 text-right font-bold text-blue-600 text-base">{fmtMoney(totalPaid)}</td>
                     <td className="px-4 py-3 text-right font-black text-rose-600 text-base">{fmtMoney(totalDebt)}</td>
@@ -617,6 +642,13 @@ const ContractsPage: React.FC = () => {
                 </tfoot>
               )}
             </table>
+            {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+              <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                <Pagination currentPage={currentPage} totalPages={Math.ceil(filtered.length / itemsPerPage)} onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+              </div>
+            )}
+            </>
+            );})()}
           )}
           </div>
         </div>

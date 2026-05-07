@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 
-export function meetingRoutes(_prisma: any, db: any) {
+export function meetingRoutes(db: any) {
   const router = Router();
 
   async function buildMeeting(m: any) {

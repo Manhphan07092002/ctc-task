@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { sendNotification } from '../utils/notify.js';
 
-export function taskRoutes(_prisma: any, db: any) {
+export function taskRoutes(db: any) {
   const router = Router();
 
   function groupByKey(rows: any[], key: string): Record<string, any[]> {
@@ -12,9 +12,16 @@ export function taskRoutes(_prisma: any, db: any) {
     }, {});
   }
 
-  async function buildTasks() {
+  async function buildTasks(thresholdDate?: string) {
+    let tasksQuery = 'SELECT * FROM tasks';
+    const params: any[] = [];
+    if (thresholdDate) {
+      tasksQuery += ' WHERE startDate >= ? OR dueDate >= ? OR startDate IS NULL OR dueDate IS NULL';
+      params.push(thresholdDate, thresholdDate);
+    }
+    
     const [tasks, assignees, tags, subtasks, comments] = await Promise.all([
-      db.all('SELECT * FROM tasks'),
+      db.all(tasksQuery, params),
       db.all('SELECT taskId, userId FROM task_assignees'),
       db.all('SELECT taskId, tag FROM task_tags'),
       db.all('SELECT id, taskId, title, isCompleted FROM task_subtasks ORDER BY sortOrder'),
@@ -69,8 +76,16 @@ export function taskRoutes(_prisma: any, db: any) {
 
   router.get('/', async (_req, res) => {
     try {
-      res.json(await buildTasks());
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      res.json(await buildTasks(sixMonthsAgo.toISOString()));
     } catch (e) { res.status(500).json({ error: 'Failed to fetch tasks' }); }
+  });
+
+  router.get('/archive', async (_req, res) => {
+    try {
+      res.json(await buildTasks());
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch tasks archive' }); }
   });
 
   router.post('/', async (req, res) => {

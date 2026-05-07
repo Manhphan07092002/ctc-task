@@ -2,14 +2,29 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { sendNotification } from '../utils/notify.js';
 
-export function reportRoutes(_prisma: any, db: any) {
+export function reportRoutes(db: any) {
   const router = Router();
 
   router.get('/', async (_req, res) => {
     try {
-      const reports = await db.all('SELECT * FROM reports WHERE isDeleted IS NULL OR isDeleted = 0');
+      // Time-boxing: only load data from the last 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const thresholdDate = sixMonthsAgo.toISOString();
+      
+      const reports = await db.all(
+        'SELECT * FROM reports WHERE (isDeleted IS NULL OR isDeleted = 0) AND createdAt >= ?',
+        [thresholdDate]
+      );
       res.json(reports);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch reports' }); }
+  });
+
+  router.get('/archive', async (_req, res) => {
+    try {
+      const reports = await db.all('SELECT * FROM reports WHERE isDeleted IS NULL OR isDeleted = 0');
+      res.json(reports);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch reports archive' }); }
   });
 
   router.post('/', async (req, res) => {

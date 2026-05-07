@@ -12,6 +12,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report } from '../../types';
 import * as XLSX from 'xlsx-js-style';
 import { RevenueReportModal } from './RevenueReportModal';
+import { Pagination } from '../../components/Pagination';
 
 export default function ReportsPage() {
   const { t } = useLanguage();
@@ -34,6 +35,8 @@ export default function ReportsPage() {
   const [historyWeeksShown, setHistoryWeeksShown] = useState(4);
   const [devMode, setDevMode] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const perms = user?.permissions || [];
   const canApprove = perms.includes('approve_dept_reports') || perms.includes('approve_dept_revenue') || perms.includes('approve_all_revenue');
   const canViewAll = perms.includes('view_all_reports');
@@ -87,6 +90,11 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'mine' | 'pending' | 'all' | 'weekly_summary' | 'dept_approved' | 'history'>(
     canViewAll ? 'pending' : 'mine'
   );
+
+  // Reset page when tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, statusFilter, filterDept, historySearch]);
 
   // Sync tab if user permissions change at runtime
   useEffect(() => {
@@ -948,7 +956,13 @@ export default function ReportsPage() {
                 <p className="font-medium text-gray-500">Không có báo cáo nào</p>
                 <p className="text-sm mt-1 text-gray-400">{activeTab === 'pending' ? 'Tất cả báo cáo đã được xử lý ✓' : 'Nhấn nút tạo báo cáo để bắt đầu'}</p>
               </div>
-            ) : displayedReports.map(report => {
+            ) : (() => {
+              const totalItems = displayedReports.length;
+              const totalPages = Math.ceil(totalItems / itemsPerPage);
+              const currentData = displayedReports.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+              return (
+                <>
+                  {currentData.map(report => {
               const author = getUserDetails(report.authorId);
               let approver = report.approvedBy ? getUserDetails(report.approvedBy) : null;
               if (!approver && report.status?.startsWith('Pending')) { const dept = departments.find(d => d.name === report.department); if (dept?.managerId) approver = getUserDetails(dept.managerId); }
@@ -989,6 +1003,14 @@ export default function ReportsPage() {
                 </div>
               );
             })}
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={totalItems} itemsPerPage={itemsPerPage} />
+              </div>
+            )}
+            </>
+            );
+            })()}
           </div>
         </div>
       )}

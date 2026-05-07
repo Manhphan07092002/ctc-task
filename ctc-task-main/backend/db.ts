@@ -32,8 +32,7 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
       startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
-      assignees TEXT, tags TEXT, createdBy TEXT, department TEXT,
-      recurrence TEXT, subtasks TEXT, comments TEXT
+      createdBy TEXT, department TEXT, recurrence TEXT, contractId TEXT
     );
     CREATE TABLE IF NOT EXISTS task_assignees (
       taskId TEXT NOT NULL, userId TEXT NOT NULL,
@@ -174,84 +173,132 @@ export async function initDb() {
     );
   `);
 
-  // Migrations (safe to run multiple times)
-  const migrations = [
-    'ALTER TABLE users ADD COLUMN password TEXT;',
-    'ALTER TABLE users ADD COLUMN mailPassword TEXT;',
-    'ALTER TABLE users ADD COLUMN failedLogins INTEGER NOT NULL DEFAULT 0;',
-    'ALTER TABLE users ADD COLUMN lockedUntil TEXT;',
-    'ALTER TABLE users ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0;',
-    "ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown';",
-    'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT;',
-    'ALTER TABLE reports ADD COLUMN directorFeedback TEXT;',
-    'ALTER TABLE reports ADD COLUMN managerFeedback TEXT;',
-    'ALTER TABLE reports ADD COLUMN deletedAt TEXT;',
-    'ALTER TABLE reports ADD COLUMN isDeleted INTEGER DEFAULT 0;',
-    'UPDATE reports SET isDeleted = 1 WHERE deletedAt IS NOT NULL AND (isDeleted IS NULL OR isDeleted = 0);',
-    'ALTER TABLE notes ADD COLUMN userId TEXT;',
-    'ALTER TABLE notes ADD COLUMN reminderAt TEXT;',
-    'ALTER TABLE users ADD COLUMN phone TEXT;',
-    'ALTER TABLE users ADD COLUMN dob TEXT;',
-    'ALTER TABLE users ADD COLUMN hometown TEXT;',
-    'ALTER TABLE users ADD COLUMN bio TEXT;',
-    'ALTER TABLE users ADD COLUMN cccd TEXT;',
-    'ALTER TABLE users ADD COLUMN gender TEXT;',
-    "UPDATE users SET phone = '0987654321', dob = '1985-06-15', hometown = 'Hà Nội', bio = 'Chuyên gia quản trị với hơn 10 năm kinh nghiệm trong lĩnh vực phát triển kinh doanh.', cccd = '001085123456', gender = 'Nam' WHERE email = 'vandat@ctcdn.vn' AND phone IS NULL;",
-    "UPDATE users SET phone = '0123456789', dob = '2002-09-07', hometown = 'Đà Nẵng', bio = 'Nhân viên năng nổ, luôn nỗ lực học hỏi và hoàn thành xuất sắc các dự án được giao.', cccd = '048202012345', gender = 'Nam' WHERE email = 'xuanmanh@ctcdn.vn' AND phone IS NULL;",
-    "UPDATE users SET phone = '0912345678', dob = '1990-01-01', hometown = 'Hồ Chí Minh', bio = 'Quản trị viên hệ thống cấp cao.', cccd = '079190001111', gender = 'Khác' WHERE email = 'admin@ctcdn.vn' AND phone IS NULL;",
-    "ALTER TABLE contracts ADD COLUMN status TEXT DEFAULT 'draft';",
-    "ALTER TABLE contracts ADD COLUMN attachments TEXT;",
-    "ALTER TABLE contracts ADD COLUMN products TEXT;",
-    "ALTER TABLE contracts ADD COLUMN vatRate REAL DEFAULT 10;",
-    "ALTER TABLE contracts ADD COLUMN postTaxValue REAL DEFAULT 0;",
-    "ALTER TABLE contracts ADD COLUMN paidAmount REAL DEFAULT 0;",
-    "ALTER TABLE tasks ADD COLUMN contractId TEXT;",
-    "ALTER TABLE products ADD COLUMN category TEXT;",
-    "ALTER TABLE products ADD COLUMN importQuantity INTEGER DEFAULT 0;",
-    "ALTER TABLE products ADD COLUMN remainingQuantity INTEGER DEFAULT 0;",
-    "ALTER TABLE products ADD COLUMN importPrice REAL DEFAULT 0;",
-    "ALTER TABLE products ADD COLUMN salePrice REAL DEFAULT 0;",
-    "ALTER TABLE products ADD COLUMN importCode TEXT;"
+  // ─── Versioned Migration System ────────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      appliedAt TEXT NOT NULL
+    )
+  `);
+
+  const MIGRATIONS: { version: number; name: string; sqls: string[] }[] = [
+    {
+      version: 1, name: 'add_user_auth_columns',
+      sqls: [
+        'ALTER TABLE users ADD COLUMN password TEXT',
+        'ALTER TABLE users ADD COLUMN mailPassword TEXT',
+        'ALTER TABLE users ADD COLUMN failedLogins INTEGER NOT NULL DEFAULT 0',
+        'ALTER TABLE users ADD COLUMN lockedUntil TEXT',
+        'ALTER TABLE users ADD COLUMN isLocked INTEGER NOT NULL DEFAULT 0',
+      ],
+    },
+    {
+      version: 2, name: 'add_password_reset_email_tracking',
+      sqls: [
+        "ALTER TABLE password_reset_requests ADD COLUMN emailStatus TEXT NOT NULL DEFAULT 'unknown'",
+        'ALTER TABLE password_reset_requests ADD COLUMN emailSentAt TEXT',
+      ],
+    },
+    {
+      version: 3, name: 'add_report_feedback_and_soft_delete',
+      sqls: [
+        'ALTER TABLE reports ADD COLUMN directorFeedback TEXT',
+        'ALTER TABLE reports ADD COLUMN managerFeedback TEXT',
+        'ALTER TABLE reports ADD COLUMN deletedAt TEXT',
+        'ALTER TABLE reports ADD COLUMN isDeleted INTEGER DEFAULT 0',
+        'UPDATE reports SET isDeleted = 1 WHERE deletedAt IS NOT NULL AND (isDeleted IS NULL OR isDeleted = 0)',
+      ],
+    },
+    {
+      version: 4, name: 'add_note_user_and_reminder',
+      sqls: [
+        'ALTER TABLE notes ADD COLUMN userId TEXT',
+        'ALTER TABLE notes ADD COLUMN reminderAt TEXT',
+      ],
+    },
+    {
+      version: 5, name: 'add_user_profile_fields',
+      sqls: [
+        'ALTER TABLE users ADD COLUMN phone TEXT',
+        'ALTER TABLE users ADD COLUMN dob TEXT',
+        'ALTER TABLE users ADD COLUMN hometown TEXT',
+        'ALTER TABLE users ADD COLUMN bio TEXT',
+        'ALTER TABLE users ADD COLUMN cccd TEXT',
+        'ALTER TABLE users ADD COLUMN gender TEXT',
+      ],
+    },
+    {
+      version: 6, name: 'seed_user_profile_data',
+      sqls: [
+        "UPDATE users SET phone = '0987654321', dob = '1985-06-15', hometown = 'Hà Nội', bio = 'Chuyên gia quản trị với hơn 10 năm kinh nghiệm trong lĩnh vực phát triển kinh doanh.', cccd = '001085123456', gender = 'Nam' WHERE email = 'vandat@ctcdn.vn' AND phone IS NULL",
+        "UPDATE users SET phone = '0123456789', dob = '2002-09-07', hometown = 'Đà Nẵng', bio = 'Nhân viên năng nổ, luôn nỗ lực học hỏi và hoàn thành xuất sắc các dự án được giao.', cccd = '048202012345', gender = 'Nam' WHERE email = 'xuanmanh@ctcdn.vn' AND phone IS NULL",
+        "UPDATE users SET phone = '0912345678', dob = '1990-01-01', hometown = 'Hồ Chí Minh', bio = 'Quản trị viên hệ thống cấp cao.', cccd = '079190001111', gender = 'Khác' WHERE email = 'admin@ctcdn.vn' AND phone IS NULL",
+      ],
+    },
+    {
+      version: 7, name: 'add_contract_extra_columns',
+      sqls: [
+        "ALTER TABLE contracts ADD COLUMN status TEXT DEFAULT 'draft'",
+        'ALTER TABLE contracts ADD COLUMN attachments TEXT',
+        'ALTER TABLE contracts ADD COLUMN products TEXT',
+        'ALTER TABLE contracts ADD COLUMN vatRate REAL DEFAULT 10',
+        'ALTER TABLE contracts ADD COLUMN postTaxValue REAL DEFAULT 0',
+        'ALTER TABLE contracts ADD COLUMN paidAmount REAL DEFAULT 0',
+      ],
+    },
+    {
+      version: 8, name: 'add_task_contract_link',
+      sqls: [
+        'ALTER TABLE tasks ADD COLUMN contractId TEXT',
+      ],
+    },
+    {
+      version: 9, name: 'add_product_inventory_columns',
+      sqls: [
+        'ALTER TABLE products ADD COLUMN category TEXT',
+        'ALTER TABLE products ADD COLUMN importQuantity INTEGER DEFAULT 0',
+        'ALTER TABLE products ADD COLUMN remainingQuantity INTEGER DEFAULT 0',
+        'ALTER TABLE products ADD COLUMN importPrice REAL DEFAULT 0',
+        'ALTER TABLE products ADD COLUMN salePrice REAL DEFAULT 0',
+        'ALTER TABLE products ADD COLUMN importCode TEXT',
+      ],
+    },
+    {
+      version: 10, name: 'add_user_preferences',
+      sqls: [
+        "ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'",
+      ],
+    },
+    {
+      version: 11, name: 'drop_legacy_json_columns_from_tasks',
+      sqls: [
+        'ALTER TABLE tasks DROP COLUMN assignees',
+        'ALTER TABLE tasks DROP COLUMN tags',
+        'ALTER TABLE tasks DROP COLUMN subtasks',
+        'ALTER TABLE tasks DROP COLUMN comments',
+      ],
+    },
   ];
-  for (const sql of migrations) {
-    try { await db.exec(sql); } catch (_) { /* column already exists */ }
+
+  // Run pending migrations only
+  const applied = await db.all('SELECT version FROM _migrations');
+  const appliedSet = new Set(applied.map((r: any) => r.version));
+
+  for (const m of MIGRATIONS) {
+    if (appliedSet.has(m.version)) continue;
+    console.log(`⏳ Running migration #${m.version}: ${m.name}...`);
+    for (const sql of m.sqls) {
+      try { await db.exec(sql); } catch (_) { /* column/change may already exist from legacy runs */ }
+    }
+    await db.run(
+      'INSERT INTO _migrations (version, name, appliedAt) VALUES (?, ?, ?)',
+      [m.version, m.name, new Date().toISOString()]
+    );
+    console.log(`✅ Migration #${m.version}: ${m.name}`);
   }
 
-  // Migrate existing JSON task columns to normalized tables (idempotent via INSERT OR IGNORE)
-  const existingTasks = await db.all('SELECT id, assignees, tags, subtasks, comments FROM tasks');
-  for (const task of existingTasks) {
-    try {
-      const assignees: string[] = task.assignees ? JSON.parse(task.assignees) : [];
-      for (const userId of assignees) {
-        await db.run('INSERT OR IGNORE INTO task_assignees (taskId, userId) VALUES (?, ?)', [task.id, userId]);
-      }
-    } catch { /* malformed JSON */ }
-    try {
-      const tags: string[] = task.tags ? JSON.parse(task.tags) : [];
-      for (const tag of tags) {
-        await db.run('INSERT OR IGNORE INTO task_tags (taskId, tag) VALUES (?, ?)', [task.id, tag]);
-      }
-    } catch { /* malformed JSON */ }
-    try {
-      const subtasks: any[] = task.subtasks ? JSON.parse(task.subtasks) : [];
-      for (let i = 0; i < subtasks.length; i++) {
-        const s = subtasks[i];
-        if (s.id) await db.run(
-          'INSERT OR IGNORE INTO task_subtasks (id, taskId, title, isCompleted, sortOrder) VALUES (?, ?, ?, ?, ?)',
-          [s.id, task.id, s.title, s.isCompleted ? 1 : 0, i],
-        );
-      }
-    } catch { /* malformed JSON */ }
-    try {
-      const comments: any[] = task.comments ? JSON.parse(task.comments) : [];
-      for (const c of comments) {
-        if (c.id) await db.run(
-          'INSERT OR IGNORE INTO task_comments (id, taskId, userId, content, createdAt) VALUES (?, ?, ?, ?, ?)',
-          [c.id, task.id, c.userId, c.content, c.createdAt],
-        );
-      }
-    } catch { /* malformed JSON */ }
-  }
+  // ─── One-time data migrations (idempotent via INSERT OR IGNORE) ────────────
 
   // Migrate meetings.participants JSON → meeting_participants table
   const existingMeetings = await db.all('SELECT id, participants FROM meetings');
@@ -264,7 +311,7 @@ export async function initDb() {
     } catch { /* malformed JSON */ }
   }
 
-  // Patch existing system roles to ensure meetings permissions are included
+  // Patch existing system roles to ensure all permissions are included
   const rolePatches: { name: string; permissions: string[] }[] = [
     { name: 'Admin', permissions: ['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'join_meetings', 'admin_panel'] },
     { name: 'Director', permissions: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings'] },
@@ -285,6 +332,7 @@ export async function initDb() {
       }
     }
   }
+
 
   // Seed Roles
   const roleCount = await db.get('SELECT COUNT(*) as count FROM roles');
@@ -320,12 +368,14 @@ export async function initDb() {
   // Seed Users
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
+    const adminPwd = process.env.ADMIN_DEFAULT_PASSWORD || 'CTC@dmin2026!';
     const INITIAL_USERS = [
-      { id: 'u1', name: 'Admin', email: 'admin@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1', phone: '0912345678', dob: '1990-01-01', hometown: 'Hồ Chí Minh', bio: 'Quản trị viên hệ thống.' },
-      { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2', phone: '0987654321', dob: '1985-06-15', hometown: 'Hà Nội', bio: 'Chuyên gia quản trị.' },
-      { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3', phone: '0123456789', dob: '2002-09-07', hometown: 'Đà Nẵng', bio: 'Nhân viên ưu tú.' },
-      { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn', password: await bcrypt.hash('123456', 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u4', phone: '0933333333', dob: '1980-02-20', hometown: 'Hải Phòng', bio: 'Giám đốc điều hành.' },
+      { id: 'u1', name: 'Admin', email: 'admin@ctcdn.vn', password: await bcrypt.hash(adminPwd, 10), role: 'Admin', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u1', phone: '0912345678', dob: '1990-01-01', hometown: 'Hồ Chí Minh', bio: 'Quản trị viên hệ thống.' },
+      { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn', password: await bcrypt.hash(adminPwd, 10), role: 'Manager', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2', phone: '0987654321', dob: '1985-06-15', hometown: 'Hà Nội', bio: 'Chuyên gia quản trị.' },
+      { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', password: await bcrypt.hash(adminPwd, 10), role: 'Employee', department: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3', phone: '0123456789', dob: '2002-09-07', hometown: 'Đà Nẵng', bio: 'Nhân viên ưu tú.' },
+      { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn', password: await bcrypt.hash(adminPwd, 10), role: 'Director', department: 'Board', avatar: 'https://i.pravatar.cc/150?u=u4', phone: '0933333333', dob: '1980-02-20', hometown: 'Hải Phòng', bio: 'Giám đốc điều hành.' },
     ];
+    console.log(`🔑 Seed users created. Default password: ${adminPwd.slice(0, 3)}${'*'.repeat(adminPwd.length - 3)}`);
     for (const u of INITIAL_USERS) {
       await db.run('INSERT INTO users (id, name, email, password, role, department, avatar, phone, dob, hometown, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [u.id, u.name, u.email, u.password, u.role, u.department, u.avatar, u.phone, u.dob, u.hometown, u.bio]);
     }
@@ -336,9 +386,14 @@ export async function initDb() {
   if (taskCount.count === 0) {
     const todayStr = new Date().toISOString().split('T')[0];
     await db.run(
-      'INSERT INTO tasks (id, title, description, startDate, estimatedEndAt, priority, status, assignees, tags, createdBy, department, recurrence, subtasks, comments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      ['t1', 'Design System Review', 'Review the new color palette and component library compatibility.', todayStr, null, 'High', 'In Progress', '["u1","u2"]', '["Design","UI/UX"]', 'u1', 'Board', 'None', '[{"id":"st1","title":"Check color contrast ratios","isCompleted":true}]', '[]']
+      'INSERT INTO tasks (id, title, description, startDate, estimatedEndAt, priority, status, createdBy, department, recurrence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['t1', 'Design System Review', 'Review the new color palette and component library compatibility.', todayStr, null, 'High', 'In Progress', 'u1', 'Board', 'None']
     );
+    await db.run('INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)', ['t1', 'u1']);
+    await db.run('INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)', ['t1', 'u2']);
+    await db.run('INSERT INTO task_tags (taskId, tag) VALUES (?, ?)', ['t1', 'Design']);
+    await db.run('INSERT INTO task_tags (taskId, tag) VALUES (?, ?)', ['t1', 'UI/UX']);
+    await db.run('INSERT INTO task_subtasks (id, taskId, title, isCompleted, sortOrder) VALUES (?, ?, ?, ?, ?)', ['st1', 't1', 'Check color contrast ratios', 1, 0]);
   }
 
   // Seed Notes

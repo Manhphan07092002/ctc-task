@@ -15,9 +15,7 @@ const ChangePasswordSchema = z.object({
   newPassword: z.string().min(6, 'Mật khẩu mới phải ít nhất 6 ký tự'),
 });
 
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
-  console.error('[SECURITY] JWT_SECRET is not set. Using the default insecure secret. Set this env var immediately.');
-}
+
 
 export function authRoutes(db: any) {
   const router = Router();
@@ -143,34 +141,6 @@ export function authRoutes(db: any) {
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
-  router.post('/quick-login', async (req, res) => {
-    const { userId } = req.body;
-    try {
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
-      if (user) {
-        const role = await db.get('SELECT permissions FROM roles WHERE name = ?', [user.role]);
-        const userClientData = {
-          id: user.id, name: user.name, email: user.email, role: user.role, 
-          department: user.department, avatar: user.avatar, 
-          permissions: role?.permissions ? JSON.parse(role.permissions) : []
-        };
-        const jwtPayload = { id: user.id, role: user.role };
-        const token = generateToken(jwtPayload);
-        
-        try {
-          await db.run(
-            `INSERT INTO activity_logs (id, userId, action, entityId, entityType, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [crypto.randomUUID(), user.id, 'Đăng nhập nhanh', user.id, 'user', 'Người dùng sử dụng Quick Login', new Date().toISOString()]
-          );
-        } catch (logErr) {
-          console.error('Failed to log quick login activity', logErr);
-        }
-
-        return res.json({ token, user: userClientData });
-      }
-      return res.status(401).json({ error: 'Invalid user id' });
-    } catch (e) { res.status(500).json({ error: 'Server error' }); }
-  });
 
   return router;
 }

@@ -6,7 +6,7 @@ const LOGIN_API_URL = '/api/auth/login';
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  quickLogin: (userId: string) => Promise<{ success: boolean; error?: string }>;
+
   logout: () => void;
   isLoading: boolean;
   updateUserSession: (updatedUser: User) => void;
@@ -83,26 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('ctc_user');
   };
 
-  const quickLogin = async (userId: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetch('/api/auth/quick-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        return { success: false, error: data.error || 'Đăng nhập nhanh thất bại.' };
-      }
-      setUser(data.user);
-      localStorage.setItem('ctc_token', data.token);
-      localStorage.setItem('ctc_user', JSON.stringify(data.user));
-      return { success: true };
-    } catch (e) {
-      console.error('Quick login failed:', e);
-      return { success: false, error: 'Lỗi kết nối.' };
-    }
-  };
+
 
   const updateUserSession = (updatedUser: User) => {
     setUser(updatedUser);
@@ -110,7 +91,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, quickLogin, logout, isLoading, updateUserSession }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, updateUserSession }}>
       {children}
     </AuthContext.Provider>
   );

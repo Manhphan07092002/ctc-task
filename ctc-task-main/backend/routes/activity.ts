@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-export function activityRoutes(_prisma: any, db: any) {
+export function activityRoutes(db: any) {
   const router = Router();
 
   async function enrichLogs(logs: any[]) {

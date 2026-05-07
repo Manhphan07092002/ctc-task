@@ -48,8 +48,12 @@ async function startServer() {
   app.set('trust proxy', 1);
 
   if (!process.env.JWT_SECRET) {
-    process.env.JWT_SECRET = 'ctc_task_default_secret_key_2026_do_not_use_in_prod';
-    console.warn('⚠️ CẢNH BÁO: JWT_SECRET không có trong .env. Đã sử dụng khóa mặc định.');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('🚨 NGHIÊM TRỌNG: JWT_SECRET chưa được cấu hình! Không thể khởi động ở production.');
+      process.exit(1);
+    }
+    process.env.JWT_SECRET = crypto.randomUUID() + crypto.randomUUID();
+    console.warn('⚠️ JWT_SECRET tự sinh cho dev. Token sẽ hết hạn khi restart server.');
   }
 
   const httpServer = http.createServer(app);
@@ -88,19 +92,19 @@ async function startServer() {
   app.use('/api/auth', authRoutes(db));
   app.use('/api/auth', forgotPasswordRoutes(db, mailer));
   app.use('/api/users', userRoutes(db, mailer));
-  app.use('/api/tasks', taskRoutes(null, db));
+  app.use('/api/tasks', taskRoutes(db));
   app.use('/api/notes', noteRoutes(db));
-  app.use('/api/meetings', meetingRoutes(null, db));
-  app.use('/api/reports', requireAuth, reportRoutes(null, db));
+  app.use('/api/meetings', meetingRoutes(db));
+  app.use('/api/reports', requireAuth, reportRoutes(db));
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
   app.use('/api/admin', requireAuth, requireAdmin, adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
-  app.use('/api/activity', activityRoutes(null, db));
+  app.use('/api/activity', activityRoutes(db));
   app.use('/api/mail', mailRoutes(db));
-  app.use('/api/contracts', requireAuth, contractRoutes(null, db));
-  app.use('/api/revenue-reports', requireAuth, revenueRoutes(null, db));
+  app.use('/api/contracts', requireAuth, contractRoutes(db));
+  app.use('/api/revenue-reports', requireAuth, revenueRoutes(db));
   app.use('/api/clients', requireAuth, clientRoutes(db));
   app.use('/api/products', requireAuth, productRoutes(db));
 

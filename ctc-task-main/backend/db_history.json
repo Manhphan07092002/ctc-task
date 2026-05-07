@@ -1,5 +1,13 @@
 [
   {
+    "id": "mino4c3zcdmov5e99r",
+    "action": "import",
+    "filename": "ctc-database-2026-05-07.sqlite",
+    "performedBy": "u1",
+    "note": "Nhập database từ file ctc-database-2026-05-07.sqlite",
+    "createdAt": "2026-05-07T07:11:40.911Z"
+  },
+  {
     "id": "zazorahme2emos2tksx",
     "action": "export",
     "filename": "database.sqlite",

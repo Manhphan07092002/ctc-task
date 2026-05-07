@@ -4,6 +4,7 @@ import { TaskListItem } from '../../components/TaskListItem';
 import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Trash2, Download, ArrowDownUp, AlertCircle, Repeat, Flame } from 'lucide-react';
 import { Task, User, TaskStatus, TaskPriority } from '../../types';
 import { AIAssistantHandle } from '../../components/AIAssistant';
+import { Pagination } from '../../components/Pagination';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import * as XLSX from 'xlsx-js-style';
 
@@ -36,6 +37,13 @@ export default function TasksPage({
   
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [sortBy, setSortBy] = useState<'none' | 'dueDate' | 'priority'>('none');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTags, sortBy, viewMode]);
 
   const sortedTasks = useMemo(() => {
     const tasks = [...filteredTasks];
@@ -202,26 +210,38 @@ export default function TasksPage({
                   {searchQuery || selectedTags.length > 0 ? t('noMatchingTasks') : "Bạn chưa có công việc nào. Nhấn Thêm mới để bắt đầu!"}
                 </p>
               </div>
-            ) : (
-              sortedTasks.map(task => {
-                const canEdit = checkPermission('edit', task, user);
-                const canDelete = checkPermission('delete', task, user);
-                const isAssignee = task.assignees.includes(user.id);
-                return (
-                  <TaskListItem
-                    key={task.id}
-                    task={task}
-                    onClick={() => openEditModal(task)}
-                    onCheck={() => handleStatusToggle(task)}
-                    onDelete={canDelete ? () => handleDeleteTask(task.id) : undefined}
-                    canToggle={canEdit || isAssignee}
-                    isReadOnly={!canEdit}
-                    showDepartment={!!(user.permissions?.includes('view_all_tasks') || user.permissions?.includes('manage_dept_tasks'))}
-                    allUsers={users}
-                  />
-                );
-              })
-            )}
+            ) : (() => {
+              const totalItems = sortedTasks.length;
+              const totalPages = Math.ceil(totalItems / itemsPerPage);
+              const currentData = sortedTasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+              return (
+                <>
+                  {currentData.map(task => {
+                    const canEdit = checkPermission('edit', task, user);
+                    const canDelete = checkPermission('delete', task, user);
+                    const isAssignee = task.assignees.includes(user.id);
+                    return (
+                      <TaskListItem
+                        key={task.id}
+                        task={task}
+                        onClick={() => openEditModal(task)}
+                        onCheck={() => handleStatusToggle(task)}
+                        onDelete={canDelete ? () => handleDeleteTask(task.id) : undefined}
+                        canToggle={canEdit || isAssignee}
+                        isReadOnly={!canEdit}
+                        showDepartment={!!(user.permissions?.includes('view_all_tasks') || user.permissions?.includes('manage_dept_tasks'))}
+                        allUsers={users}
+                      />
+                    );
+                  })}
+                  {totalPages > 1 && (
+                    <div className="p-4 border-t border-gray-100 mt-4">
+                      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={totalItems} itemsPerPage={itemsPerPage} />
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         ) : (
           /* Kanban Board View */

@@ -2,15 +2,28 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { sendNotification } from '../utils/notify.js';
 
-export function revenueRoutes(_prisma: any, db: any) {
+export function revenueRoutes(db: any) {
   const router = Router();
 
-  // GET all revenue reports (not deleted)
+  // GET all revenue reports (not deleted, last 6 months)
   router.get('/', async (_req, res) => {
+    try {
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const rows = await db.all(
+        'SELECT * FROM revenue_reports WHERE (isDeleted IS NULL OR isDeleted = 0) AND createdAt >= ? ORDER BY createdAt DESC',
+        [sixMonthsAgo.toISOString()]
+      );
+      res.json(rows);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch revenue reports' }); }
+  });
+
+  // GET archive
+  router.get('/archive', async (_req, res) => {
     try {
       const rows = await db.all('SELECT * FROM revenue_reports WHERE isDeleted IS NULL OR isDeleted = 0 ORDER BY createdAt DESC');
       res.json(rows);
-    } catch (e) { res.status(500).json({ error: 'Failed to fetch revenue reports' }); }
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch revenue reports archive' }); }
   });
 
   // CREATE

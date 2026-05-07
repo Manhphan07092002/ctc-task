@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 
-export function contractRoutes(_prisma: any, db: any) {
+export function contractRoutes(db: any) {
   const router = Router();
 
   async function logActivity(userId: string, action: string, entityId: string, metadata: any) {
@@ -24,6 +24,12 @@ export function contractRoutes(_prisma: any, db: any) {
       let query = 'SELECT * FROM contracts WHERE (isDeleted IS NULL OR isDeleted = 0)';
       const params: any[] = [];
 
+      // Time-boxing
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      query += ' AND createdAt >= ?';
+      params.push(sixMonthsAgo.toISOString());
+
       if (!canViewAll) {
         // Tạm thời mở quyền cho mọi người xem HĐ phòng ban do tính chất công việc hiện tại
         // Nếu muốn siết chặt "Nhân viên chỉ xem của mình", có thể đổi điều kiện ở đây.
@@ -42,6 +48,35 @@ export function contractRoutes(_prisma: any, db: any) {
       }));
       res.json(mapped);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch contracts' }); }
+  });
+
+  // GET archive
+  router.get('/archive', async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+      const perms = user.permissions || [];
+      const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || perms.includes('admin_panel') || perms.includes('view_all_tasks');
+
+      let query = 'SELECT * FROM contracts WHERE (isDeleted IS NULL OR isDeleted = 0)';
+      const params: any[] = [];
+
+      if (!canViewAll) {
+        query += ' AND createdBy = ?';
+        params.push(user.id);
+      }
+      
+      query += ' ORDER BY createdAt DESC';
+
+      const rows = await db.all(query, params);
+      const mapped = rows.map((r: any) => ({
+        ...r,
+        products: r.products ? JSON.parse(r.products) : [],
+        attachments: r.attachments ? JSON.parse(r.attachments) : []
+      }));
+      res.json(mapped);
+    } catch (e) { res.status(500).json({ error: 'Failed to fetch contracts archive' }); }
   });
 
   // CREATE

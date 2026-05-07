@@ -19,8 +19,8 @@ export function scheduleDailyTaskReminder(db: any) {
 
       let totalSent = 0;
       for (const task of tasks) {
-        let assigneeIds: string[] = [];
-        try { assigneeIds = JSON.parse(task.assignees || '[]'); } catch { continue; }
+        const assignees = await db.all('SELECT userId FROM task_assignees WHERE taskId = ?', [task.id]);
+        const assigneeIds = assignees.map((r: any) => r.userId);
         if (assigneeIds.length === 0) continue;
 
         for (const userId of assigneeIds) {

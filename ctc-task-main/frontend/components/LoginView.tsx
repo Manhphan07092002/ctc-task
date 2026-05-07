@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useData } from '../contexts/DataContext';
-import { User } from '../types';
 import { ArrowRight, AlertCircle, Sparkles, ShieldCheck, Eye, EyeOff, BarChart3, CheckSquare, Mail, Video, Brain } from 'lucide-react';
 
 const TECH_FEATURES = [
@@ -15,14 +13,12 @@ const TECH_FEATURES = [
 ];
 
 export const LoginView: React.FC = () => {
-  const { login, quickLogin } = useAuth();
-  const { users } = useData();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [quickLoading, setQuickLoading] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,14 +31,6 @@ export const LoginView: React.FC = () => {
         setIsLoading(false);
       }
     }, 800);
-  };
-
-  const handleQuickAccess = async (u: User) => {
-    setQuickLoading(u.id);
-    setError('');
-    const res = await quickLogin(u.id);
-    if (!res.success) setError(res.error || 'Không thể đăng nhập nhanh cho tài khoản này.');
-    setQuickLoading(null);
   };
 
   return (

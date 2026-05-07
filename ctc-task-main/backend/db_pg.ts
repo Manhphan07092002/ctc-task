@@ -119,8 +119,7 @@ const DDL = `
   CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
     startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
-    assignees TEXT, tags TEXT, createdBy TEXT, department TEXT,
-    recurrence TEXT, subtasks TEXT, comments TEXT, contractId TEXT
+    createdBy TEXT, department TEXT, recurrence TEXT, contractId TEXT
   );
   CREATE TABLE IF NOT EXISTS task_assignees (
     taskId TEXT NOT NULL, userId TEXT NOT NULL,
@@ -255,14 +254,16 @@ async function seedIfEmpty(db: PgDb): Promise<void> {
 
   const userCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (Number(userCount?.count) === 0) {
+    const adminPwd = process.env.ADMIN_DEFAULT_PASSWORD || 'CTC@dmin2026!';
     const USERS = [
       { id: 'u1', name: 'Admin',           email: 'admin@ctcdn.vn',    role: 'Admin',    dept: 'Board',   avatar: 'https://i.pravatar.cc/150?u=u1' },
       { id: 'u2', name: 'Nguyễn Văn Đạt', email: 'vandat@ctcdn.vn',   role: 'Manager',  dept: 'Product', avatar: 'https://i.pravatar.cc/150?u=u2' },
       { id: 'u3', name: 'Phan Xuân Mạnh', email: 'xuanmanh@ctcdn.vn', role: 'Employee', dept: 'Product', avatar: 'https://i.pravatar.cc/150?u=u3' },
       { id: 'u4', name: 'Nguyễn Văn Duy', email: 'vanduy@ctcdn.vn',   role: 'Director', dept: 'Board',   avatar: 'https://i.pravatar.cc/150?u=u4' },
     ];
+    console.log(`🔑 [PG] Seed users created. Default password: ${adminPwd.slice(0, 3)}${'*'.repeat(adminPwd.length - 3)}`);
     for (const u of USERS) {
-      const hashed = await bcrypt.hash('123456', 10);
+      const hashed = await bcrypt.hash(adminPwd, 10);
       await db.run('INSERT INTO users (id, name, email, password, role, department, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [u.id, u.name, u.email, hashed, u.role, u.dept, u.avatar]);
     }
@@ -303,13 +304,50 @@ export async function initDbPostgres(): Promise<PgDb> {
 
   const db = new PgDb(pool);
   await db.exec(DDL);
-  
-  // Safe migrations
-  const migrations = [
-    'ALTER TABLE tasks ADD COLUMN "contractId" TEXT;'
+
+  // ─── Versioned Migration System ────────────────────────────────────────────
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      appliedAt TEXT NOT NULL
+    )
+  `);
+
+  const MIGRATIONS: { version: number; name: string; sqls: string[] }[] = [
+    {
+      version: 1, name: 'add_task_contract_link',
+      sqls: ['ALTER TABLE tasks ADD COLUMN "contractId" TEXT'],
+    },
+    {
+      version: 2, name: 'add_user_preferences',
+      sqls: ["ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'"],
+    },
+    {
+      version: 3, name: 'drop_legacy_json_columns_from_tasks',
+      sqls: [
+        'ALTER TABLE tasks DROP COLUMN assignees',
+        'ALTER TABLE tasks DROP COLUMN tags',
+        'ALTER TABLE tasks DROP COLUMN subtasks',
+        'ALTER TABLE tasks DROP COLUMN comments',
+      ],
+    },
   ];
-  for (const sql of migrations) {
-    try { await db.run(sql); } catch (_) { /* ignore if exists */ }
+
+  const applied = await db.all('SELECT version FROM _migrations');
+  const appliedSet = new Set(applied.map((r: any) => r.version));
+
+  for (const m of MIGRATIONS) {
+    if (appliedSet.has(m.version)) continue;
+    console.log(`⏳ [PG] Running migration #${m.version}: ${m.name}...`);
+    for (const sql of m.sqls) {
+      try { await db.run(sql); } catch (_) { /* may already exist */ }
+    }
+    await db.run(
+      'INSERT INTO _migrations (version, name, appliedAt) VALUES (?, ?, ?)',
+      [m.version, m.name, new Date().toISOString()]
+    );
+    console.log(`✅ [PG] Migration #${m.version}: ${m.name}`);
   }
 
   await seedIfEmpty(db);
