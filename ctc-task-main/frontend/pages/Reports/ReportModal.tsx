@@ -15,6 +15,10 @@ interface TaskRow {
   id: string;
   assignee?: string;
   content: string;
+  contractId?: string;
+  contractStatus?: string;
+  projectId?: string;
+  projectStatus?: string;
   result: 'done' | 'in_progress' | 'pending' | '';
   nextAction: string;
   note: string;
@@ -47,6 +51,10 @@ interface ReportModalProps {
   departments: Department[];
   users: UserType[];
   allReports: Report[];
+  contracts?: any[];
+  projects?: any[];
+  saveContract?: (c: any) => Promise<void>;
+  saveProject?: (p: any) => Promise<void>;
   t: (key: string) => string;
 }
 
@@ -99,6 +107,10 @@ const newRow = (): TaskRow => ({
   id: Math.random().toString(36).slice(2),
   assignee: '',
   content: '',
+  contractId: '',
+  contractStatus: '',
+  projectId: '',
+  projectStatus: '',
   result: '',
   nextAction: '',
   note: ''
@@ -113,7 +125,7 @@ const RESULT_OPTIONS: { value: TaskRow['result']; label: string; color: string }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export const ReportModal: React.FC<ReportModalProps> = ({
-  isOpen, onClose, onSave, onDelete, onAdminHardDelete, initialReport, currentUser, tasks, departments, users, allReports,
+  isOpen, onClose, onSave, onDelete, onAdminHardDelete, initialReport, currentUser, tasks, departments, users, allReports, contracts = [], projects = [], saveContract, saveProject, t
 }) => {
   const week = getWeekRange();
 
@@ -250,14 +262,51 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   // ── Import from task list ──
   const importDoneTasks = () => {
     const myTasks = tasks.filter(t => t.assignees.includes(currentUser.id));
-    const newRows: TaskRow[] = myTasks.map(t => ({
-      id: t.id,
-      assignee: currentUser.name,
-      content: t.title,
-      result: (t.status === 'Done' ? 'done' : t.status === 'In Progress' ? 'in_progress' : 'pending') as TaskRow['result'],
-      nextAction: '',
-      note: '',
-    }));
+    const grouped = new Map<string, TaskRow>();
+
+    myTasks.forEach(t => {
+      let cId = t.contractId || '';
+      let pId = t.projectId || '';
+      
+      if (cId) {
+        const c = contracts?.find(x => x.id === cId);
+        if (c && c.projectId) pId = c.projectId;
+      }
+
+      const row: TaskRow = {
+        id: t.id,
+        assignee: currentUser.name,
+        content: t.title,
+        result: (t.status === 'Done' ? 'done' : t.status === 'In Progress' ? 'in_progress' : 'pending') as TaskRow['result'],
+        nextAction: '',
+        note: '',
+        contractId: cId,
+        projectId: pId,
+        contractStatus: cId ? (contracts?.find(x => x.id === cId)?.status || '') : '',
+        projectStatus: pId ? (projects?.find(x => x.id === pId)?.status || '') : ''
+      };
+
+      const groupKey = pId ? `project_${pId}` : (cId ? `contract_${cId}` : `task_${t.id}`);
+      
+      if (grouped.has(groupKey)) {
+        const existing = grouped.get(groupKey)!;
+        const existingTitles = existing.content.split('\n').map(s => s.trim());
+        if (!existingTitles.includes(t.title.trim())) {
+          existing.content = `${existing.content}\n${t.title}`;
+        }
+        if (!existing.contractId && cId) {
+          existing.contractId = cId;
+          existing.contractStatus = row.contractStatus;
+        }
+        if (row.result === 'in_progress' || (row.result === 'pending' && existing.result === 'done')) {
+           existing.result = 'in_progress';
+        }
+      } else {
+        grouped.set(groupKey, row);
+      }
+    });
+
+    const newRows = Array.from(grouped.values());
     if (newRows.length) setRows(newRows);
   };
 
@@ -576,10 +625,11 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </div>
 
             <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm bg-white">
-              <div className="grid bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider" style={{ gridTemplateColumns: '32px 40px 1fr 140px 1fr 140px 140px 40px' }}>
+              <div className="grid bg-gray-50/80 border-b border-gray-200 text-[11px] font-bold text-gray-500 uppercase tracking-wider" style={{ gridTemplateColumns: '32px 40px 1.5fr 160px 120px 1.5fr 120px 100px 40px' }}>
                 <div className="px-2 py-3.5" />
                 <div className="px-1 py-3.5 text-center">STT</div>
                 <div className="px-3 py-3.5">Nội dung</div>
+                <div className="px-3 py-3.5">Hợp đồng / Dự án</div>
                 <div className="px-3 py-3.5 text-center">Kết quả</div>
                 <div className="px-3 py-3.5">Bước tiếp theo</div>
                 <div className="px-3 py-3.5">Ghi chú</div>
@@ -598,7 +648,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                               ref={provided.innerRef} 
                               {...provided.draggableProps} 
                               className={`grid items-start transition-colors group relative ${snapshot.isDragging ? 'bg-blue-50 shadow-lg ring-1 ring-blue-200 rounded-xl z-50' : 'hover:bg-blue-50/30 bg-white'}`} 
-                              style={{ ...provided.draggableProps.style, gridTemplateColumns: '32px 40px 1fr 140px 1fr 140px 140px 40px' }}
+                              style={{ ...provided.draggableProps.style, gridTemplateColumns: '32px 40px 1.5fr 160px 120px 1.5fr 120px 100px 40px' }}
                             >
                               <div className="px-1 py-4 flex items-center justify-center mt-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" {...provided.dragHandleProps}>
                                 {!isFormReadOnly && <GripVertical size={16} />}
@@ -606,6 +656,60 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                               <div className="px-1 py-4 text-center text-xs font-semibold text-gray-400 mt-1">{idx + 1}</div>
                               <div className="px-2 py-3">
                       <textarea value={row.content} onChange={e => updateRow(row.id, 'content', e.target.value)} disabled={isFormReadOnly} rows={2} placeholder="Mô tả công việc..." className="w-full resize-none text-sm font-medium text-gray-800 bg-transparent border-0 outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 rounded-xl p-2.5 transition-all disabled:cursor-default placeholder-gray-300" />
+                    </div>
+                    <div className="px-2 py-3 flex flex-col gap-2">
+                      <div className="relative">
+                        <select value={row.contractId || ''} onChange={e => {
+                          updateRow(row.id, 'contractId', e.target.value);
+                          const c = contracts.find(x => x.id === e.target.value);
+                          if(c) updateRow(row.id, 'contractStatus', c.status || '');
+                        }} disabled={isFormReadOnly} className="w-full appearance-none text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-200 bg-gray-50">
+                          <option value="">-- Hợp đồng --</option>
+                          {contracts.map(c => <option key={c.id} value={c.id}>{c.contractNumber || c.contractName}</option>)}
+                        </select>
+                      </div>
+                      {row.contractId && (
+                        <div className="relative">
+                          <select value={row.contractStatus || ''} onChange={async e => {
+                            const newStatus = e.target.value;
+                            updateRow(row.id, 'contractStatus', newStatus);
+                            const c = contracts.find(x => x.id === row.contractId);
+                            if(c && saveContract && !isFormReadOnly) await saveContract({...c, status: newStatus});
+                          }} disabled={isFormReadOnly} className="w-full appearance-none text-[10px] font-bold uppercase border border-gray-200 rounded-lg px-2 py-1 focus:outline-none bg-blue-50 text-blue-700">
+                             <option value="draft">Bản nháp</option>
+                             <option value="pending">Chờ duyệt</option>
+                             <option value="in_progress">Đang thực hiện</option>
+                             <option value="completed">Đã hoàn thành</option>
+                             <option value="cancelled">Đã hủy</option>
+                          </select>
+                        </div>
+                      )}
+                      
+                      <div className="relative mt-1">
+                        <select value={row.projectId || ''} onChange={e => {
+                          updateRow(row.id, 'projectId', e.target.value);
+                          const p = projects.find(x => x.id === e.target.value);
+                          if(p) updateRow(row.id, 'projectStatus', p.status || '');
+                        }} disabled={isFormReadOnly} className="w-full appearance-none text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-200 bg-gray-50">
+                          <option value="">-- Dự án --</option>
+                          {projects.map(p => <option key={p.id} value={p.id}>{p.projectCode || p.name}</option>)}
+                        </select>
+                      </div>
+                      {row.projectId && (
+                        <div className="relative">
+                          <select value={row.projectStatus || ''} onChange={async e => {
+                            const newStatus = e.target.value;
+                            updateRow(row.id, 'projectStatus', newStatus);
+                            const p = projects.find(x => x.id === row.projectId);
+                            if(p && saveProject && !isFormReadOnly) await saveProject({...p, status: newStatus});
+                          }} disabled={isFormReadOnly} className="w-full appearance-none text-[10px] font-bold uppercase border border-gray-200 rounded-lg px-2 py-1 focus:outline-none bg-brand-50 text-brand-700">
+                             <option value="planning">Kế hoạch</option>
+                             <option value="in_progress">Đang chạy</option>
+                             <option value="on_hold">Tạm dừng</option>
+                             <option value="completed">Hoàn thành</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <div className="px-2 py-3 flex items-start justify-center mt-1">
                       {isReadOnly ? (

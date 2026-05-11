@@ -32,7 +32,7 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
       startDate TEXT, dueDate TEXT, estimatedEndAt TEXT, priority TEXT, status TEXT,
-      createdBy TEXT, department TEXT, recurrence TEXT, contractId TEXT
+      createdBy TEXT, department TEXT, recurrence TEXT, contractId TEXT, projectId TEXT
     );
     CREATE TABLE IF NOT EXISTS task_assignees (
       taskId TEXT NOT NULL, userId TEXT NOT NULL,
@@ -157,6 +157,39 @@ export async function initDb() {
       submittedAt TEXT,
       isDeleted INTEGER DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      projectCode TEXT NOT NULL,
+      name TEXT NOT NULL,
+      clientName TEXT,
+      department TEXT,
+      managerId TEXT,
+      status TEXT DEFAULT 'planning',
+      startDate TEXT,
+      endDate TEXT,
+      budget REAL DEFAULT 0,
+      description TEXT,
+      biddingCode TEXT,
+      biddingDate TEXT,
+      procurementMethod TEXT,
+      investor TEXT,
+      biddingPrice REAL DEFAULT 0,
+      winningPrice REAL DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT,
+      isDeleted INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS project_reports (
+      id TEXT PRIMARY KEY,
+      projectId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      progress INTEGER DEFAULT 0,
+      authorId TEXT NOT NULL,
+      status TEXT DEFAULT 'draft',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT
+    );
     CREATE TABLE IF NOT EXISTS clients (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
@@ -277,6 +310,56 @@ export async function initDb() {
         'ALTER TABLE tasks DROP COLUMN tags',
         'ALTER TABLE tasks DROP COLUMN subtasks',
         'ALTER TABLE tasks DROP COLUMN comments',
+      ],
+    },
+    {
+      version: 12, name: 'add_project_id_to_contracts',
+      sqls: [
+        'ALTER TABLE contracts ADD COLUMN projectId TEXT',
+      ],
+    },
+    {
+      version: 13, name: 'add_project_id_to_tasks',
+      sqls: [
+        'ALTER TABLE tasks ADD COLUMN projectId TEXT',
+      ],
+    },
+    {
+      version: 14, name: 'add_bidding_fields_to_projects',
+      sqls: [
+        'ALTER TABLE projects ADD COLUMN biddingCode TEXT',
+        'ALTER TABLE projects ADD COLUMN biddingDate TEXT',
+        'ALTER TABLE projects ADD COLUMN procurementMethod TEXT',
+        'ALTER TABLE projects ADD COLUMN investor TEXT',
+      ],
+    },
+    {
+      version: 15, name: 'add_bidding_price_to_projects',
+      sqls: [
+        'ALTER TABLE projects ADD COLUMN biddingPrice REAL DEFAULT 0',
+        'ALTER TABLE projects ADD COLUMN winningPrice REAL DEFAULT 0',
+      ],
+    },
+    {
+      version: 16, name: 'add_project_milestones_table',
+      sqls: [
+        `CREATE TABLE IF NOT EXISTS project_milestones (
+          id TEXT PRIMARY KEY,
+          projectId TEXT NOT NULL,
+          title TEXT NOT NULL,
+          dueDate TEXT,
+          completedAt TEXT,
+          status TEXT DEFAULT 'pending',
+          sortOrder INTEGER DEFAULT 0,
+          createdAt TEXT NOT NULL
+        )`,
+      ],
+    },
+    {
+      version: 17, name: 'add_priority_phase_to_projects',
+      sqls: [
+        "ALTER TABLE projects ADD COLUMN priority TEXT DEFAULT 'medium'",
+        "ALTER TABLE projects ADD COLUMN phase TEXT DEFAULT 'initiation'",
       ],
     },
   ];

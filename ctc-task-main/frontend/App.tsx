@@ -18,6 +18,8 @@ import ProductsPage from './pages/Products/index';
 import ForgotPasswordPage from './pages/ForgotPassword/index';
 import ResetPasswordPage from './pages/ResetPassword/index';
 import NotificationsPage from './pages/Notifications/index';
+import ProjectsPage from './pages/Projects/index';
+import ProjectReportsPage from './pages/ProjectReports/index';
 
 import { Sparkles } from 'lucide-react';
 
@@ -417,6 +419,8 @@ export default function CTCTaskApp() {
               } />
 
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/project-reports" element={<ProjectReportsPage />} />
               <Route path="/contracts" element={<ContractsPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/revenue" element={<RevenuePage />} />

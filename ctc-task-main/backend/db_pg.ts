@@ -196,6 +196,105 @@ const DDL = `
     subject TEXT NOT NULL, "to" TEXT NOT NULL, opens INTEGER NOT NULL DEFAULT 0,
     lastOpen TEXT, createdAt TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS contracts (
+    id TEXT PRIMARY KEY,
+    contractNumber TEXT NOT NULL,
+    clientName TEXT NOT NULL,
+    contractName TEXT NOT NULL,
+    products TEXT,
+    preTaxValue REAL DEFAULT 0,
+    vatRate REAL DEFAULT 10,
+    postTaxValue REAL DEFAULT 0,
+    paidAmount REAL DEFAULT 0,
+    invoiceDate TEXT,
+    invoiceNumber TEXT,
+    department TEXT NOT NULL,
+    createdBy TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    attachments TEXT,
+    projectId TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT,
+    isDeleted INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    projectCode TEXT NOT NULL,
+    name TEXT NOT NULL,
+    clientName TEXT,
+    department TEXT,
+    managerId TEXT,
+    status TEXT DEFAULT 'planning',
+    startDate TEXT,
+    endDate TEXT,
+    budget REAL DEFAULT 0,
+    description TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT,
+    isDeleted INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS project_reports (
+    id TEXT PRIMARY KEY,
+    projectId TEXT NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT,
+    progress INTEGER DEFAULT 0,
+    authorId TEXT NOT NULL,
+    status TEXT DEFAULT 'draft',
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT
+  );
+  CREATE TABLE IF NOT EXISTS revenue_reports (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    reportType TEXT NOT NULL,
+    periodStart TEXT NOT NULL,
+    periodEnd TEXT NOT NULL,
+    content TEXT,
+    totalPreTax REAL DEFAULT 0,
+    totalDelivered REAL DEFAULT 0,
+    totalCumulative REAL DEFAULT 0,
+    authorId TEXT NOT NULL,
+    department TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    approvedBy TEXT,
+    approvedAt TEXT,
+    managerFeedback TEXT,
+    directorFeedback TEXT,
+    createdAt TEXT NOT NULL,
+    submittedAt TEXT,
+    isDeleted INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    address TEXT,
+    taxCode TEXT,
+    representative TEXT,
+    notes TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT,
+    isDeleted INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    unit TEXT,
+    origin TEXT,
+    unitPrice REAL,
+    category TEXT,
+    importQuantity INTEGER DEFAULT 0,
+    exportQuantity INTEGER DEFAULT 0,
+    remainingQuantity INTEGER DEFAULT 0,
+    importPrice REAL DEFAULT 0,
+    salePrice REAL DEFAULT 0,
+    importCode TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT,
+    isDeleted INTEGER DEFAULT 0
+  );
 `;
 
 // ─── Seed helpers (same data as db.ts) ───────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
 import { Wand2, Sparkles, PlusCircle, LayoutList, LayoutGrid, Clock, CheckCircle2, Trash2, Download, ArrowDownUp, AlertCircle, Repeat, Flame } from 'lucide-react';
@@ -43,7 +43,7 @@ export default function TasksPage({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedTags, sortBy, viewMode]);
+  }, [searchQuery, selectedTags.join(','), sortBy, viewMode]);
 
   const sortedTasks = useMemo(() => {
     const tasks = [...filteredTasks];

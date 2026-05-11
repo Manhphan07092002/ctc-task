@@ -63,7 +63,7 @@ const getStatusBadge = (status: string = 'draft') => {
 
 const ContractsPage: React.FC = () => {
   const { user } = useAuth();
-  const { contracts, clients, users, departments, tasks, saveContract, deleteContract } = useData();
+  const { contracts, clients, users, departments, tasks, projects, saveContract, deleteContract } = useData();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDebt, setFilterDebt] = useState('all');
@@ -84,7 +84,7 @@ const ContractsPage: React.FC = () => {
   }, [search, filterStatus, filterDebt, activeTab]);
 
   // Form state
-  const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
+  const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number, projectId: string }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '' });
   const [uploading, setUploading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<productService.Product[]>([]);
 
@@ -139,7 +139,7 @@ const ContractsPage: React.FC = () => {
 
   const openCreate = () => {
     setEditingContract(null);
-    setForm({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0 });
+    setForm({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '' });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
     setEditingProductIdx(null);
     setHasInvoice(false);
@@ -148,7 +148,7 @@ const ContractsPage: React.FC = () => {
 
   const openEdit = (c: Contract) => {
     setEditingContract(c);
-    setForm({ contractNumber: c.contractNumber, clientName: c.clientName, contractName: c.contractName, preTaxValue: c.preTaxValue, vatRate: c.vatRate || 10, postTaxValue: c.postTaxValue || 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '', products: c.products || [], status: c.status || 'draft', attachments: c.attachments || [], paidAmount: c.paidAmount || 0 });
+    setForm({ contractNumber: c.contractNumber, clientName: c.clientName, contractName: c.contractName, preTaxValue: c.preTaxValue, vatRate: c.vatRate || 10, postTaxValue: c.postTaxValue || 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '', products: c.products || [], status: c.status || 'draft', attachments: c.attachments || [], paidAmount: c.paidAmount || 0, projectId: c.projectId || '' });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
     setEditingProductIdx(null);
     setHasInvoice(!!c.invoiceDate || !!c.invoiceNumber);
@@ -469,11 +469,16 @@ const ContractsPage: React.FC = () => {
       {/* Tables */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          {activeTab === 'list' && (
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left py-3 px-5 text-xs font-bold text-gray-500 uppercase tracking-wider">Hợp đồng</th>
+          {activeTab === 'list' && (() => {
+            const totalItems = filtered.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+            return (
+              <>
+                <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="text-left py-3 px-5 text-xs font-bold text-gray-500 uppercase tracking-wider">Hợp đồng</th>
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Khách hàng</th>
                 {canViewAll && <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Phòng ban</th>}
                 <th className="text-left py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Giá trị / Công nợ</th>
@@ -483,13 +488,7 @@ const ContractsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(() => {
-                const totalItems = filtered.length;
-                const totalPages = Math.ceil(totalItems / itemsPerPage);
-                const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-                return (
-                  <>
-                    {currentData.map(c => {
+              {currentData.map(c => {
                 const debt = Math.max(0, (c.postTaxValue || 0) - (c.paidAmount || 0));
                 return (
                   <tr key={c.id} className="hover:bg-emerald-50/30 transition-colors group">
@@ -570,18 +569,23 @@ const ContractsPage: React.FC = () => {
               )}
             </tbody>
           </table>
-          {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+          {totalPages > 1 && (
             <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-              <Pagination currentPage={currentPage} totalPages={Math.ceil(filtered.length / itemsPerPage)} onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={totalItems} itemsPerPage={itemsPerPage} />
             </div>
           )}
           </>
-          );})()}
-          )}
+          );
+          })()}
 
-          {activeTab === 'debts' && (
-            <table className="w-full text-sm">
-              <thead>
+          {activeTab === 'debts' && (() => {
+            const totalItems = filtered.length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+            return (
+              <>
+                <table className="w-full text-sm">
+                  <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wider w-12">STT</th>
                   <th className="text-left px-4 py-3 font-bold text-gray-600 text-xs uppercase tracking-wider">Số hợp đồng</th>
@@ -593,13 +597,7 @@ const ContractsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(() => {
-                  const totalItems = filtered.length;
-                  const totalPages = Math.ceil(totalItems / itemsPerPage);
-                  const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-                  return (
-                    <>
-                      {currentData.map((c, idx) => {
+                {currentData.map((c, idx) => {
                   const pTax = c.postTaxValue || 0;
                   const paid = c.paidAmount || 0;
                   const debt = Math.max(0, pTax - paid);
@@ -642,14 +640,14 @@ const ContractsPage: React.FC = () => {
                 </tfoot>
               )}
             </table>
-            {Math.ceil(filtered.length / itemsPerPage) > 1 && (
+            {totalPages > 1 && (
               <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-                <Pagination currentPage={currentPage} totalPages={Math.ceil(filtered.length / itemsPerPage)} onPageChange={setCurrentPage} totalItems={filtered.length} itemsPerPage={itemsPerPage} />
+                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={totalItems} itemsPerPage={itemsPerPage} />
               </div>
             )}
             </>
-            );})()}
-          )}
+            );
+          })()}
           </div>
         </div>
       </div>
@@ -753,6 +751,14 @@ const ContractsPage: React.FC = () => {
                     <option key={name} value={name} />
                   ))}
                 </datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Thuộc Dự án (Tùy chọn)</label>
+                <select value={form.projectId || ''} onChange={e => setForm({...form, projectId: e.target.value})}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+                  <option value="">-- Không thuộc dự án nào --</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.projectCode} - {p.name}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Trạng thái *</label>

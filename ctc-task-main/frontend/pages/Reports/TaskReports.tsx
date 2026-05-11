@@ -17,7 +17,7 @@ import { Pagination } from '../../components/Pagination';
 export default function ReportsPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { reports, revenueReports, tasks, users, roles, departments, saveReport, deleteReport, adminHardDeleteReport, saveRevenueReport } = useData();
+  const { reports, revenueReports, tasks, users, roles, departments, contracts, projects, saveReport, deleteReport, adminHardDeleteReport, saveRevenueReport, saveContract, saveProject } = useData();
   const { user } = useAuth();
   const { refresh: refreshNotifications, showToast, pushLocalNotification } = useNotifications();
 
@@ -335,15 +335,26 @@ export default function ReportsPage() {
       const status = r.status === 'Approved' ? 'Đã duyệt' : r.status === 'Pending' ? 'Chờ duyệt' : r.status === 'Rejected' ? 'Từ chối' : 'Nháp';
       const weekLabel = getReportWeekInfo(r).label;
       if (tasks.length === 0) {
-        rows.push({ 'Tuần': weekLabel, 'Tiêu đề': r.title, 'Phòng ban': r.department, 'Tác giả': author, 'Nội dung': '', 'Kết quả': '', 'Bước tiếp theo': '', 'Ghi chú': '', 'Trạng thái': status, 'Người duyệt': approver });
+        rows.push({ 'Tuần': weekLabel, 'Tiêu đề': r.title, 'Phòng ban': r.department, 'Tác giả': author, 'Nội dung': '', 'Hợp đồng / Dự án': '', 'Kết quả': '', 'Bước tiếp theo': '', 'Ghi chú': '', 'Trạng thái': status, 'Người duyệt': approver });
       } else {
-        tasks.forEach((t, i) => {
+        tasks.forEach((t: any, i: number) => {
+          let linkText = '';
+          if (t.contractId) {
+            const c = contracts?.find(x => x.id === t.contractId);
+            if (c) linkText += `HĐ: ${c.contractNumber || c.contractName} (${t.contractStatus || '—'})`;
+          }
+          if (t.projectId) {
+            const p = projects?.find(x => x.id === t.projectId);
+            if (p) linkText += (linkText ? '\n' : '') + `DA: ${p.projectCode || p.name} (${t.projectStatus || '—'})`;
+          }
+
           rows.push({
             'Tuần': i === 0 ? weekLabel : '',
             'Tiêu đề': i === 0 ? r.title : '',
             'Phòng ban': i === 0 ? r.department : '',
             'Tác giả': t.assignee || author,
             'Nội dung': t.content || '',
+            'Hợp đồng / Dự án': linkText,
             'Kết quả': RESULT_LABEL[t.result] || '',
             'Bước tiếp theo': t.nextAction || '',
             'Ghi chú': t.note || '',
@@ -356,7 +367,7 @@ export default function ReportsPage() {
 
     const ws = XLSX.utils.json_to_sheet(rows);
     // Auto column widths
-    ws['!cols'] = [{ wch: 22 }, { wch: 35 }, { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 18 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 22 }, { wch: 35 }, { wch: 16 }, { wch: 16 }, { wch: 40 }, { wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo');
     XLSX.writeFile(wb, `CTC_BaoCao_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -1091,6 +1102,10 @@ export default function ReportsPage() {
         departments={departments}
         users={users}
         allReports={reports}
+        contracts={contracts || []}
+        projects={projects || []}
+        saveContract={saveContract}
+        saveProject={saveProject}
         t={t}
       />
 

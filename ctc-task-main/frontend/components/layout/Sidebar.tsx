@@ -40,6 +40,7 @@ const NAV_GROUPS = [
   {
     label: 'Kinh doanh',
     items: [
+      { id: 'projects', icon: Briefcase, path: '/projects', permission: null },
       { id: 'contracts', icon: Briefcase, path: '/contracts', permission: null },
       { id: 'products', icon: Package, path: '/products', permission: null },
       { id: 'revenue',   icon: DollarSign, path: '/revenue',  permission: ['create_revenue_report', 'approve_dept_revenue', 'approve_all_revenue', 'view_all_reports', 'director_feedback'] },
@@ -58,7 +59,9 @@ const NAV_LABELS: Record<string, string> = {
   dashboard:     'Tổng quan',
   tasks:         'Công việc',
   calendar:      'Lịch',
-  reports:       'Báo cáo',
+  reports:       'Báo cáo CV',
+  project_reports: 'Báo cáo DA',
+  projects:      'Dự án',
   contracts:     'Hợp đồng',
   products:      'Kho hàng',
   revenue:       'Doanh thu',

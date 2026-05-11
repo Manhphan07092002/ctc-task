@@ -48,6 +48,7 @@ export interface Task {
   subtasks?: Subtask[];
   comments?: Comment[];
   contractId?: string;
+  projectId?: string;
 }
 
 export interface Note {
@@ -151,5 +152,111 @@ export interface PasswordResetRequest {
   userId: string;
   email: string;
   status: 'pending' | 'resolved';
+  createdAt: string;
+}
+
+export interface Contract {
+  id: string;
+  contractNumber: string;
+  clientName: string;
+  contractName: string;
+  preTaxValue?: number;
+  postTaxValue?: number;
+  invoiceDate?: string;
+  invoiceNumber?: string;
+  department: string;
+  status?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  isDeleted?: number;
+  projectId?: string;
+}
+
+export interface RevenueReport {
+  id: string;
+  title: string;
+  reportType: string;
+  periodStart: string;
+  periodEnd: string;
+  content?: string;
+  totalPreTax?: number;
+  totalDelivered?: number;
+  totalCumulative?: number;
+  authorId: string;
+  department: string;
+  status: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  managerFeedback?: string;
+  directorFeedback?: string;
+  createdAt: string;
+  submittedAt?: string;
+  isDeleted?: number;
+}
+
+export type ProjectPriority = 'low' | 'medium' | 'high' | 'critical';
+export type ProjectPhase = 'initiation' | 'planning' | 'execution' | 'monitoring' | 'closure';
+
+export interface Project {
+  id: string;
+  projectCode: string;
+  name: string;
+  clientName?: string;
+  department?: string;
+  managerId?: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  description?: string;
+  biddingCode?: string;
+  biddingDate?: string;
+  procurementMethod?: string;
+  investor?: string;
+  biddingPrice?: number;
+  winningPrice?: number;
+  priority?: ProjectPriority;
+  phase?: ProjectPhase;
+  createdAt: string;
+  updatedAt?: string;
+  isDeleted?: number;
+}
+
+export interface ProjectMilestone {
+  id: string;
+  projectId: string;
+  title: string;
+  dueDate?: string;
+  completedAt?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface ProjectReport {
+  id: string;
+  projectId: string;
+  title: string;
+  content?: string;
+  progress?: number;
+  authorId: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  region?: string;
+  createdAt: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  unit?: string;
+  origin?: string;
+  defaultPrice?: number;
   createdAt: string;
 }

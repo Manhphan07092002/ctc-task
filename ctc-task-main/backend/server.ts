@@ -29,6 +29,7 @@ import { contractRoutes } from './routes/contracts.js';
 import { revenueRoutes } from './routes/revenue.js';
 import { clientRoutes } from './routes/clients.js';
 import { productRoutes } from './routes/products.js';
+import { projectRoutes } from './routes/projects.js';
 
 import { initSocket } from './socket.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
@@ -52,8 +53,8 @@ async function startServer() {
       console.error('🚨 NGHIÊM TRỌNG: JWT_SECRET chưa được cấu hình! Không thể khởi động ở production.');
       process.exit(1);
     }
-    process.env.JWT_SECRET = crypto.randomUUID() + crypto.randomUUID();
-    console.warn('⚠️ JWT_SECRET tự sinh cho dev. Token sẽ hết hạn khi restart server.');
+    process.env.JWT_SECRET = 'dev_secret_key_do_not_use_in_production_12345';
+    console.warn('⚠️ JWT_SECRET tự sinh tĩnh cho dev. Token sẽ KHÔNG hết hạn khi restart server.');
   }
 
   const httpServer = http.createServer(app);
@@ -99,6 +100,16 @@ async function startServer() {
   app.use('/api/roles', roleRoutes(db));
   app.use('/api/departments', departmentRoutes(db));
   app.use('/api/notifications', notificationRoutes(db));
+
+  // Allow all authenticated users to read AI keys for the AI service
+  app.get('/api/system-config/ai-keys', requireAuth, async (_req, res) => {
+    try {
+      const config = await db.get(`SELECT value FROM system_config WHERE key = 'gemini_api_keys'`);
+      if (config && config.value) return res.json({ keys: JSON.parse(config.value) });
+      res.json({ keys: [] });
+    } catch (e) { res.status(500).json({ error: 'Failed' }); }
+  });
+
   app.use('/api/admin', requireAuth, requireAdmin, adminRoutes(db, mailer));
   app.use('/api/events', eventRoutes(db));
   app.use('/api/activity', activityRoutes(db));
@@ -107,6 +118,7 @@ async function startServer() {
   app.use('/api/revenue-reports', requireAuth, revenueRoutes(db));
   app.use('/api/clients', requireAuth, clientRoutes(db));
   app.use('/api/products', requireAuth, productRoutes(db));
+  app.use('/api/projects', requireAuth, projectRoutes(db));
 
   scheduleFridayReminder(db);
   scheduleNoteReminders(db);

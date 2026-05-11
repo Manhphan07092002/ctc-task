@@ -32,6 +32,7 @@ export interface Contract {
   status?: string; // 'draft', 'pending', 'in_progress', 'completed', 'cancelled'
   attachments?: string[];
   paidAmount?: number;
+  projectId?: string;
 }
 
 export const getContracts = async (): Promise<Contract[]> => {
@@ -41,7 +42,7 @@ export const getContracts = async (): Promise<Contract[]> => {
 };
 
 export const saveContract = async (contract: Contract & { _isNew?: boolean }): Promise<void> => {
-  const isNew = contract._isNew !== false && !contract.updatedAt;
+  const isNew = contract._isNew !== undefined ? contract._isNew : !contract.updatedAt;
   const res = await apiFetch(isNew ? API_URL : `${API_URL}/${contract.id}`, {
     method: isNew ? 'POST' : 'PUT',
     body: JSON.stringify(contract),

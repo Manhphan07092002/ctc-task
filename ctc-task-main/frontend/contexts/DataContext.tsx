@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Task, Note, User, Report, Role, Department } from '../types';
+import { Task, Note, User, Report, Role, Department, Project } from '../types';
 import { getTasks as fetchTasks, saveTask as apiSaveTask, deleteTask as apiDeleteTask } from '../services/taskService';
 import { getNotes as fetchNotes, saveNote as apiSaveNote, deleteNote as apiDeleteNote } from '../services/noteService';
 import { getUsers as fetchUsers, saveUser as apiSaveUser, deleteUser as apiDeleteUser } from '../services/userService';
@@ -10,6 +10,7 @@ import { getDepartments as fetchDepartments } from '../services/departmentServic
 import { getContracts as fetchContracts, saveContract as apiSaveContract, deleteContract as apiDeleteContract, Contract } from '../services/contractService';
 import { getRevenueReports as fetchRevenueReports, saveRevenueReport as apiSaveRevenueReport, deleteRevenueReport as apiDeleteRevenueReport, RevenueReport } from '../services/revenueService';
 import { getClients, Client } from '../services/clientService';
+import { getProjects, saveProject as apiSaveProject, deleteProject as apiDeleteProject } from '../services/projectService';
 import { useAuth } from './AuthContext';
 
 interface DataContextType {
@@ -22,6 +23,7 @@ interface DataContextType {
   contracts: Contract[];
   revenueReports: RevenueReport[];
   clients: Client[];
+  projects: Project[];
   isLoading: boolean;
   error: string | null;
   saveTask: (t: Task) => Promise<void>;
@@ -37,6 +39,8 @@ interface DataContextType {
   deleteContract: (id: string) => Promise<void>;
   saveRevenueReport: (r: RevenueReport & { _isNew?: boolean }) => Promise<void>;
   deleteRevenueReport: (id: string) => Promise<void>;
+  saveProject: (p: Project) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -56,10 +60,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { data: contracts = [], isLoading: contractsLoading, error: contractsError } = useQuery({ queryKey: ['contracts'], queryFn: fetchContracts, enabled: !!userId, retry: false });
   const { data: revenueReports = [], isLoading: revenueLoading, error: revenueError } = useQuery({ queryKey: ['revenueReports'], queryFn: fetchRevenueReports, enabled: !!userId, retry: false });
   const { data: clients = [], isLoading: clientsLoading, error: clientsError } = useQuery({ queryKey: ['clients'], queryFn: getClients, enabled: !!userId, retry: false });
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQuery({ queryKey: ['projects'], queryFn: getProjects, enabled: !!userId, retry: false });
 
-  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading || contractsLoading || revenueLoading || clientsLoading;
+  const isLoading = tasksLoading || notesLoading || usersLoading || reportsLoading || rolesLoading || departmentsLoading || contractsLoading || revenueLoading || clientsLoading || projectsLoading;
   
-  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError || contractsError || revenueError || clientsError;
+  const anyError = tasksError || notesError || usersError || reportsError || rolesError || deptsError || contractsError || revenueError || clientsError || projectsError;
   const error = anyError ? 'Failed to fetch data' : null;
 
   const refreshData = async () => {
@@ -156,9 +161,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['revenueReports'] }),
   });
 
+  const saveProjectMutation = useMutation({
+    mutationFn: apiSaveProject,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  });
+  const deleteProjectMutation = useMutation({
+    mutationFn: apiDeleteProject,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  });
+
   return (
     <DataContext.Provider value={{
-      tasks, notes, users, reports, roles, departments, contracts, revenueReports, clients, isLoading, error,
+      tasks, notes, users, reports, roles, departments, contracts, revenueReports, clients, projects, isLoading, error,
       saveTask: async (t) => { await saveTaskMutation.mutateAsync(t); },
       deleteTask: async (id) => { await deleteTaskMutation.mutateAsync(id); },
       saveNote: async (n) => { await saveNoteMutation.mutateAsync(n); },
@@ -172,6 +186,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       deleteContract: async (id) => { await deleteContractMutation.mutateAsync(id); },
       saveRevenueReport: async (r) => { await saveRevenueReportMutation.mutateAsync(r); },
       deleteRevenueReport: async (id) => { await deleteRevenueReportMutation.mutateAsync(id); },
+      saveProject: async (p) => { await saveProjectMutation.mutateAsync(p); },
+      deleteProject: async (id) => { await deleteProjectMutation.mutateAsync(id); },
       refreshData
     }}>
       {children}
