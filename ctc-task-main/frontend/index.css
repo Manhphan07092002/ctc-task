@@ -65,53 +65,53 @@ body {
 
 /* --- Basic Global Dark Mode Overrides --- */
 html.dark body {
-  background-color: #0f172a;
+  background-color: #1a2332;
   background-image: 
-    radial-gradient(at 0% 0%, hsla(210,100%,30%,0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, hsla(190,100%,30%,0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, hsla(210,100%,30%,0.2) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, hsla(210,100%,35%,0.12) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(190,100%,35%,0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(210,100%,35%,0.15) 0px, transparent 50%);
   color: #f8fafc;
 }
 
 html.dark .bg-white {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+  background-color: #243447 !important;
+  border-color: #3a5068 !important;
 }
 html.dark .bg-white\/80 {
-  background-color: rgba(30, 41, 59, 0.8) !important;
+  background-color: rgba(36, 52, 71, 0.85) !important;
 }
 
 html.dark .text-gray-900, 
 html.dark .text-gray-800, 
 html.dark .text-gray-700 {
-  color: #f1f5f9 !important;
+  color: #f8fafc !important;
 }
 
 html.dark .text-gray-600, 
 html.dark .text-gray-500 {
-  color: #94a3b8 !important;
+  color: #a8b8cc !important;
 }
 
 html.dark .bg-gray-50,
 html.dark .bg-gray-100 {
-  background-color: #334155 !important;
+  background-color: #2d3f54 !important;
 }
 
 html.dark .hover\:bg-gray-100:hover,
 html.dark .hover\:bg-gray-50:hover {
-  background-color: #475569 !important;
+  background-color: #3a5068 !important;
 }
 
 html.dark .border-gray-100, 
 html.dark .border-gray-200 {
-  border-color: #334155 !important;
+  border-color: #3a5068 !important;
 }
 
 html.dark input,
 html.dark textarea {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
+  background-color: #243447 !important;
+  color: #f8fafc !important;
+  border-color: #3a5068 !important;
 }
 
 html.dark input::placeholder,
@@ -121,12 +121,12 @@ html.dark textarea::placeholder {
 
 html.dark input:disabled,
 html.dark textarea:disabled {
-  background-color: #0f172a !important;
-  color: #475569 !important;
+  background-color: #1a2332 !important;
+  color: #5a7390 !important;
 }
 
 html.dark .bg-gray-50\/50 {
-  background-color: rgba(15, 23, 42, 0.5) !important;
+  background-color: rgba(26, 35, 50, 0.5) !important;
 }
 
 html.dark .bg-blue-50 {
@@ -188,7 +188,7 @@ html.dark .border-red-200 {
 }
 
 html.dark .text-gray-400 {
-  color: #64748b !important;
+  color: #7a8da3 !important;
 }
 
 html.dark .shadow-sm {
@@ -224,33 +224,33 @@ html.dark .hover\:border-rose-100:hover {
 /* Sidebar & TopHeader glassmorphism dark mode */
 html.dark .bg-white\/80,
 html.dark .bg-white\/60 {
-  background-color: rgba(15, 23, 42, 0.85) !important;
+  background-color: rgba(26, 35, 50, 0.88) !important;
 }
 
 html.dark .border-white\/60,
 html.dark .border-white\/50 {
-  border-color: rgba(51, 65, 85, 0.8) !important;
+  border-color: rgba(58, 80, 104, 0.8) !important;
 }
 
 html.dark .bg-white\/90,
 html.dark .bg-white\/95 {
-  background-color: rgba(15, 23, 42, 0.9) !important;
-  border-color: #334155 !important;
+  background-color: rgba(26, 35, 50, 0.92) !important;
+  border-color: #3a5068 !important;
 }
 
 /* Notification dropdown dark */
 html.dark .rounded-2xl.shadow-2xl.border.border-gray-100 {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
+  background-color: #243447 !important;
+  border-color: #3a5068 !important;
 }
 
 /* Card / Card-like containers */
 html.dark .ring-1 {
-  --tw-ring-color: #334155 !important;
+  --tw-ring-color: #3a5068 !important;
 }
 
 html.dark .divide-gray-100 > * + * {
-  border-color: #334155 !important;
+  border-color: #3a5068 !important;
 }
 
 /* Sidebar nav active item */
@@ -263,11 +263,11 @@ html.dark .text-brand-700 {
 }
 
 html.dark .border-brand-100 {
-  border-color: rgba(37, 99, 235, 0.3) !important;
+  border-color: rgba(37, 99, 235, 0.35) !important;
 }
 
 html.dark .text-gray-600 {
-  color: #94a3b8 !important;
+  color: #a8b8cc !important;
 }
 
 html.dark .hover\:text-gray-900:hover {
@@ -285,24 +285,24 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* Select dropdown */
 html.dark select {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
+  background-color: #243447 !important;
+  color: #f8fafc !important;
+  border-color: #3a5068 !important;
 }
 
 /* Table */
 html.dark table thead {
-  background-color: #0f172a !important;
+  background-color: #1a2332 !important;
 }
 
 html.dark table tbody tr:hover {
-  background-color: #1e293b !important;
+  background-color: #2d3f54 !important;
 }
 
 html.dark table td,
 html.dark table th {
-  border-color: #334155 !important;
-  color: #cbd5e1 !important;
+  border-color: #3a5068 !important;
+  color: #dde5ef !important;
 }
 
 /* --- Print Styles --- */

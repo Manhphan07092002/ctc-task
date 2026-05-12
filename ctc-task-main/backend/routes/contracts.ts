@@ -44,7 +44,8 @@ export function contractRoutes(db: any) {
       const mapped = rows.map((r: any) => ({
         ...r,
         products: r.products ? JSON.parse(r.products) : [],
-        attachments: r.attachments ? JSON.parse(r.attachments) : []
+        attachments: r.attachments ? JSON.parse(r.attachments) : [],
+        documentChecklist: r.documentChecklist ? JSON.parse(r.documentChecklist) : {}
       }));
       res.json(mapped);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch contracts' }); }
@@ -81,14 +82,14 @@ export function contractRoutes(db: any) {
 
   // CREATE
   router.post('/', async (req, res) => {
-    const { id, contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, department, createdBy, status, attachments, paidAmount, projectId } = req.body;
+    const { id, contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, department, createdBy, status, attachments, paidAmount, projectId, contractType, supplierName, documentChecklist } = req.body;
     try {
       const now = new Date().toISOString();
       const contractId = id || randomUUID();
       await db.run(
-        `INSERT INTO contracts (id, contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, department, createdBy, createdAt, status, attachments, paidAmount, projectId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [contractId, contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, department, createdBy, now, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, projectId || null]
+        `INSERT INTO contracts (id, contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, department, createdBy, createdAt, status, attachments, paidAmount, projectId, contractType, supplierName, documentChecklist)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [contractId, contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, department, createdBy, now, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, projectId || null, contractType || 'output', supplierName || null, documentChecklist ? JSON.stringify(documentChecklist) : null]
       );
 
       // Auto-create a Task for this new contract
@@ -109,11 +110,11 @@ export function contractRoutes(db: any) {
 
   // UPDATE
   router.put('/:id', async (req, res) => {
-    const { contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, status, attachments, paidAmount, projectId } = req.body;
+    const { contractNumber, clientName, contractName, products, preTaxValue, vatRate, postTaxValue, invoiceDate, invoiceNumber, status, attachments, paidAmount, projectId, contractType, supplierName, documentChecklist } = req.body;
     try {
       await db.run(
-        `UPDATE contracts SET contractNumber=?, clientName=?, contractName=?, products=?, preTaxValue=?, vatRate=?, postTaxValue=?, invoiceDate=?, invoiceNumber=?, status=?, attachments=?, paidAmount=?, projectId=?, updatedAt=? WHERE id=?`,
-        [contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, projectId || null, new Date().toISOString(), req.params.id]
+        `UPDATE contracts SET contractNumber=?, clientName=?, contractName=?, products=?, preTaxValue=?, vatRate=?, postTaxValue=?, invoiceDate=?, invoiceNumber=?, status=?, attachments=?, paidAmount=?, projectId=?, contractType=?, supplierName=?, documentChecklist=?, updatedAt=? WHERE id=?`,
+        [contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, projectId || null, contractType || 'output', supplierName || null, documentChecklist ? JSON.stringify(documentChecklist) : null, new Date().toISOString(), req.params.id]
       );
 
       await logActivity(req.user?.id || 'system', 'Cập nhật Hợp đồng', req.params.id, { contractNumber, status, preTaxValue, paidAmount });

@@ -362,6 +362,34 @@ export async function initDb() {
         "ALTER TABLE projects ADD COLUMN phase TEXT DEFAULT 'initiation'",
       ],
     },
+    {
+      version: 18, name: 'add_contract_type',
+      sqls: [
+        "ALTER TABLE contracts ADD COLUMN contractType TEXT DEFAULT 'output'",
+        "ALTER TABLE contracts ADD COLUMN supplierName TEXT",
+      ],
+    },
+    {
+      version: 19, name: 'create_contract_links',
+      sqls: [
+        `CREATE TABLE IF NOT EXISTS contract_links (
+          id TEXT PRIMARY KEY,
+          outputContractId TEXT NOT NULL,
+          inputContractId TEXT NOT NULL,
+          linkType TEXT DEFAULT 'related',
+          description TEXT,
+          createdBy TEXT,
+          createdAt TEXT NOT NULL,
+          UNIQUE(outputContractId, inputContractId)
+        )`,
+      ],
+    },
+    {
+      version: 20, name: 'add_document_checklist',
+      sqls: [
+        "ALTER TABLE contracts ADD COLUMN documentChecklist TEXT",
+      ],
+    },
   ];
 
   // Run pending migrations only

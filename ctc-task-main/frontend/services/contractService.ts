@@ -13,6 +13,20 @@ export interface ContractProduct {
   invoicedQuantity?: number;
 }
 
+export type ContractType = 'input' | 'output';
+
+export interface DocumentChecklist {
+  hoaDon?: boolean;        // Hóa đơn
+  bbbg?: boolean;          // Biên bản bàn giao
+  bbnt?: boolean;          // Biên bản nghiệm thu
+  deNghiTT?: boolean;      // Đề nghị thanh toán
+  thanhLy?: boolean;       // Thanh lý hợp đồng
+  camKetBH?: boolean;      // Cam kết bảo hành
+  coCq?: boolean;          // CO-CQ
+  hopDongGoc?: boolean;    // Hợp đồng gốc
+  phuluc?: boolean;        // Phụ lục HĐ
+}
+
 export interface Contract {
   id: string;
   contractNumber: string;
@@ -33,6 +47,9 @@ export interface Contract {
   attachments?: string[];
   paidAmount?: number;
   projectId?: string;
+  contractType?: ContractType;
+  supplierName?: string;
+  documentChecklist?: DocumentChecklist;
 }
 
 export const getContracts = async (): Promise<Contract[]> => {

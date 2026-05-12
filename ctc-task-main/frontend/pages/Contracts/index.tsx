@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Card, Button, Avatar } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { PlusCircle, Search, FileText, Pencil, Trash2, X, Save, Building2, DollarSign, Hash, Calendar as CalendarIcon, Filter, Upload, Paperclip, Download, Briefcase, WalletCards, TrendingUp, AlertCircle, Wallet, Printer, PackageMinus } from 'lucide-react';
-import { Contract, ContractProduct } from '../../services/contractService';
+import { Contract, ContractProduct, ContractType, DocumentChecklist } from '../../services/contractService';
 import { apiFetch } from '../../services/api';
 import * as XLSX from 'xlsx-js-style';
 import * as productService from '../../services/productService';
@@ -14,7 +14,20 @@ import { PrintableQuote } from './PrintableQuote';
 import { ExportStockModal } from './ExportStockModal';
 import { ExportInvoiceModal } from './ExportInvoiceModal';
 import { Pagination } from '../../components/Pagination';
+import { ContractLinksTab } from './ContractLinksTab';
 const fmtMoney = (v: number) => v.toLocaleString('vi-VN') + ' ₫';
+
+const CHECKLIST_ITEMS: { key: keyof DocumentChecklist; label: string; short: string }[] = [
+  { key: 'hopDongGoc', label: 'Hợp đồng gốc', short: 'HĐ' },
+  { key: 'hoaDon', label: 'Hóa đơn', short: 'HĐn' },
+  { key: 'bbbg', label: 'Biên bản bàn giao (BBBG)', short: 'BBBG' },
+  { key: 'bbnt', label: 'Biên bản nghiệm thu (BBNT)', short: 'BBNT' },
+  { key: 'deNghiTT', label: 'Đề nghị thanh toán', short: 'ĐNTT' },
+  { key: 'thanhLy', label: 'Thanh lý hợp đồng', short: 'TL' },
+  { key: 'camKetBH', label: 'Cam kết bảo hành', short: 'BH' },
+  { key: 'coCq', label: 'CO-CQ', short: 'CO' },
+  { key: 'phuluc', label: 'Phụ lục HĐ', short: 'PL' },
+];
 
 const readGroup = (group: number): string => {
   const digits = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
@@ -67,7 +80,7 @@ const ContractsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDebt, setFilterDebt] = useState('all');
-  const [activeTab, setActiveTab] = useState<'list' | 'debts' | 'create'>('list');
+  const [activeTab, setActiveTab] = useState<'output' | 'input' | 'debts' | 'links' | 'create'>('output');
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [paymentContract, setPaymentContract] = useState<Contract | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -84,7 +97,8 @@ const ContractsPage: React.FC = () => {
   }, [search, filterStatus, filterDebt, activeTab]);
 
   // Form state
-  const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number, projectId: string }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '' });
+  const emptyChecklist: DocumentChecklist = {};
+  const [form, setForm] = useState<{ contractNumber: string, clientName: string, contractName: string, preTaxValue: number, vatRate: number, postTaxValue: number, invoiceDate: string, invoiceNumber: string, products: ContractProduct[], status: string, attachments: string[], paidAmount: number, projectId: string, contractType: ContractType, supplierName: string, documentChecklist: DocumentChecklist }>({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '', contractType: 'output', supplierName: '', documentChecklist: {} });
   const [uploading, setUploading] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<productService.Product[]>([]);
 
@@ -106,7 +120,14 @@ const ContractsPage: React.FC = () => {
   const filtered = useMemo(() => {
     let list = contracts;
 
-    if (activeTab === 'list' || activeTab === 'create') {
+    // Filter by contract type for output/input tabs
+    if (activeTab === 'output' || activeTab === 'create') {
+      list = list.filter(c => (c.contractType || 'output') === (activeTab === 'create' ? form.contractType : 'output'));
+      if (filterStatus !== 'all') {
+        list = list.filter(c => c.status === filterStatus);
+      }
+    } else if (activeTab === 'input') {
+      list = list.filter(c => c.contractType === 'input');
       if (filterStatus !== 'all') {
         list = list.filter(c => c.status === filterStatus);
       }
@@ -126,10 +147,10 @@ const ContractsPage: React.FC = () => {
 
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(c => c.contractNumber.toLowerCase().includes(q) || c.clientName.toLowerCase().includes(q) || c.contractName.toLowerCase().includes(q));
+      list = list.filter(c => c.contractNumber.toLowerCase().includes(q) || c.clientName.toLowerCase().includes(q) || c.contractName.toLowerCase().includes(q) || (c.supplierName || '').toLowerCase().includes(q));
     }
     return list;
-  }, [contracts, search, filterStatus, filterDebt, activeTab, canViewAll, userDept]);
+  }, [contracts, search, filterStatus, filterDebt, activeTab, form.contractType, canViewAll, userDept]);
 
   const totalValue = useMemo(() => filtered.reduce((s, c) => s + (c.preTaxValue || 0), 0), [filtered]);
   const totalPostTax = useMemo(() => filtered.reduce((s, c) => s + (c.postTaxValue || 0), 0), [filtered]);
@@ -137,9 +158,10 @@ const ContractsPage: React.FC = () => {
   const totalDebt = Math.max(0, totalPostTax - totalPaid);
   const collectionRate = totalPostTax > 0 ? Math.round((totalPaid / totalPostTax) * 100) : 0;
 
-  const openCreate = () => {
+  const openCreate = (type?: ContractType) => {
     setEditingContract(null);
-    setForm({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '' });
+    const ct = type || (activeTab === 'input' ? 'input' : 'output');
+    setForm({ contractNumber: '', clientName: '', contractName: '', preTaxValue: 0, vatRate: 10, postTaxValue: 0, invoiceDate: '', invoiceNumber: '', products: [], status: 'draft', attachments: [], paidAmount: 0, projectId: '', contractType: ct, supplierName: '', documentChecklist: {} });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
     setEditingProductIdx(null);
     setHasInvoice(false);
@@ -148,7 +170,7 @@ const ContractsPage: React.FC = () => {
 
   const openEdit = (c: Contract) => {
     setEditingContract(c);
-    setForm({ contractNumber: c.contractNumber, clientName: c.clientName, contractName: c.contractName, preTaxValue: c.preTaxValue, vatRate: c.vatRate || 10, postTaxValue: c.postTaxValue || 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '', products: c.products || [], status: c.status || 'draft', attachments: c.attachments || [], paidAmount: c.paidAmount || 0, projectId: c.projectId || '' });
+    setForm({ contractNumber: c.contractNumber, clientName: c.clientName, contractName: c.contractName, preTaxValue: c.preTaxValue, vatRate: c.vatRate || 10, postTaxValue: c.postTaxValue || 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '', products: c.products || [], status: c.status || 'draft', attachments: c.attachments || [], paidAmount: c.paidAmount || 0, projectId: c.projectId || '', contractType: c.contractType || 'output', supplierName: c.supplierName || '', documentChecklist: c.documentChecklist || {} });
     setNewProduct({ name: '', unit: '', quantity: '1', origin: '', unitPrice: '' });
     setEditingProductIdx(null);
     setHasInvoice(!!c.invoiceDate || !!c.invoiceNumber);
@@ -263,9 +285,12 @@ const ContractsPage: React.FC = () => {
       department: user?.department || '',
       createdBy: user?.id || '',
       createdAt: editingContract?.createdAt || new Date().toISOString(),
+      contractType: form.contractType || 'output',
+      supplierName: form.supplierName || undefined,
+      documentChecklist: form.documentChecklist || {},
     };
     await saveContract(contract);
-    setActiveTab('list');
+    setActiveTab(form.contractType === 'input' ? 'input' : 'output');
   };
 
   const handleDelete = async () => {
@@ -356,15 +381,22 @@ const ContractsPage: React.FC = () => {
               <Download size={14}/> Xuất Excel
             </Button>
           )}
-          <Button variant={activeTab === 'list' ? 'primary' : 'secondary'} onClick={() => setActiveTab('list')} size="sm">Danh sách</Button>
+          <Button variant={activeTab === 'output' ? 'primary' : 'secondary'} onClick={() => setActiveTab('output')} size="sm">📤 HĐ Đầu ra</Button>
+          <Button variant={activeTab === 'input' ? 'primary' : 'secondary'} onClick={() => setActiveTab('input')} size="sm">📥 HĐ Đầu vào</Button>
+          <Button variant={activeTab === 'links' ? 'primary' : 'secondary'} onClick={() => setActiveTab('links')} size="sm">🔗 Liên kết</Button>
           <Button variant={activeTab === 'debts' ? 'primary' : 'secondary'} onClick={() => setActiveTab('debts')} size="sm">Công nợ</Button>
-          <Button variant={activeTab === 'create' ? 'primary' : 'secondary'} onClick={openCreate} size="sm" className="gap-1">
-            <PlusCircle size={14}/> Thêm hợp đồng
+          <Button variant={activeTab === 'create' ? 'primary' : 'secondary'} onClick={() => openCreate()} size="sm" className="gap-1">
+            <PlusCircle size={14}/> Thêm HĐ
           </Button>
         </div>
       </div>
 
-      {activeTab !== 'create' && (
+      {/* Links Tab */}
+      {activeTab === 'links' && (
+        <ContractLinksTab contracts={contracts} />
+      )}
+
+      {activeTab !== 'create' && activeTab !== 'links' && (
         <div className="space-y-6 animate-in fade-in duration-300">
 
       {/* Dashboard Metrics */}
@@ -386,17 +418,15 @@ const ContractsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Tổng Doanh thu */}
+        {/* Card 2 */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-emerald-50/50 group-hover:bg-emerald-100/50 transition-colors z-0"></div>
+          <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full ${activeTab === 'input' ? 'bg-rose-50/50 group-hover:bg-rose-100/50' : 'bg-emerald-50/50 group-hover:bg-emerald-100/50'} transition-colors z-0`}></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Tổng Doanh thu</p>
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                <DollarSign size={20} />
-              </div>
+              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">{activeTab === 'input' ? 'Tổng Chi phí' : 'Tổng Doanh thu'}</p>
+              <div className={`p-2 rounded-xl ${activeTab === 'input' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}><DollarSign size={20} /></div>
             </div>
-            <p className="text-2xl font-black text-emerald-600 truncate" title={fmtMoney(totalPostTax)}>{fmtMoney(totalPostTax)}</p>
+            <p className={`text-2xl font-black truncate ${activeTab === 'input' ? 'text-rose-600' : 'text-emerald-600'}`} title={fmtMoney(totalPostTax)}>{fmtMoney(totalPostTax)}</p>
             <p className="text-xs text-gray-400 mt-2">Tổng giá trị sau thuế (VAT)</p>
           </div>
         </div>
@@ -406,7 +436,7 @@ const ContractsPage: React.FC = () => {
           <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-indigo-50/50 group-hover:bg-indigo-100/50 transition-colors z-0"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Đã thanh toán</p>
+              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">{activeTab === 'input' ? 'Đã chi' : 'Đã thanh toán'}</p>
               <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                 <WalletCards size={20} />
               </div>
@@ -427,15 +457,37 @@ const ContractsPage: React.FC = () => {
           <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-rose-50/50 group-hover:bg-rose-100/50 transition-colors z-0"></div>
           <div className="relative z-10">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Tổng Công nợ</p>
+              <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">{activeTab === 'input' ? 'Còn phải trả' : 'Còn phải thu'}</p>
               <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
                 <AlertCircle size={20} />
               </div>
             </div>
             <p className="text-2xl font-black text-rose-600 truncate" title={fmtMoney(totalDebt)}>{fmtMoney(totalDebt)}</p>
-            <p className="text-xs text-gray-400 mt-2 font-medium">Còn phải thu từ khách hàng</p>
+            <p className="text-xs text-gray-400 mt-2 font-medium">{activeTab === 'input' ? 'Còn phải trả NCC' : 'Còn phải thu từ KH'}</p>
           </div>
         </div>
+
+        {/* Card 5: Lợi nhuận */}
+        {activeTab !== 'debts' && (() => {
+          const outputContracts = contracts.filter(c => (c.contractType || 'output') === 'output');
+          const inputContracts = contracts.filter(c => c.contractType === 'input');
+          const revenue = outputContracts.reduce((s, c) => s + (c.postTaxValue || 0), 0);
+          const expense = inputContracts.reduce((s, c) => s + (c.postTaxValue || 0), 0);
+          const profit = revenue - expense;
+          return (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+              <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full ${profit >= 0 ? 'bg-emerald-50/50' : 'bg-red-50/50'} transition-colors z-0`}></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Lợi nhuận ước tính</p>
+                  <div className={`p-2 rounded-xl ${profit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}><TrendingUp size={20} /></div>
+                </div>
+                <p className={`text-2xl font-black truncate ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`} title={fmtMoney(profit)}>{fmtMoney(profit)}</p>
+                <p className="text-xs text-gray-400 mt-2">Doanh thu - Chi phí</p>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Search and Filter */}
@@ -469,7 +521,7 @@ const ContractsPage: React.FC = () => {
       {/* Tables */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          {activeTab === 'list' && (() => {
+          {(activeTab === 'output' || activeTab === 'input') && (() => {
             const totalItems = filtered.length;
             const totalPages = Math.ceil(totalItems / itemsPerPage);
             const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -508,6 +560,21 @@ const ContractsPage: React.FC = () => {
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500 border border-gray-200">Chưa có hóa đơn</span>
                           )}
                         </div>
+                        {/* Document Checklist Mini */}
+                        {(() => {
+                          const cl = c.documentChecklist || {};
+                          const done = CHECKLIST_ITEMS.filter(item => cl[item.key]).length;
+                          const total = CHECKLIST_ITEMS.length;
+                          if (done === 0) return null;
+                          return (
+                            <div className="flex items-center gap-1 mt-1" title={`Hồ sơ: ${done}/${total} - ${CHECKLIST_ITEMS.filter(item => cl[item.key]).map(i => i.short).join(', ')}`}>
+                              {CHECKLIST_ITEMS.map(item => (
+                                <div key={item.key} className={`w-2 h-2 rounded-full ${cl[item.key] ? 'bg-emerald-500' : 'bg-gray-200'}`} title={item.label}></div>
+                              ))}
+                              <span className={`text-[9px] font-bold ml-1 ${done === total ? 'text-emerald-600' : 'text-amber-600'}`}>{done}/{total}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-gray-700">{c.clientName}</td>
@@ -700,6 +767,19 @@ const ContractsPage: React.FC = () => {
               </div>
             )}
             
+            {/* Contract Type Selector */}
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200 mb-2">
+              <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Loại HĐ:</span>
+              <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer font-bold text-sm transition-all ${form.contractType === 'output' ? 'bg-emerald-100 text-emerald-700 border-2 border-emerald-300 shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}>
+                <input type="radio" name="contractType" value="output" checked={form.contractType === 'output'} onChange={() => setForm({...form, contractType: 'output'})} className="sr-only" />
+                📤 HĐ Đầu ra (Bán)
+              </label>
+              <label className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer font-bold text-sm transition-all ${form.contractType === 'input' ? 'bg-blue-100 text-blue-700 border-2 border-blue-300 shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}`}>
+                <input type="radio" name="contractType" value="input" checked={form.contractType === 'input'} onChange={() => setForm({...form, contractType: 'input'})} className="sr-only" />
+                📥 HĐ Đầu vào (Mua)
+              </label>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Số hợp đồng *</label>
@@ -717,18 +797,19 @@ const ContractsPage: React.FC = () => {
                 </datalist>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Chủ đầu tư *</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">{form.contractType === 'input' ? 'Nhà cung cấp *' : 'Khách hàng / Chủ đầu tư *'}</label>
                 <input 
                   list="client-suggestions"
-                  value={form.clientName} 
-                  onChange={e => setForm({...form, clientName: e.target.value})} 
-                  placeholder="VD: Viễn thông Khánh Hòa"
+                  value={form.contractType === 'input' ? form.supplierName : form.clientName} 
+                  onChange={e => form.contractType === 'input' ? setForm({...form, supplierName: e.target.value, clientName: e.target.value}) : setForm({...form, clientName: e.target.value})} 
+                  placeholder={form.contractType === 'input' ? 'VD: Công ty ABC' : 'VD: Viễn thông Khánh Hòa'}
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
                 />
                 <datalist id="client-suggestions">
                   {Array.from(new Set([
                     ...clients.map(c => c.name),
-                    ...contracts.map(c => c.clientName?.trim())
+                    ...contracts.map(c => c.clientName?.trim()),
+                    ...contracts.filter(c => c.supplierName).map(c => c.supplierName!.trim())
                   ].filter(Boolean))).sort().map(client => (
                     <option key={client} value={client} />
                   ))}
@@ -1034,10 +1115,43 @@ const ContractsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Checklist Hồ sơ HĐ */}
+            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-2">
+                  📋 Checklist hồ sơ hợp đồng
+                </label>
+                <span className="text-xs font-bold text-amber-600">
+                  {CHECKLIST_ITEMS.filter(item => form.documentChecklist[item.key]).length}/{CHECKLIST_ITEMS.length} hoàn thành
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full bg-amber-100 rounded-full h-2 mb-4 overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-400 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${(CHECKLIST_ITEMS.filter(item => form.documentChecklist[item.key]).length / CHECKLIST_ITEMS.length) * 100}%` }}></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {CHECKLIST_ITEMS.map(item => (
+                  <label key={item.key} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all border ${form.documentChecklist[item.key] ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/30'}`}>
+                    <input
+                      type="checkbox"
+                      checked={!!form.documentChecklist[item.key]}
+                      onChange={() => setForm(f => ({ ...f, documentChecklist: { ...f.documentChecklist, [item.key]: !f.documentChecklist[item.key] } }))}
+                      className="sr-only"
+                    />
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${form.documentChecklist[item.key] ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 bg-white'}`}>
+                      {form.documentChecklist[item.key] && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                    </div>
+                    <span className={`text-sm font-medium ${form.documentChecklist[item.key] ? 'text-emerald-700' : 'text-gray-600'}`}>{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
           </div>
           
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-            <button onClick={() => setActiveTab('list')} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">← Quay lại</button>
+            <button onClick={() => setActiveTab('output')} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">← Quay lại</button>
             <div className="flex gap-3">
               {editingContract && (
                 <button onClick={() => {
@@ -1050,7 +1164,7 @@ const ContractsPage: React.FC = () => {
                   <FileText size={16}/> In HĐ
                 </button>
               )}
-              <button onClick={() => setActiveTab('list')} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">Hủy</button>
+              <button onClick={() => setActiveTab('output')} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">Hủy</button>
               <button onClick={handleSave} disabled={!form.contractNumber || !form.clientName || !form.contractName}
                 className="px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
                 <Save size={16}/> {editingContract ? 'Cập nhật' : 'Tạo mới'}

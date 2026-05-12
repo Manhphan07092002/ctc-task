@@ -26,6 +26,7 @@ import { activityRoutes } from './routes/activity.js';
 import { mailRoutes } from './routes/mail.js';
 import { uploadRoutes } from './routes/upload.js';
 import { contractRoutes } from './routes/contracts.js';
+import { contractLinkRoutes } from './routes/contractLinks.js';
 import { revenueRoutes } from './routes/revenue.js';
 import { clientRoutes } from './routes/clients.js';
 import { productRoutes } from './routes/products.js';
@@ -115,6 +116,7 @@ async function startServer() {
   app.use('/api/activity', activityRoutes(db));
   app.use('/api/mail', mailRoutes(db));
   app.use('/api/contracts', requireAuth, contractRoutes(db));
+  app.use('/api/contract-links', requireAuth, contractLinkRoutes(db));
   app.use('/api/revenue-reports', requireAuth, revenueRoutes(db));
   app.use('/api/clients', requireAuth, clientRoutes(db));
   app.use('/api/products', requireAuth, productRoutes(db));
