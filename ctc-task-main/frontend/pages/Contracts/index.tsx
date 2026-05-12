@@ -915,9 +915,15 @@ const ContractsPage: React.FC = () => {
                             if (match) {
                               if (!newProduct.unit) updates.unit = match.unit || '';
                               if (!newProduct.origin) updates.origin = match.origin || '';
-                              if (!newProduct.unitPrice && 'salePrice' in match && match.salePrice) updates.unitPrice = String(match.salePrice);
-                              else if (!newProduct.unitPrice && 'defaultPrice' in match && match.defaultPrice !== undefined) updates.unitPrice = String(match.defaultPrice);
-                              else if (!newProduct.unitPrice && 'unitPrice' in match) updates.unitPrice = String(match.unitPrice);
+                              if (!newProduct.unitPrice) {
+                                if ('importPrice' in match || 'salePrice' in match) {
+                                  if (form.contractType === 'input' && match.importPrice) updates.unitPrice = String(match.importPrice);
+                                  else if (form.contractType !== 'input' && match.salePrice) updates.unitPrice = String(match.salePrice);
+                                  else if (match.defaultPrice !== undefined) updates.unitPrice = String(match.defaultPrice);
+                                } else if ('unitPrice' in match) {
+                                  updates.unitPrice = String(match.unitPrice);
+                                }
+                              }
                             }
                           }
                           setNewProduct({...newProduct, ...updates});
