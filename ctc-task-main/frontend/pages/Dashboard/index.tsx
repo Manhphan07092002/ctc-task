@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { 
   CheckCircle2, ListTodo, Timer, Flame, FileText, Video, 
   Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle,
-  FileSignature, Wallet, DollarSign
+  FileSignature, Wallet, DollarSign, Briefcase, PenTool, CalendarPlus
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { Button, Card, Avatar } from '../../components/UI';
 import { TaskListItem } from '../../components/TaskListItem';
 import { StatCard } from '../../components/StatCard';
 import { subscribeToMeetings } from '../../services/meetingService';
+import { useData } from '../../contexts/DataContext';
 
 interface DashboardProps {
   roleBasedTasks: Task[];
@@ -38,6 +39,7 @@ export default function DashboardPage({
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const { projects = [] } = useData();
 
   useEffect(() => {
     const unsubscribe = subscribeToMeetings(setMeetings);
@@ -165,18 +167,23 @@ export default function DashboardPage({
   return (
     <>
       {/* Header Banner */}
-      <div className="mb-6 flex items-center justify-between bg-white dark:bg-slate-800/80 p-5 rounded-2xl border border-gray-100 dark:border-slate-700/60 shadow-sm">
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-white via-white to-brand-50/30 dark:from-slate-800/80 dark:via-slate-800/80 dark:to-slate-700/40 p-6 rounded-2xl border border-gray-100 dark:border-slate-700/60 shadow-sm">
         <div className="flex items-center gap-4">
-          <Avatar src={user.avatar} alt={user.name} size={12} className="ring-4 ring-gray-50 dark:ring-slate-700" />
+          <Avatar src={user.avatar} alt={user.name} size={12} className="ring-4 ring-brand-100/50 dark:ring-slate-700" />
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <timeOfDay.icon size={18} className={timeOfDay.color} />
-              <h1 className="text-xl font-bold text-gray-800 dark:text-slate-100">{timeOfDay.label}, {user.name}!</h1>
+              <timeOfDay.icon size={20} className={timeOfDay.color} />
+              <h1 className="text-xl font-black text-gray-800 dark:text-slate-100">{timeOfDay.label}, {user.name}!</h1>
             </div>
-            <p className="text-sm text-gray-500 dark:text-slate-400">
-              Hôm nay là {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">
+              {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} — {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => openCreateModal()} className="flex items-center gap-1.5 px-3 py-2 bg-brand-50 text-brand-700 rounded-xl text-xs font-bold hover:bg-brand-100 transition-colors border border-brand-200/50"><CalendarPlus size={14}/> Tạo CV</button>
+          <button onClick={() => navigate('/reports')} className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors border border-amber-200/50"><PenTool size={14}/> Báo cáo</button>
+          <button onClick={() => navigate('/contracts')} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors border border-emerald-200/50"><FileSignature size={14}/> Hợp đồng</button>
         </div>
       </div>
 
@@ -184,10 +191,10 @@ export default function DashboardPage({
       <div className="mb-6">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Công việc & Hoạt động</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" />
-          <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" />
-          <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" />
-          <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" />
+          <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" onClick={() => navigate('/tasks')} subtitle={`${stats.inProgress} đang chạy`} delay={0} />
+          <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0}% hoàn thành`} delay={60} />
+          <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" onClick={() => navigate('/tasks')} subtitle={stats.overdue > 0 ? 'Cần xử lý ngay!' : 'Tốt, không có trễ'} alert={true} delay={120} />
+          <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.highPriority / stats.total) * 100) : 0}% tổng CV`} delay={180} />
         </div>
       </div>
 
@@ -195,10 +202,10 @@ export default function DashboardPage({
       <div className="mb-8">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Tài chính & Khác</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Hợp đồng" value={stats.totalContracts} icon={FileSignature} color="from-blue-500 to-blue-400" />
-          <StatCard label="Công nợ (tr)" value={Math.round(stats.totalDebt / 1000000)} icon={Wallet} color="from-teal-500 to-teal-400" />
-          <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" />
-          <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" />
+          <StatCard label="Hợp đồng" value={stats.totalContracts} icon={FileSignature} color="from-blue-500 to-blue-400" onClick={() => navigate('/contracts')} subtitle={`${contracts.filter(c => c.status === 'in_progress').length} đang thực hiện`} delay={240} />
+          <StatCard label="Công nợ (tr)" value={Math.round(stats.totalDebt / 1000000)} icon={Wallet} color="from-teal-500 to-teal-400" onClick={() => navigate('/contracts')} subtitle={`DT: ${Math.round(stats.totalPostTax / 1000000)}tr`} delay={300} />
+          <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" onClick={() => navigate('/notes')} subtitle="Ghi chú cá nhân" delay={360} />
+          <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" onClick={() => navigate('/reports')} subtitle="Chờ phê duyệt" alert={true} delay={420} />
         </div>
       </div>
 
@@ -414,6 +421,54 @@ export default function DashboardPage({
             </div>
           </section>
 
+          {/* Projects Summary Widget */}
+          {projects.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+                  <Briefcase size={20} className="text-indigo-500" />
+                  Dự án ({projects.length})
+                </h2>
+                <button onClick={() => navigate('/projects')} className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                  Quản lý DA <ChevronRight size={16} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {(() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const active = projects.filter(p => p.status === 'in_progress');
+                  const overdue = projects.filter(p => p.endDate && p.endDate < today && p.status !== 'completed');
+                  const nearDeadline = projects.filter(p => p.endDate && p.endDate >= today && p.endDate <= new Date(Date.now()+7*86400000).toISOString().split('T')[0] && p.status !== 'completed');
+                  return (
+                    <>
+                      <div onClick={() => navigate('/projects')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-all cursor-pointer group">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center"><Briefcase size={20} className="text-indigo-600" /></div>
+                          <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{active.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Đang chạy</p></div>
+                        </div>
+                        <div className="text-xs text-gray-400">Tổng: {projects.length} dự án</div>
+                      </div>
+                      <div onClick={() => navigate('/projects')} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${nearDeadline.length > 0 ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${nearDeadline.length > 0 ? 'bg-amber-100' : 'bg-gray-100'}`}><Clock size={20} className={nearDeadline.length > 0 ? 'text-amber-600' : 'text-gray-400'} /></div>
+                          <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{nearDeadline.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Sắp hết hạn</p></div>
+                        </div>
+                        {nearDeadline.length > 0 && <div className="text-[11px] text-amber-600 font-medium truncate">{nearDeadline[0].name}</div>}
+                      </div>
+                      <div onClick={() => navigate('/projects')} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${overdue.length > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${overdue.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}><AlertTriangle size={20} className={overdue.length > 0 ? 'text-red-600 animate-pulse' : 'text-gray-400'} /></div>
+                          <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{overdue.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Quá hạn</p></div>
+                        </div>
+                        {overdue.length > 0 && <div className="text-[11px] text-red-600 font-medium truncate">{overdue[0].name}</div>}
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </section>
+          )}
+
         </div>
 
         {/* Side Column */}
@@ -451,7 +506,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Weekly Progress */}
-          <Card className="p-6">
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/tasks')}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">{t('weeklyProgress')}</h3>
             <div className="relative" style={{ height: 192 }}>
               {stats.total === 0 ? (
@@ -486,7 +541,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Priority Distribution */}
-          <Card className="p-6">
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/tasks')}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">Mức độ ưu tiên</h3>
             <div className="relative" style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height={200}>
@@ -494,15 +549,15 @@ export default function DashboardPage({
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} allowDecimals={false} />
-                  <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={32} />
+                  <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
           {/* Finance Analytics */}
-          <Card className="p-6">
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/contracts')}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4 flex items-center gap-2">
               <DollarSign size={18} className="text-emerald-500" /> Tình hình tài chính
             </h3>
@@ -530,7 +585,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Team Widget */}
-          <Card className="p-6">
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/team')}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-gray-800 dark:text-slate-100">{t('team')}</h3>
               <span className="text-xs font-bold text-brand-600 dark:text-blue-400 bg-brand-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">{users.length} thành viên</span>
