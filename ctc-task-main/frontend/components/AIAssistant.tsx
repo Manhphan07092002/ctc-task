@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
@@ -32,6 +32,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { notifications, markRead } = useNotifications();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -64,6 +65,23 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const [isLoading, setIsLoading] = useState(false);
   const chatSessionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const getSuggestions = () => {
+    switch (location.pathname) {
+      case '/':
+        return ["Tóm tắt công việc hôm nay", "Có thông báo nào mới không?"];
+      case '/tasks':
+        return ["Tôi có công việc nào quá hạn không?", "Tạo một công việc mới"];
+      case '/calendar':
+      case '/meetings':
+        return ["Hôm nay có cuộc họp nào không?", "Lên lịch một cuộc họp nhanh"];
+      case '/revenue':
+      case '/reports':
+        return ["Tổng doanh thu gần đây là bao nhiêu?", "Phân tích các báo cáo"];
+      default:
+        return ["Tôi có thể giúp gì cho bạn?", "Tóm tắt thông báo mới"];
+    }
+  };
 
   const buildContextString = async () => {
     let events: any[] = [];
@@ -215,13 +233,14 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent, textOverride?: string) => {
     e?.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+    const textToSubmit = textOverride || inputValue;
+    if (!textToSubmit.trim() || isLoading) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', text: inputValue };
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', text: textToSubmit };
     setMessages(prev => [...prev, userMsg]);
-    setInputValue('');
+    if (!textOverride) setInputValue('');
     setIsLoading(true);
 
     try {
@@ -231,7 +250,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
         chatSessionRef.current = await createChatSession(contextString, history);
       }
 
-      const result = await chatSessionRef.current.sendMessageStream({ message: userMsg.text });
+      const result = await chatSessionRef.current.sendMessageStream({ message: textToSubmit });
       
       let fullResponse = "";
       const modelMsgId = (Date.now() + 1).toString();
@@ -591,7 +610,21 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
           </div>
 
           {/* Input Area */}
-          <div className="p-3 bg-white border-t border-gray-100">
+          <div className="p-3 bg-white border-t border-gray-100 flex flex-col gap-2">
+            {!isLoading && (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide no-scrollbar" style={{ scrollbarWidth: 'none' }}>
+                {getSuggestions().map((suggestion, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(undefined, suggestion)}
+                    className="whitespace-nowrap px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[13px] font-medium rounded-full transition-colors border border-brand-100"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
             <form onSubmit={handleSendMessage} className="relative">
               <input
                 type="text"
