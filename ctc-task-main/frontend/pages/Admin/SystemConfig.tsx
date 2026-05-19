@@ -425,6 +425,7 @@ export default function AdminSystemConfig() {
                 <option value="groq">Groq (Llama 3 / Mixtral - Siêu Nhanh)</option>
                 <option value="deepseek">DeepSeek (Giá Rẻ - Thông Minh)</option>
                 <option value="openrouter">OpenRouter (Đa dạng Mô Hình)</option>
+                <option value="openai">OpenAI (ChatGPT / GPT-4)</option>
               </select>
               <p className="text-xs text-gray-500 mt-2">
                 Hệ thống sẽ dựa vào Provider này để thay đổi chuẩn kết nối. Hãy đảm bảo API Keys bên dưới tương ứng với Provider bạn chọn.

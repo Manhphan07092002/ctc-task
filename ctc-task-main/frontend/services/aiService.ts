@@ -202,6 +202,7 @@ const getOpenAIProviderConfig = (provider: string) => {
     case 'groq': return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
     case 'deepseek': return { url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' };
     case 'openrouter': return { url: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemini-2.5-flash:free' };
+    case 'openai': return { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-5.4-codex' };
     default: return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
   }
 };
