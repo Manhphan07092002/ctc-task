@@ -472,9 +472,13 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-brand-500 hover:bg-brand-600 text-white rounded-full shadow-lg shadow-brand-200 flex items-center justify-center transition-all hover:scale-110 z-40 group"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 text-white rounded-full shadow-[0_0_15px_rgba(79,70,229,0.4)] flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-[0_0_25px_rgba(79,70,229,0.6)] z-40 group border border-white/20"
       >
-        <Sparkles size={24} className="animate-pulse" />
+        <Bot size={26} className="animate-pulse" />
+        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-brand-500 border-2 border-white"></span>
+        </span>
         <span className="absolute right-full mr-3 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
           {t('askAi')}
         </span>
