@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2 } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
 import { GenerateContentResponse } from "@google/genai";
@@ -30,7 +30,17 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem('ai_chat_history');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ai_chat_history', JSON.stringify(messages));
+  }, [messages]);
   
   // Initial greeting effect - handles language switch for the welcome message too
   useEffect(() => {
@@ -161,7 +171,8 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
     try {
       if (!chatSessionRef.current) {
         const contextString = await buildContextString();
-        chatSessionRef.current = await createChatSession(contextString);
+        const history = messages.filter(m => m.id !== 'welcome' && !m.text.includes('✅') && !m.text.includes('❌'));
+        chatSessionRef.current = await createChatSession(contextString, history);
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: hiddenSystemPrompt });
@@ -208,7 +219,8 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
     try {
       if (!chatSessionRef.current) {
         const contextString = await buildContextString();
-        chatSessionRef.current = await createChatSession(contextString);
+        const history = messages.filter(m => m.id !== 'welcome' && !m.text.includes('✅') && !m.text.includes('❌'));
+        chatSessionRef.current = await createChatSession(contextString, history);
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: userMsg.text });
@@ -397,10 +409,24 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
           <span className="font-bold">Bot CTC Tasks</span>
         </div>
         <div className="flex items-center gap-2 text-white/80">
-          <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="hover:text-white">
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if(window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện?')) {
+                setMessages([]);
+                chatSessionRef.current = null;
+                localStorage.removeItem('ai_chat_history');
+              }
+            }} 
+            className="hover:text-red-300 mr-1"
+            title="Xóa lịch sử chat"
+          >
+            <Trash2 size={16} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }} className="hover:text-white" title="Thu nhỏ/Mở rộng">
             {isMinimized ? <Maximize2 size={16} /> : <Minimize2 size={16} />}
           </button>
-          <button onClick={() => setIsOpen(false)} className="hover:text-white">
+          <button onClick={() => setIsOpen(false)} className="hover:text-white" title="Đóng">
             <X size={18} />
           </button>
         </div>

@@ -185,7 +185,7 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
   }
 };
 
-export const createChatSession = async (contextString?: string) => {
+export const createChatSession = async (contextString?: string, history?: { role: 'user' | 'model', text: string }[]) => {
   const ai = await getAIInstance();
 
   const baseInstruction = `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
@@ -202,6 +202,7 @@ Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho
 
   return ai.chats.create({
     model: 'gemini-2.5-flash',
+    history: history ? history.map(msg => ({ role: msg.role, parts: [{ text: msg.text }] })) : undefined,
     config: {
       systemInstruction: systemInstruction,
       tools: [{
