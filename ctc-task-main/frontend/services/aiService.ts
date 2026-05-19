@@ -243,6 +243,77 @@ Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho
               },
               required: ['contractNumber', 'clientName', 'contractName']
             }
+          },
+          {
+            name: 'deleteTask',
+            description: 'Xóa một công việc (Task) khỏi hệ thống',
+            parameters: {
+              type: Type.OBJECT,
+              properties: { id: { type: Type.STRING, description: 'ID của công việc cần xóa' } },
+              required: ['id']
+            }
+          },
+          {
+            name: 'createNote',
+            description: 'Tạo một ghi chú (Note) mới',
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: 'Tiêu đề ghi chú' },
+                content: { type: Type.STRING, description: 'Nội dung ghi chú' }
+              },
+              required: ['title']
+            }
+          },
+          {
+            name: 'deleteNote',
+            description: 'Xóa một ghi chú (Note)',
+            parameters: {
+              type: Type.OBJECT,
+              properties: { id: { type: Type.STRING, description: 'ID của ghi chú cần xóa' } },
+              required: ['id']
+            }
+          },
+          {
+            name: 'createMeeting',
+            description: 'Tạo một lịch họp (Meeting) mới',
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: 'Tiêu đề cuộc họp' },
+                description: { type: Type.STRING, description: 'Mô tả hoặc nội dung cuộc họp' }
+              },
+              required: ['title']
+            }
+          },
+          {
+            name: 'deleteMeeting',
+            description: 'Xóa một lịch họp (Meeting)',
+            parameters: {
+              type: Type.OBJECT,
+              properties: { id: { type: Type.STRING, description: 'ID của lịch họp cần xóa' } },
+              required: ['id']
+            }
+          },
+          {
+            name: 'markNotificationRead',
+            description: 'Đánh dấu một thông báo là đã đọc',
+            parameters: {
+              type: Type.OBJECT,
+              properties: { id: { type: Type.STRING, description: 'ID của thông báo' } },
+              required: ['id']
+            }
+          },
+          {
+            name: 'navigateToPage',
+            description: 'Chuyển hướng người dùng đến một trang cụ thể trong hệ thống. (Ví dụ: /mail, /calendar, /tasks, /reports, /notes, /meetings)',
+            parameters: {
+              type: Type.OBJECT,
+              properties: { 
+                path: { type: Type.STRING, description: 'Đường dẫn bắt đầu bằng /. Các trang hỗ trợ: / (Dashboard), /tasks, /calendar, /reports, /meetings, /contracts, /mail, /notes, /clients, /settings' } 
+              },
+              required: ['path']
+            }
           }
         ]
       }]

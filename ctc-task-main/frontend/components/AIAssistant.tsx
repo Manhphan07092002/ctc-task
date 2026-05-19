@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
@@ -26,6 +27,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { tasks, notes, revenueReports, saveTask, saveReport, saveContract, deleteTask, saveNote, deleteNote } = useData();
   const { notifications, markRead } = useNotifications();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -317,6 +319,12 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               await markRead(id);
               setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã đánh dấu thông báo là đã đọc.` }]);
+            } else if (call.name === 'navigateToPage') {
+              let path = args.path;
+              if (path && !path.startsWith('/')) path = '/' + path;
+              navigate(path);
+              setIsMinimized(true);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đang mở trang: **${path}**` }]);
             }
           }
           continue;
