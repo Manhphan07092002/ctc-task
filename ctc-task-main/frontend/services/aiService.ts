@@ -82,7 +82,7 @@ export const generateSubtasksFromTitle = async (taskTitle: string): Promise<stri
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: `Generate a list of 3 to 5 concise, actionable subtasks (checklist items) for a task titled: "${taskTitle}". Return ONLY the list of strings in a JSON array.`,
         config: {
           responseMimeType: "application/json",
@@ -112,7 +112,7 @@ export const generateTaskDetails = async (taskTitle: string): Promise<{ descript
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: `For a task titled "${taskTitle}", generate a concise 1-sentence description and a list of 3-5 actionable subtasks.`,
         config: {
           responseMimeType: "application/json",
@@ -154,7 +154,7 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
   try {
     return await withRetryAndRotation(async (ai) => {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: `I have a goal: "${goal}". Break this down into 3 to 6 distinct, actionable tasks. For each task, provide a title, a short description, and a priority level (High, Medium, or Low).`,
         config: {
           responseMimeType: "application/json",
@@ -188,7 +188,7 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
 export const createChatSession = async () => {
   const ai = await getAIInstance();
   return ai.chats.create({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     config: {
       systemInstruction: `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
 Nhiệm vụ chính của bạn là:
