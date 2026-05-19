@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight, Mic, MicOff } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
 import { GenerateContentResponse } from "@google/genai";
@@ -63,8 +63,52 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const chatSessionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.lang = 'vi-VN';
+      recognitionRef.current.interimResults = false;
+
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(prev => prev ? prev + ' ' + transcript : transcript);
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Trình duyệt của bạn không hỗ trợ nhận diện giọng nói (Khuyên dùng Google Chrome).');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   const getSuggestions = () => {
     switch (location.pathname) {
@@ -630,16 +674,26 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={t('askAiPlaceholder')}
-                className="w-full pl-4 pr-12 py-3 bg-gray-100 border-transparent focus:bg-white border focus:border-brand-300 rounded-xl text-sm outline-none transition-all"
+                placeholder={isListening ? "Đang lắng nghe..." : t('askAiPlaceholder')}
+                className={`w-full pl-4 pr-20 py-3 bg-gray-100 border-transparent focus:bg-white border focus:border-brand-300 rounded-xl text-sm outline-none transition-all ${isListening ? 'ring-2 ring-red-100 border-red-300 bg-red-50' : ''}`}
               />
-              <button
-                type="submit"
-                disabled={!inputValue.trim() || isLoading}
-                className="absolute right-2 top-2 p-1.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={16} />
-              </button>
+              <div className="absolute right-2 top-2 flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`p-1.5 rounded-lg transition-colors ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50'}`}
+                  title="Nhập bằng giọng nói"
+                >
+                  {isListening ? <Mic size={16} /> : <MicOff size={16} />}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim() || isLoading}
+                  className="p-1.5 bg-brand-500 text-white rounded-lg hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
             </form>
           </div>
         </>
