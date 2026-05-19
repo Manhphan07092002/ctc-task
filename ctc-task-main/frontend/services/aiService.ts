@@ -185,12 +185,10 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
   }
 };
 
-export const createChatSession = async () => {
+export const createChatSession = async (contextString?: string) => {
   const ai = await getAIInstance();
-  return ai.chats.create({
-    model: 'gemini-2.5-flash',
-    config: {
-      systemInstruction: `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
+
+  const baseInstruction = `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
 Nhiệm vụ chính của bạn là:
 1. Giao tiếp hoàn toàn bằng Tiếng Việt một cách tự nhiên, lịch sự và chuyên nghiệp.
 2. Hỗ trợ nhân viên và ban giám đốc công ty CTC trong việc tổ chức công việc, quản lý lịch trình, tóm tắt báo cáo, và đưa ra các lời khuyên tăng cường hiệu suất.
@@ -198,7 +196,14 @@ Nhiệm vụ chính của bạn là:
 4. Khi được hỏi về công ty CTC, hãy thể hiện sự tự hào, am hiểu về môi trường làm việc năng động, chuyên nghiệp và luôn hướng tới hiệu quả cao.
 5. Các câu trả lời của bạn cần ngắn gọn, đi vào trọng tâm, có định dạng Markdown rõ ràng (dùng bullet points, in đậm) để người dùng dễ đọc.
 6. Khi người dùng yêu cầu tạo mới (ví dụ: tạo công việc, viết báo cáo, soạn hợp đồng), HÃY GỌI CÁC CÔNG CỤ (TOOLS) tương ứng thay vì chỉ trả lời bằng chữ.
-Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho mọi người trong công ty CTC!`,
+Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho mọi người trong công ty CTC!`;
+
+  const systemInstruction = contextString ? `${baseInstruction}\n\n${contextString}` : baseInstruction;
+
+  return ai.chats.create({
+    model: 'gemini-2.5-flash',
+    config: {
+      systemInstruction: systemInstruction,
       tools: [{
         functionDeclarations: [
           {

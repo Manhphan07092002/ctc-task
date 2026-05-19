@@ -10,7 +10,7 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { apiFetch } from '../services/api';
-import { getMeetings } from '../services/meetingService';
+import { getMeetings, saveMeeting, deleteMeeting } from '../services/meetingService';
 interface Message {
   id: string;
   role: 'user' | 'model';
@@ -23,8 +23,8 @@ export interface AIAssistantHandle {
 
 export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { t } = useLanguage();
-  const { tasks, notes, revenueReports, saveTask, saveReport, saveContract } = useData();
-  const { notifications } = useNotifications();
+  const { tasks, notes, revenueReports, saveTask, saveReport, saveContract, deleteTask, saveNote, deleteNote } = useData();
+  const { notifications, markRead } = useNotifications();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -83,7 +83,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     const activeTasks = tasks.filter(t => t.status !== 'Done' && t.assignees.includes(user?.id || ''));
     const tasksContext = activeTasks.length > 0
-      ? activeTasks.map(t => `- ${t.title} (Hạn: ${t.dueDate || t.startDate}, Ưu tiên: ${t.priority})`).join('\n')
+      ? activeTasks.map(t => `- [ID: ${t.id}] ${t.title} (Hạn: ${t.dueDate || t.startDate}, Ưu tiên: ${t.priority})`).join('\n')
       : "Không có công việc nào đang chờ xử lý.";
 
     const emailsContext = recentEmails.length > 0
@@ -92,17 +92,17 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     const unreadNotifications = notifications.filter(n => !n.isRead).slice(0, 5);
     const notificationsContext = unreadNotifications.length > 0
-      ? unreadNotifications.map(n => `- [${n.type}] ${n.title}: ${n.message}`).join('\n')
+      ? unreadNotifications.map(n => `- [ID: ${n.id}] [${n.type}] ${n.title}: ${n.message}`).join('\n')
       : "Không có thông báo mới.";
 
     const topNotes = notes.slice(0, 3);
     const notesContext = topNotes.length > 0
-      ? topNotes.map(n => `- ${n.title}`).join('\n')
+      ? topNotes.map(n => `- [ID: ${n.id}] ${n.title}`).join('\n')
       : "Không có ghi chú nào.";
 
     const upcomingMeetings = meetings.filter(m => m.startTime >= todayIso).slice(0, 3);
     const meetingsContext = upcomingMeetings.length > 0
-      ? upcomingMeetings.map(m => `- ${m.title} (Lúc: ${new Date(m.startTime).toLocaleString('vi-VN')})`).join('\n')
+      ? upcomingMeetings.map(m => `- [ID: ${m.id}] ${m.title} (Lúc: ${new Date(m.startTime).toLocaleString('vi-VN')})`).join('\n')
       : "Không có lịch họp sắp tới.";
 
     const topRevenue = revenueReports.slice(0, 2);
@@ -263,6 +263,60 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
               };
               await saveContract(newContract);
               setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo hợp đồng: **${args.contractNumber} - ${args.contractName}**` }]);
+            } else if (call.name === 'deleteTask') {
+              const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
+              if (window.confirm(`⚠️ AI đang yêu cầu XÓA công việc có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
+                await deleteTask(id);
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã xóa công việc.` }]);
+              } else {
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa công việc bị hủy.` }]);
+              }
+            } else if (call.name === 'createNote') {
+              const newNote: any = {
+                id: crypto.randomUUID(),
+                title: args.title,
+                content: args.content || '',
+                color: 'bg-yellow-200',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                userId: user?.id || ''
+              };
+              await saveNote(newNote);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo ghi chú: **${args.title}**` }]);
+            } else if (call.name === 'deleteNote') {
+              const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
+              if (window.confirm(`⚠️ AI đang yêu cầu XÓA ghi chú có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
+                await deleteNote(id);
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã xóa ghi chú.` }]);
+              } else {
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa ghi chú bị hủy.` }]);
+              }
+            } else if (call.name === 'createMeeting') {
+              const newMeeting: any = {
+                id: crypto.randomUUID(),
+                title: args.title,
+                description: args.description || '',
+                startTime: new Date().toISOString(),
+                endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                hostId: user?.id || '',
+                participants: [user?.id || ''],
+                meetingLink: `meet.orangetask.com/${crypto.randomUUID().substring(0,8)}`,
+                status: 'scheduled'
+              };
+              await saveMeeting(newMeeting);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo cuộc họp: **${args.title}**` }]);
+            } else if (call.name === 'deleteMeeting') {
+              const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
+              if (window.confirm(`⚠️ AI đang yêu cầu XÓA cuộc họp có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
+                await deleteMeeting(id);
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã xóa cuộc họp.` }]);
+              } else {
+                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa cuộc họp bị hủy.` }]);
+              }
+            } else if (call.name === 'markNotificationRead') {
+              const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
+              await markRead(id);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã đánh dấu thông báo là đã đọc.` }]);
             }
           }
           continue;
