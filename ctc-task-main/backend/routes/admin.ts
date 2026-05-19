@@ -189,24 +189,33 @@ export function adminRoutes(db: any, mailer: any) {
   // --- AI Config ---
   router.get('/system-config/ai-keys', async (_req, res) => {
     try {
-      const keysConfig = await db.get(`SELECT value FROM system_config WHERE key = 'gemini_api_keys'`);
-      const providerConfig = await db.get(`SELECT value FROM system_config WHERE key = 'ai_provider'`);
+      const providers = ['gemini', 'groq', 'deepseek', 'openrouter', 'openai'];
+      const keysMap: Record<string, string[]> = {};
       
-      const keys = keysConfig && keysConfig.value ? JSON.parse(keysConfig.value) : [];
+      for (const p of providers) {
+        const config = await db.get(`SELECT value FROM system_config WHERE key = ?`, [`${p}_api_keys`]);
+        keysMap[p] = config && config.value ? JSON.parse(config.value) : [];
+      }
+
+      const providerConfig = await db.get(`SELECT value FROM system_config WHERE key = 'ai_provider'`);
       const provider = providerConfig && providerConfig.value ? providerConfig.value : 'gemini';
       
-      res.json({ keys, provider });
+      res.json({ keysMap, provider });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   router.post('/system-config/ai-keys', async (req, res) => {
     try {
-      const { keys, provider } = req.body;
-      if (keys && !Array.isArray(keys)) return res.status(400).json({ error: 'Invalid keys format' });
+      const { keysMap, provider } = req.body;
       
-      if (keys) {
-        await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['gemini_api_keys', JSON.stringify(keys)]);
+      if (keysMap && typeof keysMap === 'object') {
+         for (const [p, keys] of Object.entries(keysMap)) {
+           if (Array.isArray(keys)) {
+             await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [`${p}_api_keys`, JSON.stringify(keys)]);
+           }
+         }
       }
+      
       if (provider) {
         await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['ai_provider', provider]);
       }

@@ -13,11 +13,13 @@ const loadApiKeys = async () => {
     const res = await apiFetch('/api/admin/system-config/ai-keys');
     if (res.ok) {
       const data = await res.json();
-      if (data.keys && data.keys.length > 0) {
-        API_KEYS = data.keys;
-      }
       if (data.provider) {
         AI_PROVIDER = data.provider;
+      }
+      if (data.keysMap && data.keysMap[AI_PROVIDER] && data.keysMap[AI_PROVIDER].length > 0) {
+        API_KEYS = data.keysMap[AI_PROVIDER];
+      } else if (data.keys && data.keys.length > 0) { // Fallback for old schema
+        API_KEYS = data.keys;
       }
     }
   } catch (e) {
@@ -199,11 +201,11 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
 
 const getOpenAIProviderConfig = (provider: string) => {
   switch (provider) {
-    case 'groq': return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
+    case 'groq': return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' };
     case 'deepseek': return { url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' };
     case 'openrouter': return { url: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemini-2.5-flash:free' };
-    case 'openai': return { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-5.4-codex' };
-    default: return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
+    case 'openai': return { url: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' };
+    default: return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' };
   }
 };
 

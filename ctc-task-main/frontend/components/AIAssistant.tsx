@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight, Mic, MicOff } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight, Mic, MicOff, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
 import { GenerateContentResponse } from "@google/genai";
@@ -17,7 +17,7 @@ interface Message {
   role: 'user' | 'model';
   text: string;
   uiContent?: {
-    type: 'task' | 'meeting' | 'note' | 'contract';
+    type: 'task' | 'meeting' | 'note' | 'contract' | 'alert';
     data: any;
   };
 }
@@ -355,9 +355,19 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA công việc có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
                 await deleteTask(id);
-                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã xóa công việc.` }]);
+                setMessages(prev => [...prev, { 
+                  id: Date.now().toString(), 
+                  role: 'model', 
+                  text: '',
+                  uiContent: { type: 'alert', data: { status: 'success', title: 'Hoàn tất', message: 'Đã xóa công việc khỏi hệ thống.' } }
+                }]);
               } else {
-                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa công việc bị hủy.` }]);
+                setMessages(prev => [...prev, { 
+                  id: Date.now().toString(), 
+                  role: 'model', 
+                  text: '',
+                  uiContent: { type: 'alert', data: { status: 'warning', title: 'Đã hủy', message: 'Lệnh xóa công việc bị hủy.' } }
+                }]);
               }
             } else if (call.name === 'createNote') {
               const newNote: any = {
@@ -405,27 +415,47 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
               setMessages(prev => [...prev, { 
                 id: Date.now().toString(), 
                 role: 'model', 
-                text: `✅ Đã tạo cuộc họp: **${args.title}**`,
+                text: '',
                 uiContent: { type: 'meeting', data: newMeeting }
               }]);
             } else if (call.name === 'deleteMeeting') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA cuộc họp có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
                 await deleteMeeting(id);
-                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã xóa cuộc họp.` }]);
+                setMessages(prev => [...prev, { 
+                  id: Date.now().toString(), 
+                  role: 'model', 
+                  text: '',
+                  uiContent: { type: 'alert', data: { status: 'success', title: 'Đã xóa', message: 'Cuộc họp đã được xóa thành công.' } }
+                }]);
               } else {
-                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa cuộc họp bị hủy.` }]);
+                setMessages(prev => [...prev, { 
+                  id: Date.now().toString(), 
+                  role: 'model', 
+                  text: '',
+                  uiContent: { type: 'alert', data: { status: 'warning', title: 'Đã hủy', message: 'Lệnh xóa cuộc họp bị hủy bởi người dùng.' } }
+                }]);
               }
             } else if (call.name === 'markNotificationRead') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               await markRead(id);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã đánh dấu thông báo là đã đọc.` }]);
+              setMessages(prev => [...prev, { 
+                id: Date.now().toString(), 
+                role: 'model', 
+                text: '',
+                uiContent: { type: 'alert', data: { status: 'success', title: 'Thành công', message: 'Đã đánh dấu thông báo là đã đọc.' } }
+              }]);
             } else if (call.name === 'navigateToPage') {
               let path = args.path;
               if (path && !path.startsWith('/')) path = '/' + path;
               navigate(path);
               setIsMinimized(true);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đang mở trang: **${path}**` }]);
+              setMessages(prev => [...prev, { 
+                id: Date.now().toString(), 
+                role: 'model', 
+                text: '',
+                uiContent: { type: 'alert', data: { status: 'success', title: 'Chuyển trang', message: `Đang mở trang: ${path}` } }
+              }]);
             }
           }
           continue;
@@ -443,24 +473,28 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
       console.error("Chat error details:", error);
       const errorMsg = error?.message || '';
       
-      const isNoKey = errorMsg.includes('No Gemini API keys');
-      const isInvalidKey = error?.status === 400 || errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('API key not valid');
+      const isNoKey = errorMsg.includes('No Gemini API keys') || errorMsg.includes('No AI API keys');
+      const isInvalidKey = error?.status === 400 || errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('API key not valid') || errorMsg.includes('Invalid API Key') || errorMsg.includes('401');
       const is429 = error?.status === 429 || error?.code === 429 || errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED');
       
       let errText = 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại.';
       
       if (isNoKey) {
-        errText = '⚠️ Tính năng AI chưa được cấu hình. Vui lòng thêm Gemini API Key trong phần Cài đặt Admin.';
+        errText = 'Tính năng AI chưa được cấu hình. Vui lòng thêm API Key trong phần Cài đặt Admin.';
       } else if (isInvalidKey) {
-        errText = '❌ API Key của bạn không hợp lệ hoặc đã bị vô hiệu hóa. Vui lòng kiểm tra lại trong phần Cài đặt Admin.';
+        errText = 'API Key của bạn không hợp lệ hoặc đã bị vô hiệu hóa. Vui lòng kiểm tra lại trong phần Cài đặt Admin.';
       } else if (is429) {
-        errText = '⏳ API Key đã vượt giới hạn miễn phí. Vui lòng thử lại sau ít phút hoặc nâng cấp quota tại ai.google.dev.';
+        errText = 'API Key đã vượt giới hạn (Quota / Rate Limit). Vui lòng nạp thêm tiền vào tài khoản API hoặc thử lại sau.';
       } else {
-        // Fallback to showing a part of the real error so user knows what's up
-        errText = `❌ Lỗi API: ${errorMsg.substring(0, 100)}... Vui lòng kiểm tra lại.`;
+        errText = `Lỗi API: ${errorMsg.substring(0, 100)}... Vui lòng kiểm tra lại.`;
       }
       
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: errText }]);
+      setMessages(prev => [...prev, { 
+        id: Date.now().toString(), 
+        role: 'model', 
+        text: '',
+        uiContent: { type: 'alert', data: { status: 'error', title: 'Lỗi Kết nối AI', message: errText } }
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -549,7 +583,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                   `}
                 >
                   {/* Simple Markdown-like rendering for lists and links */}
-                  {msg.text.split('\n').map((line, i) => {
+                  {msg.text && msg.text.split('\n').map((line, i) => {
                     const parts = line.split(/(\[.*?\]\(.*?\))/g);
                     return (
                       <p key={i} className={line.startsWith('-') || line.startsWith('*') ? 'pl-2' : 'min-h-[1rem]'}>
@@ -630,6 +664,44 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                             }} className="p-1.5 text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
                               <Trash2 size={14} />
                             </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.uiContent.type === 'alert' && (
+                        <div className={`p-4 border-l-4 ${
+                          msg.uiContent.data.status === 'success' ? 'border-emerald-500 bg-emerald-50/50' :
+                          msg.uiContent.data.status === 'error' ? 'border-red-500 bg-red-50/50' :
+                          'border-amber-500 bg-amber-50/50'
+                        }`}>
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 ${
+                              msg.uiContent.data.status === 'success' ? 'text-emerald-500' :
+                              msg.uiContent.data.status === 'error' ? 'text-red-500' :
+                              'text-amber-500'
+                            }`}>
+                              {msg.uiContent.data.status === 'success' && <CheckCircle size={18} />}
+                              {msg.uiContent.data.status === 'error' && <AlertCircle size={18} />}
+                              {msg.uiContent.data.status === 'warning' && <AlertTriangle size={18} />}
+                            </div>
+                            <div>
+                              {msg.uiContent.data.title && (
+                                <h4 className={`text-[15px] font-bold mb-1 ${
+                                  msg.uiContent.data.status === 'success' ? 'text-emerald-800' :
+                                  msg.uiContent.data.status === 'error' ? 'text-red-800' :
+                                  'text-amber-800'
+                                }`}>
+                                  {msg.uiContent.data.title}
+                                </h4>
+                              )}
+                              <p className={`text-sm ${
+                                msg.uiContent.data.status === 'success' ? 'text-emerald-700' :
+                                msg.uiContent.data.status === 'error' ? 'text-red-700' :
+                                'text-amber-700'
+                              }`}>
+                                {msg.uiContent.data.message}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       )}

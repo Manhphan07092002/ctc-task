@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings, Database, Server, Activity, CheckCircle,
   AlertCircle, RefreshCw, HardDrive, Users, CheckSquare,
-  FileText, Video, ArrowUpCircle, Clock, Mail, Send, Save, ShieldCheck
+  FileText, Video, ArrowUpCircle, Clock, Mail, Send, Save, ShieldCheck, Trash2
 } from 'lucide-react';
 
 interface SystemInfo {
@@ -71,7 +71,7 @@ export default function AdminSystemConfig() {
   const [smtpMessage, setSmtpMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testEmail, setTestEmail] = useState('');
 
-  const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [aiKeysMap, setAiKeysMap] = useState<Record<string, string[]>>({});
   const [aiProvider, setAiProvider] = useState<string>('gemini');
   const [aiKeysLoading, setAiKeysLoading] = useState(false);
   const [aiKeysSaving, setAiKeysSaving] = useState(false);
@@ -106,7 +106,7 @@ export default function AdminSystemConfig() {
       }
       if (aiKeysRes.ok) {
         const aiData = await aiKeysRes.json();
-        if (aiData.keys) setAiKeys(aiData.keys);
+        if (aiData.keysMap) setAiKeysMap(aiData.keysMap);
         if (aiData.provider) setAiProvider(aiData.provider);
       }
     } catch {
@@ -163,28 +163,38 @@ export default function AdminSystemConfig() {
     }
   };
 
-  const handleAddAiKey = () => setAiKeys([...aiKeys, '']);
-  const handleRemoveAiKey = (index: number) => setAiKeys(aiKeys.filter((_, i) => i !== index));
+  const handleAddAiKey = () => setAiKeysMap(prev => ({ ...prev, [aiProvider]: [...(prev[aiProvider] || []), ''] }));
+  const handleRemoveAiKey = (index: number) => setAiKeysMap(prev => {
+    const newArr = [...(prev[aiProvider] || [])];
+    newArr.splice(index, 1);
+    return { ...prev, [aiProvider]: newArr };
+  });
   const handleChangeAiKey = (index: number, value: string) => {
-    const newKeys = [...aiKeys];
-    newKeys[index] = value;
-    setAiKeys(newKeys);
+    setAiKeysMap(prev => {
+      const newArr = [...(prev[aiProvider] || [])];
+      newArr[index] = value;
+      return { ...prev, [aiProvider]: newArr };
+    });
   };
 
   const saveAiKeysConfig = async () => {
     setAiKeysSaving(true);
     setAiMessage(null);
     try {
-      const filteredKeys = aiKeys.map(k => k.trim()).filter(k => k.length > 0);
+      const cleanMap: Record<string, string[]> = {};
+      for (const p in aiKeysMap) {
+        cleanMap[p] = (aiKeysMap[p] || []).map(k => k.trim()).filter(k => k.length > 0);
+      }
+      
       const res = await apiFetch('/api/admin/system-config/ai-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys: filteredKeys, provider: aiProvider }),
+        body: JSON.stringify({ keysMap: cleanMap, provider: aiProvider }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Lưu cấu hình AI thất bại');
       setAiMessage({ type: 'success', text: 'Đã lưu cấu hình AI thành công.' });
-      setAiKeys(filteredKeys);
+      setAiKeysMap(cleanMap);
     } catch (e: any) {
       setAiMessage({ type: 'error', text: e.message || 'Lưu cấu hình AI Keys thất bại.' });
     } finally {
@@ -436,7 +446,7 @@ export default function AdminSystemConfig() {
             <p className="text-xs text-gray-500 mb-2">Hệ thống sẽ tự động dùng key đầu tiên. Nếu bị giới hạn (Rate Limit), sẽ tự động chuyển sang key tiếp theo trong danh sách.</p>
             
             <div className="space-y-3">
-              {aiKeys.map((key, index) => (
+              {(aiKeysMap[aiProvider] || []).map((key, index) => (
                 <div key={index} className="flex gap-2">
                   <span className="inline-flex items-center justify-center w-10 bg-gray-100 text-gray-500 font-mono text-sm rounded-xl border border-gray-200">
                     {index + 1}
@@ -453,7 +463,7 @@ export default function AdminSystemConfig() {
                     className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                     title="Xóa key"
                   >
-                    <AlertCircle size={18} />
+                    <Trash2 size={18} />
                   </button>
                 </div>
               ))}
