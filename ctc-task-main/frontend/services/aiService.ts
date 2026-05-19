@@ -3,17 +3,21 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 // API Key Rotation Setup
 let API_KEYS: string[] = [];
+let AI_PROVIDER: string = 'gemini';
 let currentKeyIndex = 0;
 let keysLoaded = false;
 
 const loadApiKeys = async () => {
   if (keysLoaded) return;
   try {
-    const res = await apiFetch('/api/system-config/ai-keys');
+    const res = await apiFetch('/api/admin/system-config/ai-keys');
     if (res.ok) {
       const data = await res.json();
       if (data.keys && data.keys.length > 0) {
         API_KEYS = data.keys;
+      }
+      if (data.provider) {
+        AI_PROVIDER = data.provider;
       }
     }
   } catch (e) {
@@ -31,7 +35,7 @@ const loadApiKeys = async () => {
 const getAIInstance = async () => {
   await loadApiKeys();
   if (API_KEYS.length === 0) {
-    throw new Error("No Gemini API keys configured");
+    throw new Error("No AI API keys configured");
   }
   return new GoogleGenAI({ apiKey: API_KEYS[currentKeyIndex] });
 };
@@ -39,7 +43,11 @@ const getAIInstance = async () => {
 // Auto-rotate key and retry logic wrapper
 const withRetryAndRotation = async <T>(operation: (ai: GoogleGenAI) => Promise<T>): Promise<T> => {
   await loadApiKeys();
-  if (API_KEYS.length === 0) throw new Error("No Gemini API keys configured");
+  if (API_KEYS.length === 0) throw new Error("No AI API keys configured");
+
+  if (AI_PROVIDER !== 'gemini') {
+      console.warn("Using OpenAI wrapper instead of Google SDK for generative functions isn't fully supported yet. Falling back to simple fetch.");
+  }
 
   const maxRetries = API_KEYS.length;
   let attempts = 0;
@@ -185,8 +193,164 @@ export const generateTasksFromGoal = async (goal: string): Promise<SuggestedTask
   }
 };
 
+// ===================
+// CHAT SESSION
+// ===================
+
+const getOpenAIProviderConfig = (provider: string) => {
+  switch (provider) {
+    case 'groq': return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
+    case 'deepseek': return { url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' };
+    case 'openrouter': return { url: 'https://openrouter.ai/api/v1/chat/completions', model: 'google/gemini-2.5-flash:free' };
+    default: return { url: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama3-8b-8192' };
+  }
+};
+
+const openAIFunctions = [
+  {
+    type: 'function',
+    function: {
+      name: 'createTask',
+      description: 'Tạo một công việc (Task) mới trên hệ thống',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Tiêu đề công việc' },
+          description: { type: 'string', description: 'Mô tả chi tiết công việc' },
+          priority: { type: 'string', enum: ['Low', 'Medium', 'High'], description: 'Độ ưu tiên' }
+        },
+        required: ['title']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'createReport',
+      description: 'Tạo một báo cáo (Report) mới trên hệ thống',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Tiêu đề báo cáo' },
+          content: { type: 'string', description: 'Nội dung chi tiết của báo cáo' }
+        },
+        required: ['title', 'content']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'createContract',
+      description: 'Tạo một hợp đồng (Contract) mới trên hệ thống',
+      parameters: {
+        type: 'object',
+        properties: {
+          contractNumber: { type: 'string', description: 'Số hợp đồng (ví dụ: HD-001)' },
+          clientName: { type: 'string', description: 'Tên đối tác hoặc khách hàng' },
+          contractName: { type: 'string', description: 'Tên hợp đồng' }
+        },
+        required: ['contractNumber', 'clientName', 'contractName']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteTask',
+      description: 'Xóa một công việc (Task) khỏi hệ thống',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'ID của công việc cần xóa' } },
+        required: ['id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'createNote',
+      description: 'Tạo một ghi chú (Note) mới',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Tiêu đề ghi chú' },
+          content: { type: 'string', description: 'Nội dung ghi chú' }
+        },
+        required: ['title']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteNote',
+      description: 'Xóa một ghi chú (Note)',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'ID của ghi chú cần xóa' } },
+        required: ['id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'createMeeting',
+      description: 'Tạo một lịch họp (Meeting) mới',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Tiêu đề cuộc họp' },
+          description: { type: 'string', description: 'Mô tả hoặc nội dung cuộc họp' },
+          participantNames: { type: 'array', items: { type: 'string' }, description: 'Danh sách tên những người tham gia (nếu có)' }
+        },
+        required: ['title']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'deleteMeeting',
+      description: 'Xóa một lịch họp (Meeting)',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'ID của lịch họp cần xóa' } },
+        required: ['id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'markNotificationRead',
+      description: 'Đánh dấu một thông báo là đã đọc',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'ID của thông báo' } },
+        required: ['id']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'navigateToPage',
+      description: 'Chuyển hướng người dùng đến một trang cụ thể trong hệ thống. (Ví dụ: /mail, /calendar, /tasks, /reports, /notes, /meetings)',
+      parameters: {
+        type: 'object',
+        properties: { 
+          path: { type: 'string', description: 'Đường dẫn bắt đầu bằng /. Các trang hỗ trợ: / (Dashboard), /tasks, /calendar, /reports, /meetings, /contracts, /mail, /notes, /clients, /settings' } 
+        },
+        required: ['path']
+      }
+    }
+  }
+];
+
 export const createChatSession = async (contextString?: string, history?: { role: 'user' | 'model', text: string }[]) => {
-  const ai = await getAIInstance();
+  await loadApiKeys();
 
   const baseInstruction = `Bạn là "Bot CTC Tasks", một trợ lý AI thông minh, thân thiện và tràn đầy năng lượng, được phát triển riêng cho hệ thống phần mềm quản lý công việc của công ty CTC (CTC Task). 
 Nhiệm vụ chính của bạn là:
@@ -200,6 +364,75 @@ Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho
 
   const systemInstruction = contextString ? `${baseInstruction}\n\n${contextString}` : baseInstruction;
 
+  if (AI_PROVIDER !== 'gemini') {
+    // OpenAI Compatible wrapper (Groq, DeepSeek, OpenRouter)
+    const providerConfig = getOpenAIProviderConfig(AI_PROVIDER);
+    const apiKey = API_KEYS[currentKeyIndex];
+
+    const openAiHistory: any[] = [
+      { role: 'system', content: systemInstruction },
+      ...(history || []).map(msg => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.text }))
+    ];
+
+    return {
+      sendMessageStream: async function* ({ message }: { message: string }) {
+        openAiHistory.push({ role: 'user', content: message });
+        
+        try {
+          const res = await fetch(providerConfig.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+              'HTTP-Referer': 'https://ctctask.vn', // For OpenRouter
+              'X-Title': 'CTC Task'
+            },
+            body: JSON.stringify({
+              model: providerConfig.model,
+              messages: openAiHistory,
+              tools: openAIFunctions,
+              tool_choice: 'auto'
+            })
+          });
+
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`API Error: ${res.status} ${JSON.stringify(err)}`);
+          }
+
+          const data = await res.json();
+          const choice = data.choices[0];
+          const textResponse = choice.message.content || '';
+          
+          if (textResponse) {
+             const words = textResponse.split(' ');
+             for (let i = 0; i < words.length; i++) {
+               await new Promise(r => setTimeout(r, 10)); // fake streaming effect
+               yield { text: words[i] + (i < words.length - 1 ? ' ' : '') };
+             }
+          }
+          
+          if (choice.message.tool_calls) {
+            yield {
+              functionCalls: choice.message.tool_calls.map((tc: any) => ({
+                name: tc.function.name,
+                args: JSON.parse(tc.function.arguments || '{}')
+              }))
+            };
+          }
+
+          openAiHistory.push(choice.message);
+
+        } catch (error: any) {
+           console.error("OpenAI API Error:", error);
+           throw error;
+        }
+      }
+    };
+  }
+
+  // Google Gemini Native SDK
+  const ai = await getAIInstance();
   return ai.chats.create({
     model: 'gemini-2.5-flash',
     history: history ? history.map(msg => ({ role: msg.role, parts: [{ text: msg.text }] })) : undefined,

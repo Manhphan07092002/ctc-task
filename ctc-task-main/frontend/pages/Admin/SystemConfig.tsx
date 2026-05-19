@@ -72,6 +72,7 @@ export default function AdminSystemConfig() {
   const [testEmail, setTestEmail] = useState('');
 
   const [aiKeys, setAiKeys] = useState<string[]>([]);
+  const [aiProvider, setAiProvider] = useState<string>('gemini');
   const [aiKeysLoading, setAiKeysLoading] = useState(false);
   const [aiKeysSaving, setAiKeysSaving] = useState(false);
   const [aiMessage, setAiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -106,6 +107,7 @@ export default function AdminSystemConfig() {
       if (aiKeysRes.ok) {
         const aiData = await aiKeysRes.json();
         if (aiData.keys) setAiKeys(aiData.keys);
+        if (aiData.provider) setAiProvider(aiData.provider);
       }
     } catch {
       setBackendOk(false);
@@ -177,11 +179,11 @@ export default function AdminSystemConfig() {
       const res = await apiFetch('/api/admin/system-config/ai-keys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys: filteredKeys }),
+        body: JSON.stringify({ keys: filteredKeys, provider: aiProvider }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Lưu cấu hình AI Keys thất bại');
-      setAiMessage({ type: 'success', text: 'Đã lưu danh sách AI Keys thành công.' });
+      if (!res.ok) throw new Error(data.error || 'Lưu cấu hình AI thất bại');
+      setAiMessage({ type: 'success', text: 'Đã lưu cấu hình AI thành công.' });
       setAiKeys(filteredKeys);
     } catch (e: any) {
       setAiMessage({ type: 'error', text: e.message || 'Lưu cấu hình AI Keys thất bại.' });
@@ -412,7 +414,25 @@ export default function AdminSystemConfig() {
           <div className="py-8 text-center text-gray-400">Đang tải cấu hình AI Keys...</div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500 mb-2">Hệ thống sẽ tự động dùng key đầu tiên. Nếu bị giới hạn (Rate Limit), sẽ tự động chuyển sang key tiếp theo trong danh sách.</p>
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-5 mb-4">
+              <label className="block text-sm font-bold text-gray-800 mb-2">Nhà Cung Cấp AI (AI Provider)</label>
+              <select
+                value={aiProvider}
+                onChange={(e) => setAiProvider(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-400 outline-none font-medium bg-white"
+              >
+                <option value="gemini">Google Gemini (Mặc định)</option>
+                <option value="groq">Groq (Llama 3 / Mixtral - Siêu Nhanh)</option>
+                <option value="deepseek">DeepSeek (Giá Rẻ - Thông Minh)</option>
+                <option value="openrouter">OpenRouter (Đa dạng Mô Hình)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                Hệ thống sẽ dựa vào Provider này để thay đổi chuẩn kết nối. Hãy đảm bảo API Keys bên dưới tương ứng với Provider bạn chọn.
+              </p>
+            </div>
+
+            <p className="text-sm font-bold text-gray-800">Danh sách API Keys</p>
+            <p className="text-xs text-gray-500 mb-2">Hệ thống sẽ tự động dùng key đầu tiên. Nếu bị giới hạn (Rate Limit), sẽ tự động chuyển sang key tiếp theo trong danh sách.</p>
             
             <div className="space-y-3">
               {aiKeys.map((key, index) => (

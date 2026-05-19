@@ -186,20 +186,30 @@ export function adminRoutes(db: any, mailer: any) {
     } catch (e: any) { console.error(e); res.status(500).json({ error: e.message || 'Lỗi gửi mail' }); }
   });
 
-  // --- AI Keys ---
+  // --- AI Config ---
   router.get('/system-config/ai-keys', async (_req, res) => {
     try {
-      const config = await db.get(`SELECT value FROM system_config WHERE key = 'gemini_api_keys'`);
-      if (config && config.value) return res.json({ keys: JSON.parse(config.value) });
-      res.json({ keys: [] });
+      const keysConfig = await db.get(`SELECT value FROM system_config WHERE key = 'gemini_api_keys'`);
+      const providerConfig = await db.get(`SELECT value FROM system_config WHERE key = 'ai_provider'`);
+      
+      const keys = keysConfig && keysConfig.value ? JSON.parse(keysConfig.value) : [];
+      const provider = providerConfig && providerConfig.value ? providerConfig.value : 'gemini';
+      
+      res.json({ keys, provider });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
 
   router.post('/system-config/ai-keys', async (req, res) => {
     try {
-      const { keys } = req.body;
-      if (!Array.isArray(keys)) return res.status(400).json({ error: 'Invalid keys format' });
-      await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['gemini_api_keys', JSON.stringify(keys)]);
+      const { keys, provider } = req.body;
+      if (keys && !Array.isArray(keys)) return res.status(400).json({ error: 'Invalid keys format' });
+      
+      if (keys) {
+        await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['gemini_api_keys', JSON.stringify(keys)]);
+      }
+      if (provider) {
+        await db.run('INSERT INTO system_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['ai_provider', provider]);
+      }
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed' }); }
   });
