@@ -3,6 +3,24 @@ import { Router } from 'express';
 export const productRoutes = (db: any) => {
   const router = Router();
 
+  const requireWarehousePerm = async (req: any, res: any, next: any) => {
+    try {
+      let perms: string[] = [];
+      if (req.user?.role) {
+        const roleRow = await db.get('SELECT permissions FROM roles WHERE name = ?', [req.user.role]);
+        if (roleRow?.permissions) {
+          try { perms = JSON.parse(roleRow.permissions); } catch (e) {}
+        }
+      }
+      if (!perms.includes('manage_warehouse') && !perms.includes('admin_panel')) {
+        return res.status(403).json({ error: 'Không có quyền quản lý kho' });
+      }
+      next();
+    } catch (error) {
+      res.status(500).json({ error: 'Lỗi server khi kiểm tra quyền' });
+    }
+  };
+
   // Lấy danh sách sản phẩm
   router.get('/', async (req, res) => {
     try {
@@ -14,7 +32,7 @@ export const productRoutes = (db: any) => {
   });
 
   // Thêm sản phẩm mới
-  router.post('/', async (req, res) => {
+  router.post('/', requireWarehousePerm, async (req, res) => {
     try {
       const { name, unit, origin, defaultPrice, category, importQuantity, remainingQuantity, importPrice, salePrice, importCode } = req.body;
       if (!name) return res.status(400).json({ error: 'Tên sản phẩm là bắt buộc' });
@@ -38,7 +56,7 @@ export const productRoutes = (db: any) => {
   });
 
   // Sửa sản phẩm
-  router.put('/:id', async (req, res) => {
+  router.put('/:id', requireWarehousePerm, async (req, res) => {
     try {
       const { id } = req.params;
       const { name, unit, origin, defaultPrice, category, importQuantity, remainingQuantity, importPrice, salePrice, importCode } = req.body;
@@ -63,7 +81,7 @@ export const productRoutes = (db: any) => {
   });
 
   // Xóa sản phẩm
-  router.delete('/:id', async (req, res) => {
+  router.delete('/:id', requireWarehousePerm, async (req, res) => {
     try {
       const { id } = req.params;
       const result = await db.run('DELETE FROM products WHERE id = ?', [id]);

@@ -16,7 +16,22 @@ export function projectRoutes(db: any) {
   // GET all projects
   router.get('/', async (req, res) => {
     try {
-      const rows = await db.all('SELECT * FROM projects WHERE isDeleted IS NULL OR isDeleted = 0 ORDER BY createdAt DESC');
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+      const perms = user.permissions || [];
+      const canViewAll = perms.includes('view_all_reports') || perms.includes('director_feedback') || perms.includes('admin_panel') || perms.includes('view_all_tasks');
+
+      let query = 'SELECT * FROM projects WHERE (isDeleted IS NULL OR isDeleted = 0)';
+      const params: any[] = [];
+
+      if (!canViewAll) {
+        query += ' AND (managerId = ? OR department = ?)';
+        params.push(user.id, user.department || '');
+      }
+      
+      query += ' ORDER BY createdAt DESC';
+      const rows = await db.all(query, params);
       res.json(rows);
     } catch (e) { res.status(500).json({ error: 'Failed to fetch projects' }); }
   });

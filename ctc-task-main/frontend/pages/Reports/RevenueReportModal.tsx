@@ -1,10 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { X, Save, Send, Trash2, DollarSign } from 'lucide-react';
 import { RevenueReport } from '../../services/revenueService';
 
 const fmtMoney = (v: number) => v.toLocaleString('vi-VN') + ' ₫';
+
+function getWeekRange() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  const start = new Date(d.setDate(diff));
+  const end = new Date(start);
+  end.setDate(start.getDate() + 4); // Friday
+  
+  // Format as YYYY-MM-DD local time
+  const fmt = (dt: Date) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  return { start: fmt(start), end: fmt(end) };
+}
+
+function getMonthRange() {
+  const d = new Date();
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  
+  const fmt = (dt: Date) => {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  return { start: fmt(start), end: fmt(end) };
+}
 
 interface RevenueRow {
   contractId: string;
@@ -17,6 +50,7 @@ interface RevenueRow {
   invoiceDate: string;
   invoiceNumber: string;
   assignee?: string;
+  contractType?: 'input' | 'output';
 }
 
 interface RevenueReportModalProps {
@@ -29,6 +63,7 @@ interface RevenueReportModalProps {
 export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, onClose, report, onSave }) => {
   const { user } = useAuth();
   const { contracts, saveRevenueReport, users } = useData();
+  const { showToast } = useNotifications();
 
   const getUserName = (id: string) => users.find(u => u.id === id)?.name || id;
 
@@ -53,15 +88,29 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
           setRows(Array.isArray(parsed) ? parsed : []);
         } catch { setRows([]); }
       } else {
+        const m = getMonthRange();
         setReportType('monthly');
-        setPeriodStart('');
-        setPeriodEnd('');
+        setPeriodStart(m.start);
+        setPeriodEnd(m.end);
         setManagerFeedback('');
         setDirectorFeedback('');
         setRows([]);
       }
     }
   }, [isOpen, report]);
+
+  const handleReportTypeChange = (type: 'weekly' | 'monthly') => {
+    setReportType(type);
+    if (type === 'weekly') {
+      const w = getWeekRange();
+      setPeriodStart(w.start);
+      setPeriodEnd(w.end);
+    } else {
+      const m = getMonthRange();
+      setPeriodStart(m.start);
+      setPeriodEnd(m.end);
+    }
+  };
 
   const addContractRow = (c: any) => {
     if (rows.find(r => r.contractId === c.id)) return;
@@ -70,6 +119,7 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
       contractName: c.contractName, preTaxValue: c.preTaxValue, deliveredMonth: 0,
       deliveredCumulative: 0, invoiceDate: c.invoiceDate || '', invoiceNumber: c.invoiceNumber || '',
       assignee: getUserName(c.createdBy || '') || undefined,
+      contractType: c.contractType || 'output',
     }]);
   };
 
@@ -111,6 +161,18 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
 
   const handleSave = async (status: string) => {
     if (!user) return;
+    
+    if (status !== 'Draft') {
+      if (!periodStart || !periodEnd) {
+        showToast({ type: 'error', title: 'Thiếu thông tin', message: 'Vui lòng chọn Từ ngày và Đến ngày.' });
+        return;
+      }
+      if (rows.length === 0) {
+        showToast({ type: 'error', title: 'Thiếu thông tin', message: 'Vui lòng thêm ít nhất 1 hợp đồng vào báo cáo.' });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     const now = new Date().toISOString();
     const monthLabel = periodStart ? new Date(periodStart).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }) : '';
@@ -176,7 +238,7 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Loại báo cáo</label>
-                <select value={reportType} onChange={e => setReportType(e.target.value as any)} disabled={isReadOnly}
+                <select value={reportType} onChange={e => handleReportTypeChange(e.target.value as any)} disabled={isReadOnly}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition-shadow disabled:bg-gray-50">
                   <option value="monthly">Theo tháng</option>
                   <option value="weekly">Theo tuần</option>
@@ -200,10 +262,22 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
               <h3 className="text-sm font-bold text-gray-700 mb-3">Thêm hợp đồng từ danh sách</h3>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
-                {contracts.filter(c => !rows.find(r => r.contractId === c.id)).map(c => (
+                {contracts
+                  .filter(c => c.contractType === 'output' || !c.contractType) // Default to output if not specified
+                  .filter(c => !rows.find(r => r.contractId === c.id))
+                  .map(c => (
                   <button key={c.id} onClick={() => addContractRow(c)}
-                    className="text-xs px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors truncate max-w-[250px] text-left">
-                    + {c.contractNumber} — {c.clientName}
+                    className={`text-xs px-3 py-1.5 border rounded-lg transition-colors truncate max-w-[250px] text-left flex items-center gap-1.5 ${
+                      c.contractType === 'input' 
+                        ? 'bg-fuchsia-50/50 border-fuchsia-200 hover:bg-fuchsia-100 text-fuchsia-900'
+                        : 'bg-blue-50/50 border-blue-200 hover:bg-blue-100 text-blue-900'
+                    }`}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      c.contractType === 'input' ? 'bg-fuchsia-200 text-fuchsia-800' : 'bg-blue-200 text-blue-800'
+                    }`}>
+                      {c.contractType === 'input' ? 'MUA' : 'BÁN'}
+                    </span>
+                    <span className="truncate">{c.contractNumber} — {c.clientName}</span>
                   </button>
                 ))}
                 {contracts.length === 0 && <p className="text-xs text-gray-400">Chưa có hợp đồng. Vui lòng thêm hợp đồng trước.</p>}
@@ -239,7 +313,14 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
                     <tr key={idx} className="hover:bg-orange-50/20">
                       <td className="px-3 py-2 text-center text-gray-500">{idx + 1}</td>
                       {rows.some(ro => ro.assignee) && <td className="px-3 py-2 font-medium text-blue-600 text-xs">{r.assignee || '—'}</td>}
-                      <td className="px-3 py-2 font-semibold text-gray-800 text-xs">{r.contractNumber}</td>
+                      <td className="px-3 py-2 font-semibold text-gray-800 text-xs whitespace-nowrap">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] mr-1.5 font-bold ${
+                          r.contractType === 'input' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {r.contractType === 'input' ? 'MUA' : 'BÁN'}
+                        </span>
+                        {r.contractNumber}
+                      </td>
                       <td className="px-3 py-2 text-gray-700 text-xs">{r.clientName}</td>
                       <td className="px-3 py-2 text-gray-700 text-xs max-w-[180px] truncate" title={r.contractName}>{r.contractName}</td>
                       <td className="px-3 py-2 text-right font-medium">{fmtMoney(r.preTaxValue)}</td>
@@ -326,8 +407,8 @@ export const RevenueReportModal: React.FC<RevenueReportModalProps> = ({ isOpen, 
                 <button onClick={() => handleSave('Rejected')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors">
                   Từ chối
                 </button>
-                <button onClick={() => handleSave('Pending Director')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors">
-                  Duyệt (Gửi GĐ)
+                <button onClick={() => handleSave('Approved')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 transition-colors">
+                  Phê duyệt báo cáo
                 </button>
               </>
             )}

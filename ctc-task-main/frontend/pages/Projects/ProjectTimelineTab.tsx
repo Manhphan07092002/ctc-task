@@ -8,6 +8,7 @@ interface Props {
   searchQuery: string;
   filterStatus: string;
   onEdit: (p: Project) => void;
+  canEditProject: (p: Project) => boolean;
 }
 
 const MONTH_NAMES = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
@@ -26,7 +27,7 @@ const STATUS_BG: Record<string, string> = {
   cancelled: 'rgba(239,68,68,0.12)',
 };
 
-export const ProjectTimelineTab: React.FC<Props> = ({ projects, tasks, searchQuery, filterStatus, onEdit }) => {
+export const ProjectTimelineTab: React.FC<Props> = ({ projects, tasks, searchQuery, filterStatus, onEdit, canEditProject }) => {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
 
@@ -119,7 +120,7 @@ export const ProjectTimelineTab: React.FC<Props> = ({ projects, tasks, searchQue
               const isNearDeadline = p.endDate && !isOverdue && p.endDate <= new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0] && p.status !== 'completed';
 
               return (
-                <div key={p.id} className="flex hover:bg-gray-50/80 transition-colors group cursor-pointer" onClick={() => onEdit(p)}>
+                <div key={p.id} className={`flex transition-colors group ${canEditProject(p) ? 'hover:bg-gray-50/80 cursor-pointer' : ''}`} onClick={() => canEditProject(p) && onEdit(p)}>
                   {/* Left info */}
                   <div className="w-[260px] flex-shrink-0 px-4 py-3 border-r border-gray-100 flex items-center gap-2">
                     <div className="flex-1 min-w-0">

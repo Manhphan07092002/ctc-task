@@ -403,6 +403,8 @@ export default function ReportsPage() {
     switch (status) {
       case 'Draft': return <span className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full flex items-center gap-1"><FileEdit size={12} /> Nháp</span>;
       case 'Pending': return <span className="px-2.5 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full flex items-center gap-1"><Clock size={12} /> Chờ duyệt</span>;
+      case 'Pending Manager': return <span className="px-2.5 py-1 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full flex items-center gap-1"><Clock size={12} /> Chờ TP duyệt</span>;
+      case 'Pending Director': return <span className="px-2.5 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded-full flex items-center gap-1"><Clock size={12} /> Chờ GĐ duyệt</span>;
       case 'Approved': return <span className="px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full flex items-center gap-1"><CheckCircle size={12} /> Đã duyệt</span>;
       case 'Rejected': return <span className="px-2.5 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full flex items-center gap-1"><XCircle size={12} /> Từ chối</span>;
       default: return null;
@@ -422,7 +424,7 @@ export default function ReportsPage() {
     { name: 'Từ chối', value: myStats.rejected, color: '#ef4444' },
   ].filter(d => d.value > 0);
 
-  const deptData = canViewAll ? departments.filter(d => !['GIÁM ĐỐC', 'ADMIN'].includes(d.name)).map(dept => {
+  const deptData = canViewAll ? departments.filter(d => !['GIÁM ĐỐC', 'ADMIN', 'Hội đồng quản trị và ban lãnh đạo công ty.'].includes(d.name)).map(dept => {
     return {
       name: dept.name,
       approved: reports.filter(r => r.department === dept.name && r.status === 'Approved').length,
@@ -473,7 +475,7 @@ export default function ReportsPage() {
 
   const unsubmittedDepts = useMemo(() => {
     if (!canViewAll) return [];
-    const activeDepts = departments.filter(d => !['GIÁM ĐỐC', 'ADMIN'].includes(d.name)).map(d => d.name);
+    const activeDepts = departments.filter(d => !['GIÁM ĐỐC', 'ADMIN', 'Hội đồng quản trị và ban lãnh đạo công ty.'].includes(d.name)).map(d => d.name);
     const submittedDepts = new Set(
       reports.filter(r => new Date(r.createdAt).getTime() >= currentWeekStart).map(r => r.department)
     );
@@ -787,7 +789,7 @@ export default function ReportsPage() {
                 <span className="text-xs font-medium text-blue-600 bg-white px-2.5 py-1 rounded-full border border-blue-200">{rpts.length} phòng</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-5">
-                {departments.filter(d => !['GIÁM ĐỐC', 'ADMIN'].includes(d.name)).map(dept => {
+                {departments.filter(d => !['GIÁM ĐỐC', 'ADMIN', 'Hội đồng quản trị và ban lãnh đạo công ty.'].includes(d.name)).map(dept => {
                   const rpt = rpts.find(r => r.department === dept.name);
                   return (
                     <div key={dept.id} onClick={() => rpt && handleOpenView(rpt)}
@@ -1058,7 +1060,6 @@ export default function ReportsPage() {
           if (
             r.status === 'Approved' &&
             canApprove &&
-            !canViewAll &&
             r.authorId !== user?.id &&
             r.department === user?.department
           ) {
@@ -1165,7 +1166,6 @@ export default function ReportsPage() {
           if (
             r.status === 'Approved' &&
             canApprove &&
-            !canViewAll &&
             r.authorId !== user?.id &&
             r.department === user?.department
           ) {

@@ -26,6 +26,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
   const pTax = contract.postTaxValue || 0;
   const paid = contract.paidAmount || 0;
   const debt = Math.max(0, pTax - paid);
+  const isInput = contract.contractType === 'input';
 
   const handleAmountChange = (val: string) => {
     const raw = val.replace(/\D/g, '');
@@ -117,7 +118,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
               <Wallet size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Thu tiền hợp đồng</h2>
+              <h2 className="text-lg font-bold text-white">{isInput ? 'Thanh toán hợp đồng' : 'Thu tiền hợp đồng'}</h2>
               <p className="text-xs text-emerald-100 font-medium">{contract.contractNumber}</p>
             </div>
           </div>
@@ -149,7 +150,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider flex items-center gap-1">
-                  <TrendingUp size={12} className="text-emerald-500" /> Tỷ lệ thu
+                  <TrendingUp size={12} className="text-emerald-500" /> {isInput ? 'Tỷ lệ chi' : 'Tỷ lệ thu'}
                 </label>
                 <div className="relative">
                   <input 
@@ -165,7 +166,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
               
               <div className="flex-[2]">
                 <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
-                  Số tiền thu đợt này (VNĐ)
+                  {isInput ? 'Số tiền chi đợt này (VNĐ)' : 'Số tiền thu đợt này (VNĐ)'}
                 </label>
                 <input 
                   type="text" 
@@ -179,12 +180,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
 
             {/* Quick Actions */}
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Chọn nhanh tỷ lệ thu</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">{isInput ? 'Chọn nhanh tỷ lệ chi' : 'Chọn nhanh tỷ lệ thu'}</p>
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => handleQuickPercent(30)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">Thu 30%</button>
-                <button onClick={() => handleQuickPercent(50)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">Thu 50%</button>
-                <button onClick={() => handleQuickPercent(70)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">Thu 70%</button>
-                <button onClick={handleQuickFull} className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors border border-rose-200/50 shadow-sm flex-1 text-center">Thu hết công nợ</button>
+                <button onClick={() => handleQuickPercent(30)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">{isInput ? 'Chi 30%' : 'Thu 30%'}</button>
+                <button onClick={() => handleQuickPercent(50)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">{isInput ? 'Chi 50%' : 'Thu 50%'}</button>
+                <button onClick={() => handleQuickPercent(70)} className="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200/50 shadow-sm">{isInput ? 'Chi 70%' : 'Thu 70%'}</button>
+                <button onClick={handleQuickFull} className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors border border-rose-200/50 shadow-sm flex-1 text-center">{isInput ? 'Thanh toán hết nợ' : 'Thu hết công nợ'}</button>
               </div>
             </div>
 
@@ -193,7 +194,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
               <div className="flex items-start gap-2 p-3 bg-blue-50 text-blue-700 rounded-xl border border-blue-100">
                 <AlertCircle size={16} className="mt-0.5 flex-shrink-0 text-blue-500" />
                 <p className="text-xs font-medium leading-relaxed">
-                  Bạn đang thu <strong>{fmtMoney(numAmount)}</strong>. Công nợ của hợp đồng sau khi thu sẽ còn lại <strong>{fmtMoney(Math.max(0, debt - numAmount))}</strong>.
+                  Bạn đang {isInput ? 'chi trả' : 'thu'} <strong>{fmtMoney(numAmount)}</strong>. Công nợ của hợp đồng sau khi {isInput ? 'thanh toán' : 'thu'} sẽ còn lại <strong>{fmtMoney(Math.max(0, debt - numAmount))}</strong>.
                 </p>
               </div>
             )}
@@ -209,7 +210,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ contract, onClose, o
             className="px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl hover:shadow-lg hover:shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             {isSubmitting ? 'Đang lưu...' : (
               <>
-                <Save size={16} /> Xác nhận Thu tiền
+                <Save size={16} /> Xác nhận {isInput ? 'Thanh toán' : 'Thu tiền'}
               </>
             )}
           </button>

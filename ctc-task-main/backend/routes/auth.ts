@@ -112,7 +112,7 @@ export function authRoutes(db: any) {
         department: user.department, avatar: user.avatar, 
         permissions: role?.permissions ? JSON.parse(role.permissions) : []
       };
-      const jwtPayload = { id: user.id, role: user.role };
+      const jwtPayload = { ...userClientData };
       const token = generateToken(jwtPayload);
       
       try {

@@ -5,6 +5,7 @@ import { getProjectMilestones, saveProjectMilestone, deleteProjectMilestone } fr
 
 interface Props {
   project: Partial<Project>;
+  projects: Project[];
   onChange: (p: Partial<Project>) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -19,7 +20,7 @@ const PHASE_LABELS: Record<string, string> = {
   initiation: 'Khởi tạo', planning: 'Lập kế hoạch', execution: 'Thực hiện', monitoring: 'Giám sát', closure: 'Nghiệm thu',
 };
 
-export const ProjectEditForm: React.FC<Props> = ({ project, onChange, onSave, onCancel, contracts, tasks, users, departments, saveContract }) => {
+export const ProjectEditForm: React.FC<Props> = ({ project, projects, onChange, onSave, onCancel, contracts, tasks, users, departments, saveContract }) => {
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
   const [newMilestone, setNewMilestone] = useState('');
 
@@ -91,13 +92,26 @@ export const ProjectEditForm: React.FC<Props> = ({ project, onChange, onSave, on
             </div>
             <div>
               <label className="block text-sm font-semibold mb-1 text-gray-600">Khách hàng</label>
-              <input value={project.clientName || ''} onChange={e => onChange({...project, clientName: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+              <input list="client-suggestions" value={project.clientName || ''} onChange={e => onChange({...project, clientName: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+              <datalist id="client-suggestions">
+                {Array.from(new Set([
+                  ...contracts.map(c => c.clientName?.trim()),
+                  ...projects.map(p => p.clientName?.trim())
+                ].filter(Boolean))).sort().map(val => (
+                  <option key={val as string} value={val as string} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold mb-1 text-gray-600">Hình thức LCNT</label>
-              <input value={project.procurementMethod || ''} onChange={e => onChange({...project, procurementMethod: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+              <input list="procurement-suggestions" value={project.procurementMethod || ''} onChange={e => onChange({...project, procurementMethod: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+              <datalist id="procurement-suggestions">
+                {Array.from(new Set(projects.map(p => p.procurementMethod?.trim()).filter(Boolean))).sort().map(val => (
+                  <option key={val as string} value={val as string} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-semibold mb-1 text-gray-600">Ngày đấu thầu</label>
@@ -106,7 +120,16 @@ export const ProjectEditForm: React.FC<Props> = ({ project, onChange, onSave, on
           </div>
           <div>
             <label className="block text-sm font-semibold mb-1 text-gray-600">Chủ đầu tư</label>
-            <input value={project.investor || ''} onChange={e => onChange({...project, investor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+            <input list="investor-suggestions" value={project.investor || ''} onChange={e => onChange({...project, investor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-500 text-sm" />
+            <datalist id="investor-suggestions">
+              {Array.from(new Set([
+                ...contracts.map(c => c.clientName?.trim()),
+                ...projects.map(p => p.investor?.trim()),
+                ...projects.map(p => p.clientName?.trim())
+              ].filter(Boolean))).sort().map(val => (
+                <option key={val as string} value={val as string} />
+              ))}
+            </datalist>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[{label:'Giá dự toán',key:'budget'},{label:'Giá dự thầu',key:'biddingPrice'},{label:'Giá trúng thầu',key:'winningPrice'}].map(f => (

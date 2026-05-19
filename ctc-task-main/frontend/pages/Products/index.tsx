@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusCircle, Search, Edit2, Trash2, X, Save, Package, TrendingUp, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import * as productService from '../../services/productService';
@@ -9,6 +10,9 @@ import * as productService from '../../services/productService';
 export default function ProductsPage() {
   const { t } = useLanguage();
   const { contracts } = useData();
+  const { user } = useAuth();
+  const perms = user?.permissions || [];
+  const canManage = perms.includes('manage_warehouse') || perms.includes('admin_panel');
   const [products, setProducts] = useState<productService.Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -143,10 +147,16 @@ export default function ProductsPage() {
           </h1>
           <p className="text-gray-500 dark:text-slate-400 mt-1">Quản lý hàng hóa, kiểm soát tồn kho và theo dõi giá vốn/bán</p>
         </div>
-        <button onClick={openCreateModal} className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm">
-          <PlusCircle size={18} />
-          Nhập kho
-        </button>
+        {canManage ? (
+          <button onClick={openCreateModal} className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm">
+            <PlusCircle size={18} />
+            Nhập kho
+          </button>
+        ) : (
+          <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl font-bold flex items-center gap-2 text-sm border border-gray-200">
+            <AlertCircle size={16} /> Chỉ xem
+          </div>
+        )}
       </div>
 
       {/* Thống kê nhanh */}
@@ -210,7 +220,7 @@ export default function ProductsPage() {
                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase text-center w-20">Tồn kho</th>
                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase text-right">Giá nhập</th>
                 <th className="p-3 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase text-right">Giá bán</th>
-                <th className="p-3 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase text-center w-24">Thao tác</th>
+                {canManage && <th className="p-3 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase text-center w-24">Thao tác</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-slate-700/50">
@@ -246,16 +256,18 @@ export default function ProductsPage() {
                       </td>
                       <td className="p-3 text-sm font-semibold text-gray-500 text-right">{p.importPrice ? p.importPrice.toLocaleString('vi-VN') : '-'}</td>
                       <td className="p-3 text-sm font-bold text-emerald-600 text-right">{(p.salePrice || p.defaultPrice) ? (p.salePrice || p.defaultPrice)?.toLocaleString('vi-VN') : '-'}</td>
-                      <td className="p-3 text-center">
-                        <div className="flex justify-center gap-1">
-                          <button onClick={() => handleEdit(p)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Sửa">
-                            <Edit2 size={16} />
-                          </button>
-                          <button onClick={() => setDeleteId(p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      {canManage && (
+                        <td className="p-3 text-center">
+                          <div className="flex justify-center gap-1">
+                            <button onClick={() => handleEdit(p)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Sửa">
+                              <Edit2 size={16} />
+                            </button>
+                            <button onClick={() => setDeleteId(p.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })

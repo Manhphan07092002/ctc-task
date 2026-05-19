@@ -24,18 +24,11 @@ export function contractRoutes(db: any) {
       let query = 'SELECT * FROM contracts WHERE (isDeleted IS NULL OR isDeleted = 0)';
       const params: any[] = [];
 
-      // Time-boxing
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      query += ' AND createdAt >= ?';
-      params.push(sixMonthsAgo.toISOString());
+      // Time-boxing disabled: fetching all contracts regardless of createdAt
 
       if (!canViewAll) {
-        // Tạm thời mở quyền cho mọi người xem HĐ phòng ban do tính chất công việc hiện tại
-        // Nếu muốn siết chặt "Nhân viên chỉ xem của mình", có thể đổi điều kiện ở đây.
-        // Tuy nhiên theo request: "chỉ được xem và sửa hợp đồng của chính mình" (đề xuất 6)
-        query += ' AND createdBy = ?';
-        params.push(user.id);
+        query += ' AND (createdBy = ? OR department = ?)';
+        params.push(user.id, user.department || '');
       }
       
       query += ' ORDER BY createdAt DESC';
@@ -64,8 +57,8 @@ export function contractRoutes(db: any) {
       const params: any[] = [];
 
       if (!canViewAll) {
-        query += ' AND createdBy = ?';
-        params.push(user.id);
+        query += ' AND (createdBy = ? OR department = ?)';
+        params.push(user.id, user.department || '');
       }
       
       query += ' ORDER BY createdAt DESC';
@@ -92,17 +85,58 @@ export function contractRoutes(db: any) {
         [contractId, contractNumber, clientName, contractName, products ? JSON.stringify(products) : null, preTaxValue ?? 0, vatRate ?? 0, postTaxValue ?? 0, invoiceDate ?? null, invoiceNumber ?? null, department, createdBy, now, status || 'draft', attachments ? JSON.stringify(attachments) : null, paidAmount ?? 0, projectId || null, contractType || 'output', supplierName || null, documentChecklist ? JSON.stringify(documentChecklist) : null]
       );
 
-      // Auto-create a Task for this new contract
-      const taskId = randomUUID();
-      await db.run(
-        'INSERT INTO tasks (id, title, description, startDate, priority, status, createdBy, department, contractId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [taskId, `Thực hiện HĐ: ${contractNumber}`, `Hợp đồng: ${contractName}\nKhách hàng: ${clientName}`, now.split('T')[0], 'Medium', 'Todo', createdBy, department, contractId]
-      );
-      if (createdBy) {
-        await db.run('INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)', [taskId, createdBy]);
+      // Auto-create a Task for this new contract (Only for output contracts)
+      if (contractType !== 'input') {
+        const taskId = randomUUID();
+        await db.run(
+          'INSERT INTO tasks (id, title, description, startDate, priority, status, createdBy, department, contractId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [taskId, `Thực hiện HĐ: ${contractNumber}`, `Hợp đồng: ${contractName}\nKhách hàng: ${clientName}`, now.split('T')[0], 'Medium', 'Todo', createdBy, department, contractId]
+        );
+        if (createdBy) {
+          await db.run('INSERT INTO task_assignees (taskId, userId) VALUES (?, ?)', [taskId, createdBy]);
+        }
       }
 
       await logActivity(req.user?.id || 'system', 'Tạo Hợp đồng', contractId, { contractNumber, contractName });
+
+      // Nếu là hợp đồng đầu vào, tự động thêm sản phẩm vào kho
+      if (contractType === 'input' && Array.isArray(products)) {
+        for (const p of products) {
+          if (!p.name) continue;
+          const prodId = 'prod-' + randomUUID().substring(0, 8);
+          const qty = Number(p.quantity) || 0;
+          const price = Number(p.unitPrice) || 0;
+          
+          await db.run(
+            `INSERT INTO products (id, name, unit, origin, category, importQuantity, remainingQuantity, importPrice, createdAt, importCode)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(name) DO UPDATE SET
+               importQuantity = importQuantity + excluded.importQuantity,
+               remainingQuantity = remainingQuantity + excluded.remainingQuantity,
+               importPrice = excluded.importPrice`,
+            [
+              prodId, p.name.trim(), p.unit || '', p.origin || '', '', 
+              qty, qty, price, now, contractNumber
+            ]
+          );
+        }
+      }
+
+      // Auto-create contract links if requested
+      const { linkedInputContractIds } = req.body;
+      if (contractType === 'output' && Array.isArray(linkedInputContractIds) && linkedInputContractIds.length > 0) {
+        for (const inputId of linkedInputContractIds) {
+          const linkId = randomUUID();
+          try {
+            await db.run(
+              'INSERT INTO contract_links (id, outputContractId, inputContractId, linkType, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+              [linkId, contractId, inputId, 'procurement', createdBy || null, now]
+            );
+          } catch (err: any) {
+            if (!err.message?.includes('UNIQUE')) console.error(err);
+          }
+        }
+      }
 
       res.status(201).json({ id: contractId });
     } catch (e: any) { res.status(500).json({ error: 'Failed to create contract', detail: e.message }); }
@@ -119,6 +153,22 @@ export function contractRoutes(db: any) {
 
       await logActivity(req.user?.id || 'system', 'Cập nhật Hợp đồng', req.params.id, { contractNumber, status, preTaxValue, paidAmount });
 
+      // Auto-create contract links if requested
+      const { linkedInputContractIds } = req.body;
+      if (contractType === 'output' && Array.isArray(linkedInputContractIds) && linkedInputContractIds.length > 0) {
+        for (const inputId of linkedInputContractIds) {
+          const linkId = randomUUID();
+          try {
+            await db.run(
+              'INSERT INTO contract_links (id, outputContractId, inputContractId, linkType, createdBy, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+              [linkId, req.params.id, inputId, 'procurement', req.user?.id || null, new Date().toISOString()]
+            );
+          } catch (err: any) {
+            if (!err.message?.includes('UNIQUE')) console.error(err);
+          }
+        }
+      }
+
       res.json({ success: true });
     } catch (e) { res.status(500).json({ error: 'Failed to update contract' }); }
   });
@@ -128,6 +178,16 @@ export function contractRoutes(db: any) {
     try {
       await db.run('UPDATE contracts SET isDeleted = 1 WHERE id = ?', [req.params.id]);
       
+      // Also delete any auto-generated tasks associated with this contract
+      const tasks = await db.all('SELECT id FROM tasks WHERE contractId = ?', [req.params.id]);
+      for (const t of tasks) {
+        await db.run('DELETE FROM task_assignees WHERE taskId = ?', [t.id]);
+        await db.run('DELETE FROM task_tags WHERE taskId = ?', [t.id]);
+        await db.run('DELETE FROM task_subtasks WHERE taskId = ?', [t.id]);
+        await db.run('DELETE FROM task_comments WHERE taskId = ?', [t.id]);
+        await db.run('DELETE FROM tasks WHERE id = ?', [t.id]);
+      }
+
       await logActivity(req.user?.id || 'system', 'Xóa Hợp đồng', req.params.id, {});
 
       res.json({ success: true });

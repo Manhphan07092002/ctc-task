@@ -28,6 +28,14 @@ export const createContractLink = async (link: Omit<ContractLink, 'id' | 'create
   return res.json();
 };
 
+export const updateContractLink = async (id: string, updates: Partial<ContractLink>): Promise<void> => {
+  const res = await apiFetch(`/api/contract-links/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Failed to update link');
+};
+
 export const deleteContractLink = async (id: string): Promise<void> => {
   const res = await apiFetch(`/api/contract-links/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete link');

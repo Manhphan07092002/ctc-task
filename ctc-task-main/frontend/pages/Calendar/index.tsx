@@ -86,6 +86,7 @@ function getLunarDate(date: Date): { day: number; month: number; year: number; i
 
 interface CalendarViewProps {
   tasks: Task[];
+  contracts?: any[];
   onDateClick: (date: string) => void;
   onTaskClick: (task: Task) => void;
 }
@@ -103,7 +104,7 @@ const PRIORITY_BAR: Record<string, string> = {
   'Low':    'bg-green-50 text-green-700 border-l-green-400',
 };
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, onTaskClick }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, contracts = [], onDateClick, onTaskClick }) => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -427,16 +428,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                       <span>Báo cáo 16:00</span>
                     </div>
                   )}
-                  {dayTasks.slice(0, isFriday ? 2 : 3).map(task => (
+                  {dayTasks.slice(0, isFriday ? 2 : 3).map(task => {
+                    let taskStyle = PRIORITY_BAR[task.priority] || 'bg-gray-50 text-gray-600 border-l-gray-400';
+                    
+                    // Override color if it's a contract task
+                    if (task.contractId && contracts.length > 0) {
+                      const contract = contracts.find((c: any) => c.id === task.contractId);
+                      if (contract) {
+                        if (contract.contractType === 'input') {
+                          taskStyle = 'bg-fuchsia-50 text-fuchsia-700 border-l-fuchsia-500'; // HĐ Mua
+                        } else {
+                          taskStyle = 'bg-blue-50 text-blue-700 border-l-blue-500'; // HĐ Bán
+                        }
+                      }
+                    }
+
+                    return (
                     <div
                       key={task.id}
                       onClick={(e) => { e.stopPropagation(); handleDayClick(day.dateStr, e); }}
-                      className={`text-[10px] px-1.5 py-0.5 rounded border-l-2 font-medium truncate transition-all cursor-pointer hover:brightness-95 ${PRIORITY_BAR[task.priority] || 'bg-gray-50 text-gray-600 border-l-gray-400'}`}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border-l-2 font-medium truncate transition-all cursor-pointer hover:brightness-95 ${taskStyle}`}
                       title={task.title}
                     >
                       {task.title}
                     </div>
-                  ))}
+                  )})}
                   {dayTasks.length > (isFriday ? 2 : 3) && (
                     <div className="text-[10px] text-brand-500 px-1 font-semibold">
                       +{dayTasks.length - (isFriday ? 2 : 3)} khác
@@ -464,7 +480,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onDateClick, 
                   key={task.id}
                   onClick={() => onTaskClick(task)}
                   className={`flex-shrink-0 flex flex-col gap-1 px-3 py-2 rounded-xl border text-left transition-all hover:shadow-md hover:-translate-y-0.5 min-w-[140px] max-w-[170px]
-                    ${PRIORITY_BAR[task.priority] || 'bg-gray-50 text-gray-600 border-l-gray-400'}
+                    ${(() => {
+                      if (task.contractId && contracts.length > 0) {
+                        const contract = contracts.find((c: any) => c.id === task.contractId);
+                        if (contract?.contractType === 'input') return 'bg-fuchsia-50 text-fuchsia-700 border-l-fuchsia-500 border-t-transparent border-r-transparent border-b-transparent';
+                        if (contract?.contractType === 'output') return 'bg-blue-50 text-blue-700 border-l-blue-500 border-t-transparent border-r-transparent border-b-transparent';
+                      }
+                      return PRIORITY_BAR[task.priority] || 'bg-gray-50 text-gray-600 border-l-gray-400';
+                    })()}
                   `}
                 >
                   <p className="text-[11px] font-bold truncate">{task.title}</p>

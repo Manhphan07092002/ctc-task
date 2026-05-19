@@ -36,6 +36,18 @@ export function contractLinkRoutes(db: any) {
     }
   });
 
+  // UPDATE link
+  router.put('/:id', async (req, res) => {
+    const { linkType, description } = req.body;
+    try {
+      await db.run(
+        'UPDATE contract_links SET linkType = ?, description = ? WHERE id = ?',
+        [linkType || 'related', description || null, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: 'Failed to update link' }); }
+  });
+
   // DELETE link
   router.delete('/:id', async (req, res) => {
     try {

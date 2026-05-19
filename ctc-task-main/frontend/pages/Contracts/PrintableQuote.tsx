@@ -66,11 +66,12 @@ export const PrintableQuote = forwardRef<HTMLDivElement, PrintableQuoteProps>(({
         <thead>
           <tr>
             <th style={{ width: '5%' }}>STT</th>
-            <th style={{ width: '35%' }}>Tên Sản phẩm / Dịch vụ</th>
+            <th style={{ width: '30%' }}>Tên Sản phẩm / Dịch vụ</th>
             <th style={{ width: '10%' }}>ĐVT</th>
             <th style={{ width: '10%' }}>SL</th>
             <th style={{ width: '15%' }}>Đơn giá (VNĐ)</th>
-            <th style={{ width: '25%' }}>Thành tiền (VNĐ)</th>
+            <th style={{ width: '10%' }}>Thuế (%)</th>
+            <th style={{ width: '20%' }}>Thành tiền (VNĐ)</th>
           </tr>
         </thead>
         <tbody>
@@ -81,24 +82,37 @@ export const PrintableQuote = forwardRef<HTMLDivElement, PrintableQuoteProps>(({
               <td className="text-center">{p.unit || '-'}</td>
               <td className="text-center">{p.quantity}</td>
               <td className="text-right">{fmtMoney(p.unitPrice)}</td>
+              <td className="text-center">{p.vatRate ?? 8}</td>
               <td className="text-right font-bold">{fmtMoney(p.total)}</td>
             </tr>
           ))}
           {(!contract.products || contract.products.length === 0) && (
             <tr>
-              <td colSpan={6} className="text-center italic text-gray-500">Chưa có sản phẩm nào</td>
+              <td colSpan={7} className="text-center italic text-gray-500">Chưa có sản phẩm nào</td>
             </tr>
           )}
           <tr>
-            <td colSpan={5} className="text-right font-bold">Tổng cộng (chưa VAT):</td>
+            <td colSpan={6} className="text-right font-bold">Tổng cộng (chưa VAT):</td>
             <td className="text-right font-bold">{fmtMoney(contract.preTaxValue || 0)}</td>
           </tr>
+          {(() => {
+            const vatSummary = (contract.products || []).reduce((acc: any, p) => {
+              const rate = p.vatRate ?? 8;
+              acc[rate] = (acc[rate] || 0) + (p.total * rate) / 100;
+              return acc;
+            }, {});
+            const rates = Object.keys(vatSummary).map(Number).sort((a, b) => a - b);
+            if (rates.length === 0) rates.push(8);
+            
+            return rates.map(rate => (
+              <tr key={rate}>
+                <td colSpan={6} className="text-right font-bold">Thuế VAT ({rate}%):</td>
+                <td className="text-right font-bold">{fmtMoney(vatSummary[rate] || 0)}</td>
+              </tr>
+            ));
+          })()}
           <tr>
-            <td colSpan={5} className="text-right font-bold">Thuế VAT ({contract.vatRate || 0}%):</td>
-            <td className="text-right font-bold">{fmtMoney((contract.preTaxValue || 0) * (contract.vatRate || 0) / 100)}</td>
-          </tr>
-          <tr>
-            <td colSpan={5} className="text-right font-bold text-[14pt]">Tổng giá trị thanh toán:</td>
+            <td colSpan={6} className="text-right font-bold text-[14pt]">Tổng giá trị thanh toán:</td>
             <td className="text-right font-bold text-[14pt]">{fmtMoney(contract.postTaxValue || 0)}</td>
           </tr>
         </tbody>

@@ -9,6 +9,7 @@ import { Button } from '../../components/UI';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Report, ReportStatus, Task, User as UserType, Department } from '../../types';
 import { apiFetch } from '../../services/api';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface TaskRow {
@@ -128,6 +129,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   isOpen, onClose, onSave, onDelete, onAdminHardDelete, initialReport, currentUser, tasks, departments, users, allReports, contracts = [], projects = [], saveContract, saveProject, t
 }) => {
   const week = getWeekRange();
+  const { showToast } = useNotifications();
 
   const [title, setTitle]         = useState('');
   const [weekStart, setWeekStart] = useState(week.start);
@@ -270,7 +272,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       
       if (cId) {
         const c = contracts?.find(x => x.id === cId);
-        if (c && c.projectId) pId = c.projectId;
+        if (!c) return; // Skip importing if the contract is deleted or not found
+        if (c.projectId) pId = c.projectId;
+      }
+      
+      if (pId) {
+        const p = projects?.find(x => x.id === pId);
+        if (!p) return; // Skip importing if the project is deleted or not found
       }
 
       const row: TaskRow = {
@@ -307,7 +315,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     });
 
     const newRows = Array.from(grouped.values());
-    if (newRows.length) setRows(newRows);
+    if (newRows.length > 0) {
+      setRows(newRows);
+      showToast({ type: 'success', title: 'Thành công', message: `Đã kéo ${newRows.length} nhóm công việc vào báo cáo.\n(Lưu ý: Các công việc cùng hợp đồng/dự án đã được gộp chung)` });
+    } else {
+      setRows([newRow()]);
+      showToast({ type: 'error', title: 'Không có công việc', message: 'Bạn chưa có công việc hợp lệ nào trong danh sách.' });
+    }
   };
 
   // ── Aggregate Department Reports ──
@@ -910,7 +924,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   <XCircle size={16} className="mr-2" /> Trả lại
                 </Button>
                 <Button onClick={() => handleAction('Approved', true)} className="!rounded-xl shadow-md bg-green-600 hover:bg-green-700">
-                  <CheckCircle size={16} className="mr-2" /> Duyệt & Gửi GĐ
+                  <CheckCircle size={16} className="mr-2" /> Phê duyệt báo cáo
                 </Button>
               </>
             )}

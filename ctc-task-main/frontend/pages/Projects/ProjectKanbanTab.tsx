@@ -11,6 +11,7 @@ interface Props {
   filterStatus: string;
   onEdit: (p: Project) => void;
   onDragEnd: (result: DropResult) => void;
+  canEditProject: (p: Project) => boolean;
 }
 
 const COLUMNS = [
@@ -27,7 +28,7 @@ const PRIORITY_DOT: Record<string, string> = {
   low: 'bg-gray-300',
 };
 
-export const ProjectKanbanTab: React.FC<Props> = ({ projects, contracts, tasks, searchQuery, filterStatus, onEdit, onDragEnd }) => {
+export const ProjectKanbanTab: React.FC<Props> = ({ projects, contracts, tasks, searchQuery, filterStatus, onEdit, onDragEnd, canEditProject }) => {
   const today = new Date().toISOString().split('T')[0];
   const sevenDaysLater = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
@@ -76,18 +77,18 @@ export const ProjectKanbanTab: React.FC<Props> = ({ projects, contracts, tasks, 
                       const priorityDot = PRIORITY_DOT[p.priority || 'medium'] || PRIORITY_DOT.medium;
 
                       return (
-                        <Draggable key={p.id} draggableId={p.id} index={index}>
+                        <Draggable key={p.id} draggableId={p.id} index={index} isDragDisabled={!canEditProject(p)}>
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`mb-2.5 bg-white p-4 rounded-xl border transition-all cursor-pointer ${
+                              className={`mb-2.5 bg-white p-4 rounded-xl border transition-all ${
                                 snapshot.isDragging
                                   ? 'shadow-xl border-brand-300 ring-2 ring-brand-100 scale-[1.02] rotate-1'
-                                  : `shadow-sm border-gray-200 hover:border-brand-200 hover:shadow-md ${isOverdue ? 'border-l-[3px] border-l-red-500' : isNearDeadline ? 'border-l-[3px] border-l-amber-400' : ''}`
+                                  : `shadow-sm border-gray-200 ${canEditProject(p) ? 'cursor-pointer hover:border-brand-200 hover:shadow-md' : 'cursor-default'} ${isOverdue ? 'border-l-[3px] border-l-red-500' : isNearDeadline ? 'border-l-[3px] border-l-amber-400' : ''}`
                               }`}
-                              onClick={() => onEdit(p)}
+                              onClick={() => canEditProject(p) && onEdit(p)}
                             >
                               {/* Top row */}
                               <div className="flex justify-between items-start mb-2">

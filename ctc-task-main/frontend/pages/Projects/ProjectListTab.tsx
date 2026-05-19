@@ -11,6 +11,7 @@ interface Props {
   filterStatus: string;
   onEdit: (p: Project) => void;
   onDelete: (id: string) => void;
+  canEditProject: (p: Project) => boolean;
 }
 
 type SortField = 'projectCode' | 'name' | 'clientName' | 'status' | 'progress' | 'value' | 'priority' | 'endDate';
@@ -31,7 +32,7 @@ const PRIORITY_LABELS: Record<string, { label: string; cls: string }> = {
   low: { label: 'Thấp', cls: 'bg-gray-100 text-gray-500' },
 };
 
-export const ProjectListTab: React.FC<Props> = ({ projects, contracts, tasks, searchQuery, filterStatus, onEdit, onDelete }) => {
+export const ProjectListTab: React.FC<Props> = ({ projects, contracts, tasks, searchQuery, filterStatus, onEdit, onDelete, canEditProject }) => {
   const [sortField, setSortField] = useState<SortField>('projectCode');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -174,8 +175,12 @@ export const ProjectListTab: React.FC<Props> = ({ projects, contracts, tasks, se
                   </td>
                   <td className="px-5 py-4 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onEdit(p)} className="p-1.5 text-gray-400 hover:text-brand-600 bg-gray-50 hover:bg-brand-50 rounded-lg transition-colors"><Edit2 size={15}/></button>
-                      <button onClick={() => onDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={15}/></button>
+                      {canEditProject(p) && (
+                        <>
+                          <button onClick={() => onEdit(p)} className="p-1.5 text-gray-400 hover:text-brand-600 bg-gray-50 hover:bg-brand-50 rounded-lg transition-colors"><Edit2 size={15}/></button>
+                          <button onClick={() => onDelete(p.id)} className="p-1.5 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={15}/></button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

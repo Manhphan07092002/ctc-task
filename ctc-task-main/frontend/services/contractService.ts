@@ -9,8 +9,11 @@ export interface ContractProduct {
   origin: string;
   unitPrice: number;
   total: number;
+  vatRate?: number;
   exportedQuantity?: number;
   invoicedQuantity?: number;
+  sourceProductId?: string; // ID of the product in warehouse (products table)
+  sourceProductName?: string; // Name of the product in warehouse
 }
 
 export type ContractType = 'input' | 'output';

@@ -33,7 +33,7 @@ export function roleRoutes(db: any) {
       const existing = await db.get('SELECT * FROM roles WHERE id = ?', [req.params.id]);
       if (!existing) return res.status(404).json({ error: 'Not found' });
       if (existing.isSystem) {
-        await db.run('UPDATE roles SET description = ?, color = ? WHERE id = ?', [description ?? existing.description, color ?? existing.color, req.params.id]);
+        await db.run('UPDATE roles SET description = ?, color = ?, permissions = ? WHERE id = ?', [description ?? existing.description, color ?? existing.color, JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]')), req.params.id]);
       } else {
         await db.run('UPDATE roles SET name = ?, description = ?, color = ?, permissions = ? WHERE id = ?', [name ?? existing.name, description ?? existing.description, color ?? existing.color, JSON.stringify(permissions ?? JSON.parse(existing.permissions || '[]')), req.params.id]);
       }

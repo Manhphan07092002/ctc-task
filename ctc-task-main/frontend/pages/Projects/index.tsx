@@ -25,6 +25,9 @@ const TABS: { id: TabType; label: string; icon: any }[] = [
 const ProjectsPage: React.FC = () => {
   const { projects, contracts = [], tasks = [], users = [], departments = [], saveProject, deleteProject, saveContract } = useData();
   const { user } = useAuth();
+  
+  const perms = user?.permissions || [];
+  const canEditProject = (p: Project) => p.managerId === user?.id || user?.role === 'Manager' || perms.includes('admin_panel') || perms.includes('director_feedback');
 
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,7 +57,11 @@ const ProjectsPage: React.FC = () => {
     const { source, destination, draggableId } = result;
     if (source.droppableId === destination.droppableId) return;
     const project = projects.find(p => p.id === draggableId);
-    if (project) await saveProject({ ...project, status: destination.droppableId });
+    if (project && canEditProject(project)) {
+      await saveProject({ ...project, status: destination.droppableId });
+    } else if (project) {
+      alert('Bạn không có quyền chuyển trạng thái dự án này.');
+    }
   };
 
   const openEdit = (p: Project) => {
@@ -72,6 +79,7 @@ const ProjectsPage: React.FC = () => {
       <div className="max-w-7xl mx-auto pb-12 animate-in fade-in duration-300">
         <ProjectEditForm
           project={editingProject}
+          projects={projects}
           onChange={setEditingProject}
           onSave={handleSave}
           onCancel={() => { setIsEditing(false); setEditingProject({}); }}
@@ -138,10 +146,10 @@ const ProjectsPage: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      {activeTab === 'list' && <ProjectListTab projects={projects} contracts={contracts} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} onDelete={setDeleteId} />}
-      {activeTab === 'kanban' && <ProjectKanbanTab projects={projects} contracts={contracts} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} onDragEnd={handleDragEnd} />}
+      {activeTab === 'list' && <ProjectListTab projects={projects} contracts={contracts} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} onDelete={setDeleteId} canEditProject={canEditProject} />}
+      {activeTab === 'kanban' && <ProjectKanbanTab projects={projects} contracts={contracts} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} onDragEnd={handleDragEnd} canEditProject={canEditProject} />}
       {activeTab === 'overview' && <ProjectOverviewTab stats={stats} onNavigateToProject={navigateToProject} />}
-      {activeTab === 'timeline' && <ProjectTimelineTab projects={projects} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} />}
+      {activeTab === 'timeline' && <ProjectTimelineTab projects={projects} tasks={tasks} searchQuery={searchQuery} filterStatus={filterStatus} onEdit={openEdit} canEditProject={canEditProject} />}
 
       <ConfirmDialog isOpen={!!deleteId} title="Xóa dự án" message="Bạn có chắc muốn xóa dự án này không?" onConfirm={handleDelete} onCancel={() => setDeleteId(null)} type="danger" confirmText="Xóa" cancelText="Hủy" />
     </div>

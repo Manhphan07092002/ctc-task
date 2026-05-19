@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link2, Plus, Trash2, X, ArrowRight, Package, Search, AlertCircle } from 'lucide-react';
+import { Link2, Plus, Trash2, X, ArrowRight, Package, Search, AlertCircle, Pencil } from 'lucide-react';
 import { Contract } from '../../services/contractService';
 import { ContractLink, getContractLinks, createContractLink, deleteContractLink } from '../../services/contractLinkService';
 import { Button, Card } from '../../components/UI';
@@ -26,6 +26,7 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
   const [linkDesc, setLinkDesc] = useState('');
   const [searchOut, setSearchOut] = useState('');
   const [searchIn, setSearchIn] = useState('');
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
 
   const outputContracts = useMemo(() => contracts.filter(c => (c.contractType || 'output') === 'output'), [contracts]);
   const inputContracts = useMemo(() => contracts.filter(c => c.contractType === 'input'), [contracts]);
@@ -59,6 +60,23 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
     if (!confirm('Xóa liên kết này?')) return;
     await deleteContractLink(id);
     await loadLinks();
+  };
+
+  const openEdit = (link: ContractLink) => {
+    setEditingLinkId(link.id);
+    setLinkType(link.linkType || 'procurement');
+    setLinkDesc(link.description || '');
+  };
+
+  const handleUpdate = async () => {
+    if (!editingLinkId) return;
+    try {
+      await import('../../services/contractLinkService').then(m => m.updateContractLink(editingLinkId, { linkType, description: linkDesc || undefined }));
+      await loadLinks();
+      setEditingLinkId(null);
+    } catch (e: any) {
+      alert(e.message || 'Lỗi khi cập nhật liên kết!');
+    }
   };
 
   // Build relationship map for visualization
@@ -159,7 +177,7 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
         <Card className="p-12 text-center">
           <Link2 size={48} className="mx-auto mb-4 text-gray-300" />
           <p className="font-bold text-gray-600 mb-2">Chưa có liên kết nào</p>
-          <p className="text-sm text-gray-400 mb-4">Tạo liên kết để trực quan hóa mối quan hệ giữa HĐ đầu vào & đầu ra</p>
+          <p className="text-sm text-gray-400 mb-4">Tạo liên kết để trực quan hóa mối quan hệ giữa HĐ mua & HĐ bán</p>
           <Button variant="primary" size="sm" onClick={() => setShowModal(true)} className="gap-1 mx-auto">
             <Plus size={14} /> Tạo liên kết đầu tiên
           </Button>
@@ -183,7 +201,7 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-gray-800">{outContract.contractNumber}</p>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">ĐẦU RA</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">BÁN</span>
                           {outRelCount > 1 && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-700 border border-blue-200">1:{outRelCount}</span>}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">{outContract.clientName} • <span className="font-bold text-emerald-600">{fmtMoney(outContract.postTaxValue || 0)}</span></p>
@@ -217,7 +235,7 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <p className="font-bold text-gray-700 text-sm">{inContract.contractNumber}</p>
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200">ĐẦU VÀO</span>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200">MUA</span>
                                   {inRelCount > 1 && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">{inRelCount}:1</span>}
                                   {getLinkTypeBadge(link.linkType)}
                                 </div>
@@ -227,9 +245,14 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
                                 </p>
                               </div>
                             </div>
-                            <button onClick={() => handleDelete(link.id)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100" title="Xóa liên kết">
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => openEdit(link)} className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Sửa liên kết">
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={() => handleDelete(link.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Xóa liên kết">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -299,14 +322,14 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
             <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
               {/* Output Contract Picker */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">📤 HĐ Đầu ra (Bán hàng)</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">📤 Hợp đồng Bán</label>
                 <div className="relative mb-2">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input value={searchOut} onChange={e => setSearchOut(e.target.value)} placeholder="Tìm số HĐ, khách hàng..." className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
                 </div>
                 <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-2">
                   {filteredOutputs.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-3">Không có HĐ đầu ra</p>
+                    <p className="text-sm text-gray-400 text-center py-3">Không có HĐ Bán</p>
                   ) : filteredOutputs.map(c => (
                     <button key={c.id} onClick={() => setSelectedOutput(c.id)}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${selectedOutput === c.id ? 'bg-emerald-100 border-2 border-emerald-300 font-bold' : 'hover:bg-gray-50 border border-transparent'}`}>
@@ -326,14 +349,14 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
 
               {/* Input Contract Picker */}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">📥 HĐ Đầu vào (Mua hàng)</label>
+                <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wider">📥 Hợp đồng Mua</label>
                 <div className="relative mb-2">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input value={searchIn} onChange={e => setSearchIn(e.target.value)} placeholder="Tìm số HĐ, nhà cung cấp..." className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                 </div>
                 <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-100 rounded-xl p-2">
                   {filteredInputs.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-3">Không có HĐ đầu vào. Hãy tạo HĐ đầu vào trước.</p>
+                    <p className="text-sm text-gray-400 text-center py-3">Không có HĐ Mua. Hãy tạo HĐ Mua trước.</p>
                   ) : filteredInputs.map(c => (
                     <button key={c.id} onClick={() => setSelectedInput(c.id)}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${selectedInput === c.id ? 'bg-blue-100 border-2 border-blue-300 font-bold' : 'hover:bg-gray-50 border border-transparent'}`}>
@@ -364,6 +387,41 @@ export const ContractLinksTab: React.FC<Props> = ({ contracts }) => {
               <button onClick={handleCreate} disabled={!selectedOutput || !selectedInput}
                 className="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-blue-500 rounded-xl hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
                 <Link2 size={14} /> Tạo liên kết
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Link Modal */}
+      {editingLinkId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingLinkId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white">
+              <h2 className="text-lg font-bold flex items-center gap-2"><Pencil size={20} /> Cập nhật liên kết</h2>
+              <button onClick={() => setEditingLinkId(null)} className="p-1 hover:bg-white/20 rounded-lg"><X size={20} /></button>
+            </div>
+            
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Loại liên kết</label>
+                  <select value={linkType} onChange={e => setLinkType(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium">
+                    {LINK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1 uppercase tracking-wider">Ghi chú (tùy chọn)</label>
+                  <input value={linkDesc} onChange={e => setLinkDesc(e.target.value)} placeholder="VD: Mua thiết bị switch cho HĐ..." className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setEditingLinkId(null)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">Hủy</button>
+              <button onClick={handleUpdate}
+                className="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-blue-500 rounded-xl hover:shadow-lg transition-all flex items-center gap-2">
+                <Pencil size={14} /> Cập nhật
               </button>
             </div>
           </div>

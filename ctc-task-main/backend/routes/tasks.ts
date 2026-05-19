@@ -13,10 +13,10 @@ export function taskRoutes(db: any) {
   }
 
   async function buildTasks(thresholdDate?: string) {
-    let tasksQuery = 'SELECT * FROM tasks';
+    let tasksQuery = 'SELECT * FROM tasks WHERE (isDeleted IS NULL OR isDeleted = 0)';
     const params: any[] = [];
     if (thresholdDate) {
-      tasksQuery += ' WHERE startDate >= ? OR dueDate >= ? OR startDate IS NULL OR dueDate IS NULL';
+      tasksQuery += ' AND (startDate >= ? OR dueDate >= ? OR startDate IS NULL OR dueDate IS NULL)';
       params.push(thresholdDate, thresholdDate);
     }
     

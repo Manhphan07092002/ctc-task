@@ -424,7 +424,7 @@ export async function initDb() {
 
   // Patch existing system roles to ensure all permissions are included
   const rolePatches: { name: string; permissions: string[] }[] = [
-    { name: 'Admin', permissions: ['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'join_meetings', 'admin_panel'] },
+    { name: 'Admin', permissions: ['manage_users', 'view_all_tasks', 'view_all_reports', 'manage_meetings', 'join_meetings', 'admin_panel', 'manage_warehouse'] },
     { name: 'Director', permissions: ['view_all_reports', 'director_feedback', 'view_all_tasks', 'manage_meetings', 'join_meetings'] },
     { name: 'Manager', permissions: ['manage_dept_tasks', 'approve_dept_reports', 'view_dept_users', 'manage_meetings', 'join_meetings', 'create_report'] },
     { name: 'Employee', permissions: ['view_own_tasks', 'create_report', 'join_meetings'] },

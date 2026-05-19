@@ -388,7 +388,7 @@ export default function CTCTaskApp() {
 
               <Route path="/calendar" element={
                 <div className="h-[calc(100vh-8rem)]">
-                  <CalendarPage tasks={roleBasedTasks} onDateClick={(date) => openCreateModal(date)} onTaskClick={(task) => openEditModal(task)} />
+                  <CalendarPage tasks={roleBasedTasks} contracts={contracts} onDateClick={(date) => openCreateModal(date)} onTaskClick={(task) => openEditModal(task)} />
                 </div>
               } />
 

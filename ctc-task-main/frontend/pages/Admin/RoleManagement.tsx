@@ -10,6 +10,7 @@ const ALL_PERMISSIONS = [
   { id: 'admin_panel',          label: 'Truy cập Admin Panel',              group: 'Quản trị' },
   { id: 'manage_users',         label: 'Quản lý người dùng (CRUD)',         group: 'Quản trị' },
   { id: 'manage_meetings',      label: 'Quản lý tất cả cuộc họp',           group: 'Quản trị' },
+  { id: 'manage_warehouse',     label: 'Quản lý Xuất/Nhập Kho',             group: 'Quản trị' },
   { id: 'view_all_tasks',       label: 'Xem tất cả công việc',              group: 'Công việc' },
   { id: 'manage_dept_tasks',    label: 'Giao/sửa việc trong phòng ban',     group: 'Công việc' },
   { id: 'view_own_tasks',       label: 'Xem công việc được giao',           group: 'Công việc' },
@@ -48,7 +49,7 @@ const ROLE_PRESETS = [
     name: 'Admin',
     color: '#ef4444',
     desc: 'Toàn quyền hệ thống: quản trị, cấu hình, và xem mọi dữ liệu.',
-    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings', 'create_revenue_report', 'approve_dept_revenue', 'approve_all_revenue']
+    perms: ['admin_panel', 'manage_users', 'manage_meetings', 'view_all_tasks', 'manage_dept_tasks', 'view_own_tasks', 'view_all_reports', 'approve_dept_reports', 'director_feedback', 'create_report', 'view_dept_users', 'join_meetings', 'create_revenue_report', 'approve_dept_revenue', 'approve_all_revenue', 'manage_warehouse']
   },
   {
     label: 'Giám đốc',
