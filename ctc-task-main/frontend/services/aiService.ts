@@ -197,7 +197,50 @@ Nhiệm vụ chính của bạn là:
 3. Bạn am hiểu về các luồng nghiệp vụ nội bộ như: giao việc, tạo báo cáo hằng ngày/tuần, duyệt báo cáo bởi Manager/Director, và nhắc nhở công việc qua hệ thống Notification.
 4. Khi được hỏi về công ty CTC, hãy thể hiện sự tự hào, am hiểu về môi trường làm việc năng động, chuyên nghiệp và luôn hướng tới hiệu quả cao.
 5. Các câu trả lời của bạn cần ngắn gọn, đi vào trọng tâm, có định dạng Markdown rõ ràng (dùng bullet points, in đậm) để người dùng dễ đọc.
+6. Khi người dùng yêu cầu tạo mới (ví dụ: tạo công việc, viết báo cáo, soạn hợp đồng), HÃY GỌI CÁC CÔNG CỤ (TOOLS) tương ứng thay vì chỉ trả lời bằng chữ.
 Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho mọi người trong công ty CTC!`,
+      tools: [{
+        functionDeclarations: [
+          {
+            name: 'createTask',
+            description: 'Tạo một công việc (Task) mới trên hệ thống',
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: 'Tiêu đề công việc' },
+                description: { type: Type.STRING, description: 'Mô tả chi tiết công việc' },
+                priority: { type: Type.STRING, enum: ['Low', 'Medium', 'High'], description: 'Độ ưu tiên' }
+              },
+              required: ['title']
+            }
+          },
+          {
+            name: 'createReport',
+            description: 'Tạo một báo cáo (Report) mới trên hệ thống',
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING, description: 'Tiêu đề báo cáo' },
+                content: { type: Type.STRING, description: 'Nội dung chi tiết của báo cáo' }
+              },
+              required: ['title', 'content']
+            }
+          },
+          {
+            name: 'createContract',
+            description: 'Tạo một hợp đồng (Contract) mới trên hệ thống',
+            parameters: {
+              type: Type.OBJECT,
+              properties: {
+                contractNumber: { type: Type.STRING, description: 'Số hợp đồng (ví dụ: HD-001)' },
+                clientName: { type: Type.STRING, description: 'Tên đối tác hoặc khách hàng' },
+                contractName: { type: Type.STRING, description: 'Tên hợp đồng' }
+              },
+              required: ['contractNumber', 'clientName', 'contractName']
+            }
+          }
+        ]
+      }]
     }
   });
 };

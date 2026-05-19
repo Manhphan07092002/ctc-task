@@ -6,7 +6,8 @@ import { createChatSession } from '../services/aiService';
 import { GenerateContentResponse } from "@google/genai";
 import { Task } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-
+import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 interface Message {
   id: string;
   role: 'user' | 'model';
@@ -19,6 +20,8 @@ export interface AIAssistantHandle {
 
 export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { t } = useLanguage();
+  const { saveTask, saveReport, saveContract } = useData();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -144,6 +147,56 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
       for await (const chunk of result) {
         const c = chunk as GenerateContentResponse;
+        
+        if (c.functionCalls && c.functionCalls.length > 0) {
+          for (const call of c.functionCalls) {
+            const args = call.args as any;
+            
+            if (call.name === 'createTask') {
+              const newTask: any = {
+                id: crypto.randomUUID(),
+                title: args.title,
+                description: args.description || '',
+                priority: args.priority || 'Medium',
+                status: 'Todo',
+                startDate: new Date().toISOString(),
+                assignees: [user?.id || ''],
+                createdBy: user?.id || '',
+                department: user?.department || '',
+              };
+              await saveTask(newTask);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo công việc: **${args.title}**` }]);
+            } else if (call.name === 'createReport') {
+              const newReport: any = {
+                id: crypto.randomUUID(),
+                title: args.title,
+                content: args.content,
+                authorId: user?.id || '',
+                department: user?.department || '',
+                status: 'Draft',
+                createdAt: new Date().toISOString(),
+              };
+              await saveReport(newReport);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo báo cáo (Nháp): **${args.title}**` }]);
+            } else if (call.name === 'createContract') {
+              const newContract: any = {
+                id: crypto.randomUUID(),
+                contractNumber: args.contractNumber,
+                clientName: args.clientName,
+                contractName: args.contractName,
+                department: user?.department || '',
+                status: 'Draft',
+                createdBy: user?.id || '',
+                createdAt: new Date().toISOString(),
+                _isNew: true
+              };
+              await saveContract(newContract);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo hợp đồng: **${args.contractNumber} - ${args.contractName}**` }]);
+            }
+          }
+          continue;
+        }
+
         if (c.text) {
             fullResponse += c.text;
             setMessages(prev => prev.map(msg => 
@@ -153,14 +206,26 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
       }
 
     } catch (error: any) {
-      const isNoKey = error?.message?.includes('No Gemini API keys');
-      const is429 = error?.code === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED');
-      if (!isNoKey && !is429) console.error("Chat error:", error);
-      const errText = isNoKey
-        ? '⚠️ Tính năng AI chưa được cấu hình. Vui lòng thêm Gemini API Key trong phần Cài đặt Admin.'
-        : is429
-        ? '⏳ API Key đã vượt giới hạn miễn phí. Vui lòng thử lại sau ít phút hoặc nâng cấp quota tại ai.google.dev.'
-        : 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại.';
+      console.error("Chat error details:", error);
+      const errorMsg = error?.message || '';
+      
+      const isNoKey = errorMsg.includes('No Gemini API keys');
+      const isInvalidKey = error?.status === 400 || errorMsg.includes('API_KEY_INVALID') || errorMsg.includes('API key not valid');
+      const is429 = error?.status === 429 || error?.code === 429 || errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('RESOURCE_EXHAUSTED');
+      
+      let errText = 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại.';
+      
+      if (isNoKey) {
+        errText = '⚠️ Tính năng AI chưa được cấu hình. Vui lòng thêm Gemini API Key trong phần Cài đặt Admin.';
+      } else if (isInvalidKey) {
+        errText = '❌ API Key của bạn không hợp lệ hoặc đã bị vô hiệu hóa. Vui lòng kiểm tra lại trong phần Cài đặt Admin.';
+      } else if (is429) {
+        errText = '⏳ API Key đã vượt giới hạn miễn phí. Vui lòng thử lại sau ít phút hoặc nâng cấp quota tại ai.google.dev.';
+      } else {
+        // Fallback to showing a part of the real error so user knows what's up
+        errText = `❌ Lỗi API: ${errorMsg.substring(0, 100)}... Vui lòng kiểm tra lại.`;
+      }
+      
       setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: errText }]);
     } finally {
       setIsLoading(false);
