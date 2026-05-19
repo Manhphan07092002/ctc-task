@@ -93,14 +93,14 @@ async function startServer() {
 
   app.use('/api/auth', authRoutes(db));
   app.use('/api/auth', forgotPasswordRoutes(db, mailer));
-  app.use('/api/users', userRoutes(db, mailer));
-  app.use('/api/tasks', taskRoutes(db));
-  app.use('/api/notes', noteRoutes(db));
-  app.use('/api/meetings', meetingRoutes(db));
+  app.use('/api/users', requireAuth, userRoutes(db, mailer));
+  app.use('/api/tasks', requireAuth, taskRoutes(db));
+  app.use('/api/notes', requireAuth, noteRoutes(db));
+  app.use('/api/meetings', requireAuth, meetingRoutes(db));
   app.use('/api/reports', requireAuth, reportRoutes(db));
-  app.use('/api/roles', roleRoutes(db));
-  app.use('/api/departments', departmentRoutes(db));
-  app.use('/api/notifications', notificationRoutes(db));
+  app.use('/api/roles', requireAuth, roleRoutes(db));
+  app.use('/api/departments', requireAuth, departmentRoutes(db));
+  app.use('/api/notifications', requireAuth, notificationRoutes(db));
 
   // Allow all authenticated users to read AI keys for the AI service
   app.get('/api/system-config/ai-keys', requireAuth, async (_req, res) => {
@@ -112,9 +112,9 @@ async function startServer() {
   });
 
   app.use('/api/admin', requireAuth, requireAdmin, adminRoutes(db, mailer));
-  app.use('/api/events', eventRoutes(db));
-  app.use('/api/activity', activityRoutes(db));
-  app.use('/api/mail', mailRoutes(db));
+  app.use('/api/events', requireAuth, eventRoutes(db));
+  app.use('/api/activity', requireAuth, activityRoutes(db));
+  app.use('/api/mail', requireAuth, mailRoutes(db));
   app.use('/api/contracts', requireAuth, contractRoutes(db));
   app.use('/api/contract-links', requireAuth, contractLinkRoutes(db));
   app.use('/api/revenue-reports', requireAuth, revenueRoutes(db));
