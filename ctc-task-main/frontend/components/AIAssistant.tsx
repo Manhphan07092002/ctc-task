@@ -250,7 +250,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 department: user?.department || '',
               };
               await saveTask(newTask);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo công việc: **${args.title}**` }]);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo công việc: **${args.title}**. [Xem công việc](/tasks)` }]);
             } else if (call.name === 'createReport') {
               const newReport: any = {
                 id: crypto.randomUUID(),
@@ -262,7 +262,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 createdAt: new Date().toISOString(),
               };
               await saveReport(newReport);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo báo cáo (Nháp): **${args.title}**` }]);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo báo cáo (Nháp): **${args.title}**. [Xem báo cáo](/reports)` }]);
             } else if (call.name === 'createContract') {
               const newContract: any = {
                 id: crypto.randomUUID(),
@@ -276,7 +276,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 _isNew: true
               };
               await saveContract(newContract);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo hợp đồng: **${args.contractNumber} - ${args.contractName}**` }]);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo hợp đồng: **${args.contractNumber} - ${args.contractName}**. [Xem hợp đồng](/contracts)` }]);
             } else if (call.name === 'deleteTask') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA công việc có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
@@ -296,7 +296,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 userId: user?.id || ''
               };
               await saveNote(newNote);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo ghi chú: **${args.title}**` }]);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo ghi chú: **${args.title}**. [Xem ghi chú](/notes)` }]);
             } else if (call.name === 'deleteNote') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA ghi chú có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
@@ -318,7 +318,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 status: 'scheduled'
               };
               await saveMeeting(newMeeting);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo cuộc họp: **${args.title}**` }]);
+              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo cuộc họp: **${args.title}**. [Xem lịch họp](/meetings)` }]);
             } else if (call.name === 'deleteMeeting') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA cuộc họp có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
@@ -455,12 +455,40 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                       : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'}
                   `}
                 >
-                  {/* Simple Markdown-like rendering for lists */}
-                  {msg.text.split('\n').map((line, i) => (
-                    <p key={i} className={line.startsWith('-') || line.startsWith('*') ? 'pl-2' : 'min-h-[1rem]'}>
-                        {line}
-                    </p>
-                  ))}
+                  {/* Simple Markdown-like rendering for lists and links */}
+                  {msg.text.split('\n').map((line, i) => {
+                    const parts = line.split(/(\[.*?\]\(.*?\))/g);
+                    return (
+                      <p key={i} className={line.startsWith('-') || line.startsWith('*') ? 'pl-2' : 'min-h-[1rem]'}>
+                        {parts.map((part, j) => {
+                          const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
+                          if (linkMatch) {
+                            return (
+                              <button 
+                                key={j}
+                                onClick={() => {
+                                  navigate(linkMatch[2]);
+                                  setIsMinimized(true);
+                                }}
+                                className={`underline font-semibold ml-1 ${msg.role === 'user' ? 'text-white hover:text-gray-200' : 'text-brand-600 hover:text-brand-800'}`}
+                              >
+                                {linkMatch[1]}
+                              </button>
+                            );
+                          }
+                          
+                          // Simple bold parsing **text**
+                          const boldParts = part.split(/(\*\*.*?\*\*)/g);
+                          return boldParts.map((bp, k) => {
+                            if (bp.startsWith('**') && bp.endsWith('**')) {
+                              return <strong key={k}>{bp.slice(2, -2)}</strong>;
+                            }
+                            return <span key={k}>{bp}</span>;
+                          });
+                        })}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
             ))}
