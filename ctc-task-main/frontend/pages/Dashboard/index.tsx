@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { 
   CheckCircle2, ListTodo, Timer, Flame, FileText, Video, 
   Sun, Sunset, Moon, Plus, Clock, ChevronRight, AlertCircle, AlertTriangle,
-  FileSignature, Wallet, DollarSign, Briefcase, PenTool, CalendarPlus
+  FileSignature, Wallet, DollarSign, Briefcase, PenTool, CalendarPlus, X, ExternalLink, Users
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +40,10 @@ export default function DashboardPage({
   const navigate = useNavigate();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const { projects = [] } = useData();
+  const [popup, setPopup] = useState<{ title: string; content: React.ReactNode; navPath?: string; navLabel?: string } | null>(null);
+
+  const closePopup = () => setPopup(null);
+  const openPopupAndNav = (path: string) => { closePopup(); navigate(path); };
 
   useEffect(() => {
     const unsubscribe = subscribeToMeetings(setMeetings);
@@ -166,6 +170,25 @@ export default function DashboardPage({
 
   return (
     <>
+      {/* Global Popup Modal */}
+      {popup && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={closePopup}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{popup.title}</h3>
+              <button onClick={closePopup} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"><X size={18} className="text-gray-500" /></button>
+            </div>
+            <div className="p-6">{popup.content}</div>
+            {popup.navPath && (
+              <div className="px-6 pb-5">
+                <button onClick={() => openPopupAndNav(popup.navPath!)} className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-sm font-bold rounded-xl transition-colors shadow-lg shadow-brand-500/30">
+                  <ExternalLink size={15} /> {popup.navLabel || 'Mở trang quản lý'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Header Banner */}
       <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-white via-white to-brand-50/30 dark:from-slate-800/80 dark:via-slate-800/80 dark:to-slate-700/40 p-6 rounded-2xl border border-gray-100 dark:border-slate-700/60 shadow-sm">
         <div className="flex items-center gap-4">
@@ -184,6 +207,7 @@ export default function DashboardPage({
           <button onClick={() => openCreateModal()} className="flex items-center gap-1.5 px-3 py-2 bg-brand-50 text-brand-700 rounded-xl text-xs font-bold hover:bg-brand-100 transition-colors border border-brand-200/50"><CalendarPlus size={14}/> Tạo CV</button>
           <button onClick={() => navigate('/reports')} className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-100 transition-colors border border-amber-200/50"><PenTool size={14}/> Báo cáo</button>
           <button onClick={() => navigate('/contracts')} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors border border-emerald-200/50"><FileSignature size={14}/> Hợp đồng</button>
+          <button onClick={() => navigate('/projects')} className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-200/50"><Briefcase size={14}/> Dự án</button>
         </div>
       </div>
 
@@ -191,10 +215,10 @@ export default function DashboardPage({
       <div className="mb-6">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Công việc & Hoạt động</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" onClick={() => navigate('/tasks')} subtitle={`${stats.inProgress} đang chạy`} delay={0} />
-          <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0}% hoàn thành`} delay={60} />
-          <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" onClick={() => navigate('/tasks')} subtitle={stats.overdue > 0 ? 'Cần xử lý ngay!' : 'Tốt, không có trễ'} alert={true} delay={120} />
-          <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.highPriority / stats.total) * 100) : 0}% tổng CV`} delay={180} />
+          <StatCard label={t('totalTasks')} value={stats.total} icon={ListTodo} color="from-purple-500 to-purple-400" onClick={() => navigate('/tasks')} subtitle={`${stats.inProgress} đang chạy`} delay={0} details={[{label:'Đang chạy',value:stats.inProgress,color:'text-blue-600'},{label:'Hoàn thành',value:stats.done,color:'text-emerald-600'},{label:'Trễ hạn',value:stats.overdue,color:'text-rose-600'},{label:'Ưu tiên cao',value:stats.highPriority,color:'text-orange-600'}]} />
+          <StatCard label={t('done')} value={stats.done} icon={CheckCircle2} color="from-success-500 to-success-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0}% hoàn thành`} delay={60} details={[{label:'Tỉ lệ',value:`${stats.total > 0 ? Math.round((stats.done/stats.total)*100) : 0}%`,color:'text-emerald-600'},{label:'Tổng CV',value:stats.total}]} />
+          <StatCard label="Trễ hạn" value={stats.overdue} icon={AlertCircle} color="from-rose-500 to-rose-400" onClick={() => navigate('/tasks')} subtitle={stats.overdue > 0 ? 'Cần xử lý ngay!' : 'Tốt, không có trễ'} alert={true} delay={120} details={[{label:'Số CV trễ',value:stats.overdue,color:stats.overdue>0?'text-rose-600':'text-emerald-600'},{label:'Trạng thái',value:stats.overdue>0?'Cần xử lý':'Dúng hạn 100%'}]} />
+          <StatCard label="Ưu tiên cao" value={stats.highPriority} icon={Flame} color="from-orange-500 to-orange-400" onClick={() => navigate('/tasks')} subtitle={`${stats.total > 0 ? Math.round((stats.highPriority / stats.total) * 100) : 0}% tổng CV`} delay={180} details={[{label:'Số lượng',value:stats.highPriority,color:'text-orange-600'},{label:'Tỉ trọng',value:`${stats.total>0?Math.round((stats.highPriority/stats.total)*100):0}%`}]} />
         </div>
       </div>
 
@@ -202,10 +226,10 @@ export default function DashboardPage({
       <div className="mb-8">
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Tài chính & Khác</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Hợp đồng" value={stats.totalContracts} icon={FileSignature} color="from-blue-500 to-blue-400" onClick={() => navigate('/contracts')} subtitle={`${contracts.filter(c => c.status === 'in_progress').length} đang thực hiện`} delay={240} />
-          <StatCard label="Công nợ (tr)" value={Math.round(stats.totalDebt / 1000000)} icon={Wallet} color="from-teal-500 to-teal-400" onClick={() => navigate('/contracts')} subtitle={`DT: ${Math.round(stats.totalPostTax / 1000000)}tr`} delay={300} />
-          <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" onClick={() => navigate('/notes')} subtitle="Ghi chú cá nhân" delay={360} />
-          <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" onClick={() => navigate('/reports')} subtitle="Chờ phê duyệt" alert={true} delay={420} />
+          <StatCard label="Hợp đồng" value={stats.totalContracts} icon={FileSignature} color="from-blue-500 to-blue-400" onClick={() => navigate('/contracts')} subtitle={`${contracts.filter(c => c.status === 'in_progress').length} đang thực hiện`} delay={240} details={[{label:'Tổng HĐ',value:stats.totalContracts},{label:'Đang thực hiện',value:contracts.filter(c=>c.status==='in_progress').length,color:'text-blue-600'},{label:'Hoàn thành',value:contracts.filter(c=>c.status==='completed').length,color:'text-emerald-600'}]} />
+          <StatCard label="Công nợ (tr)" value={Math.round(stats.totalDebt / 1000000)} icon={Wallet} color="from-teal-500 to-teal-400" onClick={() => navigate('/contracts')} subtitle={`DT: ${Math.round(stats.totalPostTax / 1000000)}tr`} delay={300} details={[{label:'Doanh thu',value:`${Math.round(stats.totalPostTax/1000000)}tr`,color:'text-emerald-600'},{label:'Đã thu',value:`${Math.round(stats.totalPaid/1000000)}tr`,color:'text-blue-600'},{label:'Công nợ',value:`${Math.round(stats.totalDebt/1000000)}tr`,color:'text-rose-600'}]} />
+          <StatCard label="Ghi chú" value={stats.myNotes} icon={FileText} color="from-emerald-500 to-emerald-400" onClick={() => navigate('/notes')} subtitle="Ghi chú cá nhân" delay={360} details={[{label:'Tổng ghi chú',value:stats.myNotes}]} />
+          <StatCard label="Báo cáo chờ" value={stats.pendingReports} icon={Clock} color="from-amber-500 to-amber-400" onClick={() => navigate('/reports')} subtitle="Chờ phê duyệt" alert={true} delay={420} details={[{label:'Chờ phê duyệt',value:stats.pendingReports,color:stats.pendingReports>0?'text-amber-600':'text-emerald-600'}]} />
         </div>
       </div>
 
@@ -314,7 +338,23 @@ export default function DashboardPage({
                 recentReports.map(report => {
                   const author = users.find(u => u.id === report.authorId);
                   return (
-                    <div key={report.id} onClick={() => navigate('/reports')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
+                    <div key={report.id} onClick={() => setPopup({
+                      title: report.title,
+                      navPath: '/reports',
+                      navLabel: 'Quản lý Báo cáo',
+                      content: (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 mb-4">
+                            {author && <Avatar src={author.avatar} alt={author.name} size={8} />}
+                            <div><p className="font-bold text-gray-800 dark:text-slate-100">{author?.name || 'Unknown'}</p><p className="text-sm text-gray-400">{report.department}</p></div>
+                            <div className="ml-auto">{getReportStatusBadge(report.status)}</div>
+                          </div>
+                          <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Ngày tạo</span><span className="font-medium">{new Date(report.createdAt).toLocaleDateString('vi-VN')}</span></div>
+                          <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Trạng thái</span><span className="font-medium">{report.status}</span></div>
+                          {report.content && <p className="text-sm text-gray-600 dark:text-slate-300 mt-2 line-clamp-4">{report.content}</p>}
+                        </div>
+                      )
+                    })} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           {author && <Avatar src={author.avatar} alt={author.name} size={6} />}
@@ -354,7 +394,20 @@ export default function DashboardPage({
                 </div>
               ) : (
                 recentContracts.map(contract => (
-                  <div key={contract.id} onClick={() => navigate('/contracts')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
+                  <div key={contract.id} onClick={() => setPopup({
+                    title: contract.clientName,
+                    navPath: '/contracts',
+                    navLabel: 'Quản lý Hợp đồng',
+                    content: (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Số HĐ</span><span className="font-bold">{contract.contractNumber}</span></div>
+                        <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Trạng thái</span><span className={`font-bold ${contract.status==='completed'?'text-emerald-600':contract.status==='in_progress'?'text-blue-600':'text-gray-600'}`}>{contract.status==='completed'?'Hoàn thành':contract.status==='in_progress'?'Đang thực hiện':contract.status==='pending'?'Chờ duyệt':'Nhiếu trạng thái'}</span></div>
+                        <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Doanh thu</span><span className="font-bold text-emerald-600">{new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(contract.postTaxValue||0)}</span></div>
+                        <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Đã thu</span><span className="font-bold text-blue-600">{new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(contract.paidAmount||0)}</span></div>
+                        <div className="flex justify-between text-sm py-2"><span className="text-gray-500">Công nợ</span><span className="font-bold text-rose-600">{new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(Math.max(0,(contract.postTaxValue||0)-(contract.paidAmount||0)))}</span></div>
+                      </div>
+                    )
+                  })} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-shadow cursor-pointer">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-bold">
@@ -394,6 +447,80 @@ export default function DashboardPage({
             </div>
           </section>
 
+
+
+          {/* Recent Projects */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100 flex items-center gap-2">
+                <Briefcase size={20} className="text-indigo-500" />
+                Dự án gần đây
+              </h2>
+              <button onClick={() => navigate('/projects')} className="text-sm font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+                Quản lý DA <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {projects.length === 0 ? (
+                <div className="col-span-1 md:col-span-2 p-8 text-center bg-white dark:bg-slate-800/60 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
+                  <p className="text-gray-500 dark:text-slate-400">Chưa có dự án nào</p>
+                </div>
+              ) : (
+                [...projects]
+                  .sort((a: any, b: any) => new Date(b.createdAt||b.startDate||0).getTime() - new Date(a.createdAt||a.startDate||0).getTime())
+                  .slice(0, 4)
+                  .map((project: any) => {
+                    const today = new Date().toISOString().split('T')[0];
+                    const isOverdue = project.endDate && project.endDate < today && project.status !== 'completed';
+                    const isNear = project.endDate && project.endDate >= today && project.endDate <= new Date(Date.now()+7*86400000).toISOString().split('T')[0] && project.status !== 'completed';
+                    const sColor = project.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : project.status === 'in_progress' ? 'bg-blue-100 text-blue-700' : project.status === 'on_hold' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600';
+                    const sLabel = project.status === 'completed' ? 'Hoàn thành' : project.status === 'in_progress' ? 'Đang chạy' : project.status === 'on_hold' ? 'Tạm dừng' : project.status === 'planning' ? 'Lên kế hoạch' : 'Nháp';
+                    return (
+                      <div
+                        key={project.id}
+                        onClick={() => setPopup({
+                          title: project.name,
+                          navPath: '/projects',
+                          navLabel: 'Quản lý Dự án',
+                          content: (
+                            <div className="space-y-2">
+                              {project.description && <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">{project.description}</p>}
+                              <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Trạng thái</span><span className={`px-2 py-0.5 rounded text-xs font-bold ${sColor}`}>{sLabel}</span></div>
+                              {project.department && <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Phòng ban</span><span className="font-medium">{project.department}</span></div>}
+                              {project.startDate && <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Bắt đầu</span><span className="font-medium">{new Date(project.startDate).toLocaleDateString('vi-VN')}</span></div>}
+                              {project.endDate && <div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Kết thúc</span><span className={`font-bold ${isOverdue ? 'text-rose-600' : isNear ? 'text-amber-600' : ''}`}>{new Date(project.endDate).toLocaleDateString('vi-VN')}{isOverdue ? ' ⚠ Quá hạn' : isNear ? ' ⏰ Sắp hết hạn' : ''}</span></div>}
+                              {typeof project.progress === 'number' && <div className="py-2"><div className="flex justify-between text-sm mb-2"><span className="text-gray-500">Tiến độ</span><span className="font-bold text-brand-600">{project.progress}%</span></div><div className="w-full bg-gray-100 rounded-full h-2"><div className="bg-brand-500 h-2 rounded-full" style={{ width: `${project.progress}%` }} /></div></div>}
+                            </div>
+                          )
+                        })}
+                        className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-shadow cursor-pointer ${isOverdue ? 'border-red-200 bg-red-50/20' : isNear ? 'border-amber-200 bg-amber-50/20' : 'border-gray-100 dark:border-slate-700/60'}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isOverdue ? 'bg-red-100' : isNear ? 'bg-amber-100' : 'bg-indigo-50 dark:bg-indigo-900/30'}`}>
+                              <Briefcase size={15} className={isOverdue ? 'text-red-600' : isNear ? 'text-amber-600' : 'text-indigo-600'} />
+                            </div>
+                            <p className="text-sm font-bold text-gray-800 dark:text-slate-100 truncate">{project.name}</p>
+                          </div>
+                          <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${sColor}`}>{sLabel}</span>
+                        </div>
+                        {project.description && <p className="text-xs text-gray-400 dark:text-slate-500 line-clamp-1 mb-2">{project.description}</p>}
+                        <div className="flex items-center justify-between text-xs mt-1">
+                          {project.department ? <span className="bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded font-medium text-gray-500 dark:text-slate-400">{project.department}</span> : <span />}
+                          {project.endDate && <span className={isOverdue ? 'text-rose-600 font-medium' : isNear ? 'text-amber-600 font-medium' : 'text-gray-400'}>Hạn: {new Date(project.endDate).toLocaleDateString('vi-VN')}</span>}
+                        </div>
+                        {typeof project.progress === 'number' && (
+                          <div className="mt-3 w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full ${project.status === 'completed' ? 'bg-emerald-500' : 'bg-brand-500'}`} style={{ width: `${project.progress}%` }} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          </section>
+
           {/* Notes Preview */}
           <section>
             <div className="flex items-center justify-between mb-4">
@@ -407,7 +534,7 @@ export default function DashboardPage({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredNotes.slice(0, 3).map((note: Note) => (
-                <div key={note.id} onClick={() => navigate('/notes')} className={`${note.color} dark:opacity-90 p-4 rounded-xl border border-black/5 dark:border-white/10 cursor-pointer hover:shadow-md transition-all h-32 flex flex-col`}>
+                <div key={note.id} onClick={() => setPopup({ title: note.title || 'Ghi chú', navPath: '/notes', navLabel: 'Xem tất cả ghi chú', content: <div><p className="text-sm text-gray-600 dark:text-slate-300 whitespace-pre-wrap">{note.content}</p></div> })} className={`${note.color} dark:opacity-90 p-4 rounded-xl border border-black/5 dark:border-white/10 cursor-pointer hover:shadow-md transition-all h-32 flex flex-col`}>
                   <h4 className="font-bold text-gray-800 mb-2 truncate">{note.title || 'Untitled Note'}</h4>
                   <p className="text-sm text-gray-600 line-clamp-3 flex-1">{note.content}</p>
                 </div>
@@ -441,21 +568,21 @@ export default function DashboardPage({
                   const nearDeadline = projects.filter(p => p.endDate && p.endDate >= today && p.endDate <= new Date(Date.now()+7*86400000).toISOString().split('T')[0] && p.status !== 'completed');
                   return (
                     <>
-                      <div onClick={() => navigate('/projects')} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-all cursor-pointer group">
+                      <div onClick={() => setPopup({ title: 'Dự án đang chạy', navPath: '/projects', navLabel: 'Quản lý Dự án', content: <div className="space-y-2"><div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Tổng dự án</span><span className="font-bold">{projects.length}</span></div><div className="flex justify-between text-sm py-2 border-b border-gray-100 dark:border-slate-700"><span className="text-gray-500">Đang chạy</span><span className="font-bold text-indigo-600">{active.length}</span></div>{active.slice(0,3).map(p => <div key={p.id} className="py-2 border-b border-gray-50 last:border-0"><p className="text-sm font-medium text-gray-700 truncate">{p.name}</p><p className="text-xs text-gray-400">{p.department || ''}</p></div>)}</div> })} className="bg-white dark:bg-slate-800/80 p-4 rounded-xl border border-gray-100 dark:border-slate-700/60 hover:shadow-md transition-all cursor-pointer group">
                         <div className="flex items-center gap-3 mb-3">
                           <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center"><Briefcase size={20} className="text-indigo-600" /></div>
                           <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{active.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Đang chạy</p></div>
                         </div>
                         <div className="text-xs text-gray-400">Tổng: {projects.length} dự án</div>
                       </div>
-                      <div onClick={() => navigate('/projects')} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${nearDeadline.length > 0 ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
+                      <div onClick={() => setPopup({ title: 'Sắp hết hạn (7 ngày)', navPath: '/projects', navLabel: 'Quản lý Dự án', content: <div className="space-y-2">{nearDeadline.length === 0 ? <p className="text-sm text-gray-400 text-center py-2">Không có dự án sắp hết hạn</p> : nearDeadline.map(p => <div key={p.id} className="py-2 border-b border-gray-100 last:border-0"><p className="text-sm font-medium text-gray-700 truncate">{p.name}</p><p className="text-xs text-amber-600 font-medium">Hạn: {p.endDate ? new Date(p.endDate).toLocaleDateString('vi-VN') : ''}</p></div>)}</div> })} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${nearDeadline.length > 0 ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
                         <div className="flex items-center gap-3 mb-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${nearDeadline.length > 0 ? 'bg-amber-100' : 'bg-gray-100'}`}><Clock size={20} className={nearDeadline.length > 0 ? 'text-amber-600' : 'text-gray-400'} /></div>
                           <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{nearDeadline.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Sắp hết hạn</p></div>
                         </div>
                         {nearDeadline.length > 0 && <div className="text-[11px] text-amber-600 font-medium truncate">{nearDeadline[0].name}</div>}
                       </div>
-                      <div onClick={() => navigate('/projects')} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${overdue.length > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
+                      <div onClick={() => setPopup({ title: 'Dự án quá hạn', navPath: '/projects', navLabel: 'Quản lý Dự án', content: <div className="space-y-2">{overdue.length === 0 ? <p className="text-sm text-gray-400 text-center py-2">Không có dự án quá hạn</p> : overdue.map(p => <div key={p.id} className="py-2 border-b border-gray-100 last:border-0"><p className="text-sm font-medium text-gray-700 truncate">{p.name}</p><p className="text-xs text-rose-600 font-medium">Hạn: {p.endDate ? new Date(p.endDate).toLocaleDateString('vi-VN') : ''}</p></div>)}</div> })} className={`bg-white dark:bg-slate-800/80 p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer group ${overdue.length > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-100 dark:border-slate-700/60'}`}>
                         <div className="flex items-center gap-3 mb-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${overdue.length > 0 ? 'bg-red-100' : 'bg-gray-100'}`}><AlertTriangle size={20} className={overdue.length > 0 ? 'text-red-600 animate-pulse' : 'text-gray-400'} /></div>
                           <div><p className="text-2xl font-black text-gray-800 dark:text-slate-100">{overdue.length}</p><p className="text-[10px] text-gray-500 font-bold uppercase">Quá hạn</p></div>
@@ -506,7 +633,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Weekly Progress */}
-          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/tasks')}>
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setPopup({ title: t('weeklyProgress'), navPath: '/tasks', navLabel: 'Xem tất cả công việc', content: <div className="space-y-3">{chartData.map((d,i) => <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{background:d.color}}></div><span className="text-sm text-gray-600">{d.name}</span></div><span className="font-bold text-gray-800">{d.value}</span></div>)}</div> })}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">{t('weeklyProgress')}</h3>
             <div className="relative" style={{ height: 192 }}>
               {stats.total === 0 ? (
@@ -541,7 +668,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Priority Distribution */}
-          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/tasks')}>
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setPopup({ title: 'Mức độ ưu tiên', navPath: '/tasks', navLabel: 'Xem công việc', content: <div className="space-y-3">{priorityChartData.map((d,i) => <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{background:d.fill}}></div><span className="text-sm text-gray-600">{d.name}</span></div><span className="font-bold text-gray-800">{d.value}</span></div>)}</div> })}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4">Mức độ ưu tiên</h3>
             <div className="relative" style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height={200}>
@@ -557,7 +684,7 @@ export default function DashboardPage({
           </Card>
 
           {/* Finance Analytics */}
-          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/contracts')}>
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setPopup({ title: 'Tình hình tài chính', navPath: '/contracts', navLabel: 'Xem hợp đồng', content: <div className="space-y-2">{financeChartData.map((d,i) => <div key={i} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"><div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{background:d.fill}}></div><span className="text-sm text-gray-600">{d.name}</span></div><span className="font-bold" style={{color:d.fill}}>{new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(d.value)}</span></div>)}</div> })}>
             <h3 className="text-base font-bold text-gray-800 dark:text-slate-100 mb-4 flex items-center gap-2">
               <DollarSign size={18} className="text-emerald-500" /> Tình hình tài chính
             </h3>
@@ -585,25 +712,22 @@ export default function DashboardPage({
           </Card>
 
           {/* Team Widget */}
-          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigate('/team')}>
+          <Card className="p-6 cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setPopup({ title: 'Đội ngũ - ' + (user.department || 'Phòng ban'), navPath: '/team', navLabel: 'Xem đội ngũ', content: <div className="space-y-3">{(() => { const deptUsers = users.filter(u => u.department === user.department); return <div className="space-y-1">{deptUsers.map(u => <div key={u.id} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0"><div className="flex items-center gap-2"><Avatar src={u.avatar} alt={u.name} size={6}/><span className="text-sm font-medium text-gray-700">{u.name}</span></div><span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{u.role}</span></div>)}</div>; })()}</div> })}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-gray-800 dark:text-slate-100">{t('team')}</h3>
-              <span className="text-xs font-bold text-brand-600 dark:text-blue-400 bg-brand-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">{users.length} thành viên</span>
+              <span className="text-xs font-bold text-brand-600 dark:text-blue-400 bg-brand-50 dark:bg-blue-900/30 px-2 py-1 rounded-full">{users.filter(u => u.department === user.department).length} thành viên</span>
             </div>
             <div className="flex flex-col gap-4 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
               {(() => {
-                const deptMap = new Map<string, typeof users>();
-                users.forEach(u => {
-                  if (!deptMap.has(u.department)) deptMap.set(u.department, []);
-                  deptMap.get(u.department)!.push(u);
-                });
-                return Array.from(deptMap.entries()).map(([dept, deptUsers]) => (
-                  <div key={dept}>
+                const myDeptUsers = users.filter(u => u.department === user.department);
+                if (myDeptUsers.length === 0) return <p className="text-sm text-gray-500 text-center py-4">Chưa có thành viên</p>;
+                return (
+                  <div>
                     <p className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2 border-b border-gray-100 dark:border-slate-700 pb-1">
-                      {dept}
+                      {user.department || 'Phòng ban'}
                     </p>
                     <div className="flex flex-col gap-2">
-                      {deptUsers.map(u => (
+                      {myDeptUsers.map(u => (
                         <div key={u.id} className="flex items-center justify-between group">
                           <div className="flex items-center gap-2">
                             <Avatar src={u.avatar} alt={u.name} size={7} />
@@ -614,7 +738,7 @@ export default function DashboardPage({
                       ))}
                     </div>
                   </div>
-                ));
+                );
               })()}
             </div>
           </Card>

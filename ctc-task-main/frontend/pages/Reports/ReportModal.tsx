@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Send, Save, CheckCircle, XCircle, Plus, Trash2,
   CalendarDays, Building2, User, FileText, ChevronDown, GripVertical,
-  Paperclip, Image, FileUp, Download as DownloadIcon
+  Paperclip, Image, FileUp, Download as DownloadIcon, History
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Button } from '../../components/UI';
@@ -360,6 +360,48 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     }
   };
 
+  // ── Thêm từ báo cáo tuần trước ──
+  const importLastWeekTasks = () => {
+    if (!allReports) return;
+    
+    // Tìm báo cáo gần nhất của user này (không phải báo cáo hiện tại đang mở)
+    const sortedReports = [...allReports]
+      .filter(r => r.authorId === currentUser.id && r.id !== initialReport?.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+    const lastReport = sortedReports[0];
+
+    if (!lastReport) {
+      showToast({ type: 'error', title: 'Không tìm thấy', message: 'Không tìm thấy báo cáo trước đó.' });
+      return;
+    }
+
+    const parsed = parseContent(lastReport.content);
+    if (parsed && parsed.tasks) {
+      const tasksToImport = parsed.tasks.filter(t => t.content.trim() !== '');
+      if (tasksToImport.length > 0) {
+        const newRows = tasksToImport.map(t => ({
+          ...t,
+          id: Math.random().toString(36).slice(2),
+          result: '' as TaskRow['result'],
+          nextAction: '',
+          note: ''
+        }));
+        
+        if (rows.length === 1 && rows[0].content.trim() === '') {
+          setRows(newRows);
+        } else {
+          setRows(prev => [...prev, ...newRows]);
+        }
+        showToast({ type: 'success', title: 'Thành công', message: `Đã thêm ${newRows.length} công việc từ báo cáo trước.` });
+      } else {
+         showToast({ type: 'error', title: 'Không có dữ liệu', message: 'Báo cáo trước không có công việc nào.' });
+      }
+    } else {
+      showToast({ type: 'error', title: 'Lỗi', message: 'Không thể đọc nội dung báo cáo trước.' });
+    }
+  };
+
   // ── Save ──
   const buildContent = () => {
     const data: StructuredContent = { tasks: rows, nextWeekPlan, weekStart, weekEnd, attachments: attachments.length > 0 ? attachments : undefined };
@@ -631,6 +673,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       <Building2 size={14}/> Tổng hợp phòng
                     </button>
                   )}
+                  <button onClick={importLastWeekTasks} className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-xl transition-colors border border-teal-100 shadow-sm">
+                    <History size={14}/> Thêm từ tuần trước
+                  </button>
                   <button onClick={importDoneTasks} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-colors border border-blue-100 shadow-sm">
                     <Send size={14} className="rotate-90"/> Thêm từ DS
                   </button>
