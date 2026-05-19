@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2 } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, Sparkles, Minimize2, Maximize2, Trash2, Calendar, CheckSquare, FileText, ChevronRight } from 'lucide-react';
 import { Button } from './UI';
 import { createChatSession } from '../services/aiService';
 import { GenerateContentResponse } from "@google/genai";
@@ -16,6 +16,10 @@ interface Message {
   id: string;
   role: 'user' | 'model';
   text: string;
+  uiContent?: {
+    type: 'task' | 'meeting' | 'note' | 'contract';
+    data: any;
+  };
 }
 
 export interface AIAssistantHandle {
@@ -254,7 +258,12 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 department: user?.department || '',
               };
               await saveTask(newTask);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo công việc: **${args.title}**. [Xem công việc](/tasks)` }]);
+              setMessages(prev => [...prev, { 
+                id: Date.now().toString(), 
+                role: 'model', 
+                text: `✅ Đã tạo công việc: **${args.title}**`,
+                uiContent: { type: 'task', data: newTask }
+              }]);
             } else if (call.name === 'createReport') {
               const newReport: any = {
                 id: crypto.randomUUID(),
@@ -332,7 +341,12 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 status: 'scheduled'
               };
               await saveMeeting(newMeeting);
-              setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `✅ Đã tạo cuộc họp: **${args.title}**. [Xem lịch họp](/meetings)` }]);
+              setMessages(prev => [...prev, { 
+                id: Date.now().toString(), 
+                role: 'model', 
+                text: `✅ Đã tạo cuộc họp: **${args.title}**`,
+                uiContent: { type: 'meeting', data: newMeeting }
+              }]);
             } else if (call.name === 'deleteMeeting') {
               const id = args.id?.replace(/\[?ID:\s*/g, '').replace(/\]/g, '').trim();
               if (window.confirm(`⚠️ AI đang yêu cầu XÓA cuộc họp có ID: ${id}.\nBạn có chắc chắn muốn xóa không?`)) {
@@ -503,6 +517,59 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                       </p>
                     );
                   })}
+
+                  {/* Generative UI Cards */}
+                  {msg.uiContent && (
+                    <div className="mt-3 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden select-none text-left">
+                      {msg.uiContent.type === 'task' && (
+                        <div className="p-3">
+                          <div className="flex items-center gap-2 mb-2 text-brand-600 font-medium text-xs">
+                            <CheckSquare size={14} /> <span>Công việc mới</span>
+                          </div>
+                          <h4 className="font-bold text-gray-800 text-[15px] mb-1">{msg.uiContent.data.title}</h4>
+                          {msg.uiContent.data.description && <p className="text-gray-500 text-xs line-clamp-2 mb-3">{msg.uiContent.data.description}</p>}
+                          
+                          <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+                            <button onClick={() => { navigate('/tasks'); setIsMinimized(true); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-brand-50 text-brand-600 rounded-lg text-xs font-medium hover:bg-brand-100 transition-colors">
+                              Chi tiết <ChevronRight size={14} />
+                            </button>
+                            <button onClick={async () => {
+                              if(window.confirm('Xóa công việc này?')) {
+                                await deleteTask(msg.uiContent.data.id);
+                                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: '✅ Đã xóa công việc.' }]);
+                              }
+                            }} className="p-1.5 text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.uiContent.type === 'meeting' && (
+                        <div className="p-3">
+                          <div className="flex items-center gap-2 mb-2 text-blue-600 font-medium text-xs">
+                            <Calendar size={14} /> <span>Cuộc họp mới</span>
+                          </div>
+                          <h4 className="font-bold text-gray-800 text-[15px] mb-1">{msg.uiContent.data.title}</h4>
+                          {msg.uiContent.data.description && <p className="text-gray-500 text-xs line-clamp-2 mb-3">{msg.uiContent.data.description}</p>}
+                          
+                          <div className="flex items-center gap-2 pt-2 border-t border-gray-50 mt-3">
+                            <button onClick={() => { navigate('/meetings'); setIsMinimized(true); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors">
+                              Chi tiết <ChevronRight size={14} />
+                            </button>
+                            <button onClick={async () => {
+                              if(window.confirm('Xóa cuộc họp này?')) {
+                                await deleteMeeting(msg.uiContent.data.id);
+                                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: '✅ Đã xóa cuộc họp.' }]);
+                              }
+                            }} className="p-1.5 text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-lg transition-colors" title="Xóa">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
