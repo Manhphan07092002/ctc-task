@@ -5,6 +5,7 @@ import { subscribeToMeetings, deleteMeeting, saveMeeting, sendSignal } from '../
 import { Button, Avatar } from "../../components/UI";
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 interface MeetingViewProps {
   onJoinMeeting: (meeting: Meeting) => void;
@@ -18,6 +19,7 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
   const [showDropdown, setShowDropdown] = useState(false);
   const [joinLink, setJoinLink] = useState('');
   const [createdMeeting, setCreatedMeeting] = useState<Meeting | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   
   const { user } = useAuth();
   const { t, language } = useLanguage();
@@ -170,12 +172,7 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="font-medium text-gray-800 text-[15px] truncate pr-2">{meeting.title}</h4>
                       {user?.id === meeting.hostId && (
-                        <button onClick={async () => {
-                           if(window.confirm('Delete?')) {
-                              await sendSignal(meeting.id, { id: 'sys', from: user?.id, to: 'all', type: 'meeting_deleted', data: {} });
-                              deleteMeeting(meeting.id);
-                           }
-                        }} className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"><Trash2 size={16}/></button>
+                        <button onClick={() => setConfirmDeleteId(meeting.id)} className="text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"><Trash2 size={16}/></button>
                       )}
                     </div>
                     <div className="text-[13px] text-gray-500 flex items-center gap-2 mb-3">
@@ -231,6 +228,23 @@ export const MeetingView: React.FC<MeetingViewProps> = ({ onJoinMeeting, onCreat
           </div>
         </div>
       )}
+
+      <ConfirmDialog 
+        isOpen={!!confirmDeleteId} 
+        title={language === 'vi' ? 'Xóa cuộc họp' : 'Delete Meeting'} 
+        message={language === 'vi' ? 'Bạn có chắc chắn muốn xóa cuộc họp này không? Hành động này không thể hoàn tác.' : 'Are you sure you want to delete this meeting? This action cannot be undone.'} 
+        onConfirm={async () => {
+          if (confirmDeleteId) {
+             await sendSignal(confirmDeleteId, { id: 'sys', from: user?.id, to: 'all', type: 'meeting_deleted', data: {} });
+             deleteMeeting(confirmDeleteId);
+          }
+          setConfirmDeleteId(null);
+        }} 
+        onCancel={() => setConfirmDeleteId(null)} 
+        type="danger" 
+        confirmText={language === 'vi' ? 'Xóa' : 'Delete'} 
+        cancelText={language === 'vi' ? 'Hủy' : 'Cancel'} 
+      />
     </div>
   );
 };

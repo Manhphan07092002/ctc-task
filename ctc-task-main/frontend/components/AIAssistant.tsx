@@ -24,7 +24,7 @@ export interface AIAssistantHandle {
 
 export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { t } = useLanguage();
-  const { tasks, notes, revenueReports, saveTask, saveReport, saveContract, deleteTask, saveNote, deleteNote } = useData();
+  const { tasks, notes, revenueReports, saveTask, saveReport, saveContract, deleteTask, saveNote, deleteNote, users } = useData();
   const { notifications, markRead } = useNotifications();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -122,7 +122,11 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
       ? topRevenue.map(r => `- Báo cáo "${r.title}": Tổng doanh thu trước thuế ${r.totalPreTax.toLocaleString('vi-VN')} VNĐ`).join('\n')
       : "Không có báo cáo doanh thu gần đây.";
 
-    return `DỮ LIỆU NGỮ CẢNH CỦA NGƯỜI DÙNG:\n- Hôm nay là: ${todayStr}\n- Tên người dùng: ${user?.name || 'Khách'}\n- Danh sách sự kiện:\n${eventsContext}\n- Danh sách công việc chưa hoàn thành:\n${tasksContext}\n- Thông báo mới:\n${notificationsContext}\n- Lịch họp:\n${meetingsContext}\n- Ghi chú gần đây:\n${notesContext}\n- Doanh thu gần đây:\n${revenueContext}\n- Danh sách 5 email mới nhất:\n${emailsContext}`;
+    const usersContext = users?.length > 0 
+      ? users.map(u => `- ${u.name} (Phòng: ${u.department})`).join('\n')
+      : "Không có nhân sự nào.";
+
+    return `DỮ LIỆU NGỮ CẢNH CỦA NGƯỜI DÙNG:\n- Hôm nay là: ${todayStr}\n- Tên người dùng: ${user?.name || 'Khách'}\n- Danh sách nhân sự trong công ty:\n${usersContext}\n- Danh sách sự kiện:\n${eventsContext}\n- Danh sách công việc chưa hoàn thành:\n${tasksContext}\n- Thông báo mới:\n${notificationsContext}\n- Lịch họp:\n${meetingsContext}\n- Ghi chú gần đây:\n${notesContext}\n- Doanh thu gần đây:\n${revenueContext}\n- Danh sách 5 email mới nhất:\n${emailsContext}`;
   };
 
   useImperativeHandle(ref, () => ({
@@ -306,6 +310,16 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: `❌ Lệnh xóa ghi chú bị hủy.` }]);
               }
             } else if (call.name === 'createMeeting') {
+              let meetingParticipants = [user?.id || ''];
+              if (args.participantNames && Array.isArray(args.participantNames)) {
+                args.participantNames.forEach((name: string) => {
+                  const matchedUser = users.find(u => u.name.toLowerCase().includes(name.toLowerCase()));
+                  if (matchedUser && !meetingParticipants.includes(matchedUser.id)) {
+                    meetingParticipants.push(matchedUser.id);
+                  }
+                });
+              }
+
               const newMeeting: any = {
                 id: crypto.randomUUID(),
                 title: args.title,
@@ -313,7 +327,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                 startTime: new Date().toISOString(),
                 endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
                 hostId: user?.id || '',
-                participants: [user?.id || ''],
+                participants: meetingParticipants,
                 meetingLink: `meet.orangetask.com/${crypto.randomUUID().substring(0,8)}`,
                 status: 'scheduled'
               };

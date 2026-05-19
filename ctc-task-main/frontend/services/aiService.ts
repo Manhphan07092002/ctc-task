@@ -282,7 +282,8 @@ Hãy luôn sẵn sàng giúp đỡ và mang lại năng lượng tích cực cho
               type: Type.OBJECT,
               properties: {
                 title: { type: Type.STRING, description: 'Tiêu đề cuộc họp' },
-                description: { type: Type.STRING, description: 'Mô tả hoặc nội dung cuộc họp' }
+                description: { type: Type.STRING, description: 'Mô tả hoặc nội dung cuộc họp' },
+                participantNames: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'Danh sách tên những người tham gia (nếu có)' }
               },
               required: ['title']
             }
