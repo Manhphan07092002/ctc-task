@@ -534,7 +534,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                               Chi tiết <ChevronRight size={14} />
                             </button>
                             <button onClick={async () => {
-                              if(window.confirm('Xóa công việc này?')) {
+                              if(msg.uiContent && window.confirm('Xóa công việc này?')) {
                                 await deleteTask(msg.uiContent.data.id);
                                 setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: '✅ Đã xóa công việc.' }]);
                               }
@@ -558,7 +558,7 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
                               Chi tiết <ChevronRight size={14} />
                             </button>
                             <button onClick={async () => {
-                              if(window.confirm('Xóa cuộc họp này?')) {
+                              if(msg.uiContent && window.confirm('Xóa cuộc họp này?')) {
                                 await deleteMeeting(msg.uiContent.data.id);
                                 setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: '✅ Đã xóa cuộc họp.' }]);
                               }
