@@ -8,6 +8,9 @@ import { Task } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
+import { apiFetch } from '../services/api';
+import { getMeetings } from '../services/meetingService';
 interface Message {
   id: string;
   role: 'user' | 'model';
@@ -20,7 +23,8 @@ export interface AIAssistantHandle {
 
 export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const { t } = useLanguage();
-  const { saveTask, saveReport, saveContract } = useData();
+  const { tasks, notes, revenueReports, saveTask, saveReport, saveContract } = useData();
+  const { notifications } = useNotifications();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -45,6 +49,70 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const chatSessionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const buildContextString = async () => {
+    let events: any[] = [];
+    try {
+      const res = await apiFetch('/api/events');
+      events = await res.json();
+    } catch (e) {}
+
+    let recentEmails: any[] = [];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await apiFetch('/api/mail/inbox?folder=inbox&page=1&limit=5', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        recentEmails = await res.json();
+      }
+    } catch (e) {}
+
+    let meetings: any[] = [];
+    try {
+      meetings = await getMeetings();
+    } catch (e) {}
+
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const todayIso = today.toISOString().split('T')[0];
+    
+    const upcomingEvents = events.filter((e: any) => e.date >= todayIso).slice(0, 5);
+    const eventsContext = upcomingEvents.length > 0 
+      ? upcomingEvents.map(e => `- ${e.title} (${e.date})`).join('\n')
+      : "Không có sự kiện sắp tới.";
+
+    const activeTasks = tasks.filter(t => t.status !== 'Done' && t.assignees.includes(user?.id || ''));
+    const tasksContext = activeTasks.length > 0
+      ? activeTasks.map(t => `- ${t.title} (Hạn: ${t.dueDate || t.startDate}, Ưu tiên: ${t.priority})`).join('\n')
+      : "Không có công việc nào đang chờ xử lý.";
+
+    const emailsContext = recentEmails.length > 0
+      ? recentEmails.map(e => `- Từ: ${e.fromName || e.from} - Chủ đề: "${e.subject || '(Không có tiêu đề)'}" (${e.isRead ? 'Đã đọc' : 'Chưa đọc'})`).join('\n')
+      : "Không tải được thư hoặc hộp thư trống.";
+
+    const unreadNotifications = notifications.filter(n => !n.isRead).slice(0, 5);
+    const notificationsContext = unreadNotifications.length > 0
+      ? unreadNotifications.map(n => `- [${n.type}] ${n.title}: ${n.message}`).join('\n')
+      : "Không có thông báo mới.";
+
+    const topNotes = notes.slice(0, 3);
+    const notesContext = topNotes.length > 0
+      ? topNotes.map(n => `- ${n.title}`).join('\n')
+      : "Không có ghi chú nào.";
+
+    const upcomingMeetings = meetings.filter(m => m.startTime >= todayIso).slice(0, 3);
+    const meetingsContext = upcomingMeetings.length > 0
+      ? upcomingMeetings.map(m => `- ${m.title} (Lúc: ${new Date(m.startTime).toLocaleString('vi-VN')})`).join('\n')
+      : "Không có lịch họp sắp tới.";
+
+    const topRevenue = revenueReports.slice(0, 2);
+    const revenueContext = topRevenue.length > 0
+      ? topRevenue.map(r => `- Báo cáo "${r.title}": Tổng doanh thu trước thuế ${r.totalPreTax.toLocaleString('vi-VN')} VNĐ`).join('\n')
+      : "Không có báo cáo doanh thu gần đây.";
+
+    return `DỮ LIỆU NGỮ CẢNH CỦA NGƯỜI DÙNG:\n- Hôm nay là: ${todayStr}\n- Tên người dùng: ${user?.name || 'Khách'}\n- Danh sách sự kiện:\n${eventsContext}\n- Danh sách công việc chưa hoàn thành:\n${tasksContext}\n- Thông báo mới:\n${notificationsContext}\n- Lịch họp:\n${meetingsContext}\n- Ghi chú gần đây:\n${notesContext}\n- Doanh thu gần đây:\n${revenueContext}\n- Danh sách 5 email mới nhất:\n${emailsContext}`;
+  };
+
   useImperativeHandle(ref, () => ({
     summarizeTasks: (tasks: Task[]) => {
       setIsOpen(true);
@@ -57,7 +125,8 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
     const initChat = async () => {
       if (isOpen && !chatSessionRef.current) {
         try {
-          chatSessionRef.current = await createChatSession();
+          const contextString = await buildContextString();
+          chatSessionRef.current = await createChatSession(contextString);
         } catch (e) {
           // AI not configured, silently skip
         }
@@ -89,7 +158,8 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     try {
       if (!chatSessionRef.current) {
-        chatSessionRef.current = await createChatSession();
+        const contextString = await buildContextString();
+        chatSessionRef.current = await createChatSession(contextString);
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: hiddenSystemPrompt });
@@ -135,7 +205,8 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
 
     try {
       if (!chatSessionRef.current) {
-        chatSessionRef.current = await createChatSession();
+        const contextString = await buildContextString();
+        chatSessionRef.current = await createChatSession(contextString);
       }
 
       const result = await chatSessionRef.current.sendMessageStream({ message: userMsg.text });
