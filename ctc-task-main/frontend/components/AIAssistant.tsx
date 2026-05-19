@@ -35,31 +35,29 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const saved = localStorage.getItem('ai_chat_history');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return [];
-  });
+  const historyKey = `ai_chat_history_${user?.id || 'guest'}`;
 
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  // Load history when user changes or component mounts
   useEffect(() => {
-    localStorage.setItem('ai_chat_history', JSON.stringify(messages));
-  }, [messages]);
-  
-  // Initial greeting effect - handles language switch for the welcome message too
+    try {
+      const saved = localStorage.getItem(historyKey);
+      if (saved) {
+        setMessages(JSON.parse(saved));
+        return;
+      }
+    } catch (e) {}
+    
+    setMessages([{ id: 'welcome', role: 'model', text: t('aiGreeting') }]);
+  }, [historyKey, t]);
+
+  // Save history when messages change
   useEffect(() => {
-    setMessages(prev => {
-      if (prev.length === 0) {
-        return [{ id: 'welcome', role: 'model', text: t('aiGreeting') }];
-      }
-      // Optional: Update the welcome message if language changes and conversation hasn't started
-      if (prev.length === 1 && prev[0].id === 'welcome') {
-        return [{ ...prev[0], text: t('aiGreeting') }];
-      }
-      return prev;
-    });
-  }, [t]);
+    if (messages.length > 0) {
+      localStorage.setItem(historyKey, JSON.stringify(messages));
+    }
+  }, [messages, historyKey]);
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -508,9 +506,9 @@ export const AIAssistant = forwardRef<AIAssistantHandle, {}>((_, ref) => {
             onClick={(e) => { 
               e.stopPropagation(); 
               if(window.confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện?')) {
-                setMessages([]);
+                setMessages([{ id: 'welcome', role: 'model', text: t('aiGreeting') }]);
                 chatSessionRef.current = null;
-                localStorage.removeItem('ai_chat_history');
+                localStorage.removeItem(historyKey);
               }
             }} 
             className="hover:text-red-300 mr-1"
